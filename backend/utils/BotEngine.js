@@ -275,7 +275,7 @@ class BotEngine {
             { role: "system", content: "You are Mica, a witty, fun, and chaotic AI assistant in a group chat app called Relay. Keep your responses short (1-2 sentences), casual, and use emojis." },
             { role: "user", content: `${senderName} says: ${cleanContent}` }
           ],
-          model: "llama3-8b-8192",
+          model: "llama-3.1-8b-instant",
           temperature: 0.8,
           max_tokens: 150,
         });
