@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   dotOnline:  { backgroundColor: Colors.accentGreen },
-  dotRelay:   { backgroundColor: Colors.primary },
+  dotRelay:   { backgroundColor: Colors.accentGreen },
   dotOffline: { backgroundColor: '#3A3A3A' },         // dark charcoal = offline
   dotCam:     { backgroundColor: Colors.camera },
 
