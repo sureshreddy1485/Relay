@@ -267,18 +267,30 @@ class BotEngine {
       try {
         let cleanContent = incomingMsg.content.replace(/@?mica/gi, '').trim();
         if (!cleanContent) cleanContent = 'Hi';
-        const cbResponse = await cleverbot(cleanContent);
-        replyContent = cbResponse;
-      } catch (cbErr) {
-          console.error('Cleverbot fallback error:', cbErr);
+        
+        // Use Groq API
+        const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+        const chatCompletion = await groq.chat.completions.create({
+          messages: [
+            { role: "system", content: "You are Mica, a witty, fun, and chaotic AI assistant in a group chat app called Relay. Keep your responses short (1-2 sentences), casual, and use emojis." },
+            { role: "user", content: `${senderName} says: ${cleanContent}` }
+          ],
+          model: "llama3-8b-8192",
+          temperature: 0.8,
+          max_tokens: 150,
+        });
+        
+        replyContent = chatCompletion.choices[0]?.message?.content || "I have no words... literally.";
+      } catch (err) {
+          console.error('Groq AI error:', err);
           const genericReplies = [
             `Did someone say my name?`,
             `I'm Mica! Type "mica activity" or "mica leaderboard"!`,
             `You called, ${senderName}?`,
           ];
           replyContent = genericReplies[Math.floor(Math.random() * genericReplies.length)];
-        }
       }
+    }
     try {
       // Create and send message
       const msgData = {
