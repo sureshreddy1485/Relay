@@ -34,6 +34,7 @@ connectDB().then(async () => {
 });
 
 const app = express();
+app.set('trust proxy', 1); // Crucial for rate limiting behind Render's proxy
 const server = http.createServer(app);
 
 // Socket.IO — supports WebSocket natively on Render
