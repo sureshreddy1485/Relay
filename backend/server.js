@@ -87,7 +87,8 @@ app.use('/api/chats', chatRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/stories', storyRoutes);
 
-// Health check
+// Health check (root + /health for Render compatibility)
+app.get('/', (req, res) => res.status(200).json({ status: 'OK', app: 'Relay API' }));
 app.get('/health', (req, res) => res.status(200).json({ status: 'OK', app: 'Relay API' }));
 
 // ─── Error Handlers ────────────────────────────────────────────────────────
