@@ -24,6 +24,14 @@ const handleError = (error) => {
     error.message ||
     'Network error — check your connection';
   error.message = message;
+
+  if (error.response?.status === 401) {
+    if (error.config && error.config.url !== '/auth/login' && error.config.url !== '/auth/signup') {
+      const useAuthStore = require('../store/useAuthStore').default;
+      useAuthStore.getState().logout();
+    }
+  }
+
   return Promise.reject(error);
 };
 

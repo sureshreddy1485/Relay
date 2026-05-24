@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import * as Device from 'expo-device';
 import api, { uploadApi, setAuthHeader } from '../services/api';
 
 const useAuthStore = create((set, get) => ({
@@ -12,18 +14,8 @@ const useAuthStore = create((set, get) => ({
   // Hydrate from storage on app start
   hydrate: async () => {
     try {
-      let token = await AsyncStorage.getItem('nexo_token');
-      let userStr = await AsyncStorage.getItem('nexo_user');
-      
-      // Backward compatibility for app rename
-      if (!token || !userStr) {
-        token = await AsyncStorage.getItem('nexchat_token');
-        userStr = await AsyncStorage.getItem('nexchat_user');
-        if (token && userStr) {
-          await AsyncStorage.setItem('nexo_token', token);
-          await AsyncStorage.setItem('nexo_user', userStr);
-        }
-      }
+      let token = await AsyncStorage.getItem('relay_token');
+      let userStr = await AsyncStorage.getItem('relay_user');
 
       if (token && userStr) {
         const user = JSON.parse(userStr);
@@ -35,15 +27,15 @@ const useAuthStore = create((set, get) => ({
           const { data } = await api.get('/auth/me');
           if (data.user) {
             set({ user: data.user });
-            await AsyncStorage.setItem('nexo_user', JSON.stringify(data.user));
+            await AsyncStorage.setItem('relay_user', JSON.stringify(data.user));
           }
         } catch (serverErr) {
           console.log('Failed to refresh user profile from server:', serverErr.message);
           // If token is explicitly rejected (e.g., changed secrets, expired), clear session
           if (serverErr.response?.status === 401 || serverErr.message.includes('401')) {
             console.log('Token rejected by server. Clearing local session.');
-            await AsyncStorage.removeItem('nexo_token');
-            await AsyncStorage.removeItem('nexo_user');
+            await AsyncStorage.removeItem('relay_token');
+            await AsyncStorage.removeItem('relay_user');
             setAuthHeader(null);
             set({ user: null, token: null, isAuthenticated: false });
           }
@@ -57,11 +49,20 @@ const useAuthStore = create((set, get) => ({
   signup: async (formData) => {
     set({ isLoading: true, error: null });
     try {
+      const deviceName = Device.isDevice ? `${Device.osName} ${Device.modelName}` : `${Platform.OS} Simulator`;
+      let deviceId = await AsyncStorage.getItem('relay_device_id');
+      if (!deviceId) {
+        deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2);
+        await AsyncStorage.setItem('relay_device_id', deviceId);
+      }
+      formData.append('deviceName', deviceName);
+      formData.append('deviceId', deviceId);
+      
       const { data } = await uploadApi.post('/auth/signup', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      await AsyncStorage.setItem('nexo_token', data.token);
-      await AsyncStorage.setItem('nexo_user', JSON.stringify(data.user));
+      await AsyncStorage.setItem('relay_token', data.token);
+      await AsyncStorage.setItem('relay_user', JSON.stringify(data.user));
       setAuthHeader(data.token);
       set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
       return { success: true };
@@ -75,9 +76,15 @@ const useAuthStore = create((set, get) => ({
   login: async (identifier, password) => {
     set({ isLoading: true, error: null });
     try {
-      const { data } = await api.post('/auth/login', { identifier, password });
-      await AsyncStorage.setItem('nexo_token', data.token);
-      await AsyncStorage.setItem('nexo_user', JSON.stringify(data.user));
+      const deviceName = Device.isDevice ? `${Device.osName} ${Device.modelName}` : `${Platform.OS} Simulator`;
+      let deviceId = await AsyncStorage.getItem('relay_device_id');
+      if (!deviceId) {
+        deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2);
+        await AsyncStorage.setItem('relay_device_id', deviceId);
+      }
+      const { data } = await api.post('/auth/login', { identifier, password, deviceName, deviceId });
+      await AsyncStorage.setItem('relay_token', data.token);
+      await AsyncStorage.setItem('relay_user', JSON.stringify(data.user));
       setAuthHeader(data.token);
       set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
       return { success: true };
@@ -92,8 +99,8 @@ const useAuthStore = create((set, get) => ({
     try {
       await api.post('/auth/logout');
     } catch (_) {}
-    await AsyncStorage.removeItem('nexo_token');
-    await AsyncStorage.removeItem('nexo_user');
+    await AsyncStorage.removeItem('relay_token');
+    await AsyncStorage.removeItem('relay_user');
     setAuthHeader(null);
     set({ user: null, token: null, isAuthenticated: false });
   },
@@ -101,7 +108,7 @@ const useAuthStore = create((set, get) => ({
   updateUser: (updates) => {
     const updated = { ...get().user, ...updates };
     set({ user: updated });
-    AsyncStorage.setItem('nexo_user', JSON.stringify(updated));
+    AsyncStorage.setItem('relay_user', JSON.stringify(updated));
   },
 
   setError: (error) => set({ error }),

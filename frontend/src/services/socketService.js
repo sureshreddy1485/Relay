@@ -1,5 +1,5 @@
 import { io } from 'socket.io-client';
-import { AppState } from 'react-native';
+import { AppState, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import useChatStore from '../store/useChatStore';
 import useAuthStore from '../store/useAuthStore';
@@ -38,13 +38,30 @@ const connectSocket = (userId) => {
 
   // ── Realtime events ─────────────────────────────────────────────
   socket.on('new_message', (message) => {
-    const { selectedChat, addMessage, incrementUnread } = useChatStore.getState();
+    const storeState = useChatStore.getState();
+    const { selectedChat, addMessage, incrementUnread, messages } = storeState;
     const chatId = message.chat?._id || message.chat;
+
+    // Prevent duplicating the user's own message while they wait for the HTTP response
+    const currentUserId = useAuthStore.getState().user?._id;
+    const senderId = message.sender?._id || message.sender;
+    
+    if (senderId === currentUserId) {
+      const chatMsgs = messages[chatId] || [];
+      const hasOptimisticMatch = chatMsgs.some(m => 
+        m.isOptimistic && 
+        m.content === message.content && 
+        !m.mediaUrl === !message.mediaUrl
+      );
+      if (hasOptimisticMatch) {
+        return; // Skip socket message; wait for HTTP replaceMessage
+      }
+    }
 
     addMessage(chatId, message);
 
-    // Increment unread and show notification if not in that chat
-    if (selectedChat?._id !== chatId) {
+    // Increment unread and show notification if not in that chat, OR if app is in background
+    if (selectedChat?._id !== chatId || AppState.currentState !== 'active') {
       incrementUnread(chatId);
       
       // Show system or in-app notification
@@ -52,8 +69,15 @@ const connectSocket = (userId) => {
         const title = message.chat?.isGroupChat 
           ? message.chat.chatName 
           : (message.sender?.displayName || message.sender?.username || 'New Message');
-        const body = message.content || (message.mediaUrl ? '📷 Media' : 'New message');
-          
+        let body = message.content || (message.mediaUrl ? '📷 Media' : 'New message');
+        if (message.messageType === 'group_invite') {
+          try {
+            const parsed = JSON.parse(message.content);
+            body = `Invited you to join ${parsed.groupName || 'a group'}`;
+          } catch (e) {
+            body = 'Group Invitation';
+          }
+        }
         if (AppState.currentState === 'active') {
           // Foreground: show custom banner
           useChatStore.getState().showNotification({
@@ -72,14 +96,24 @@ const connectSocket = (userId) => {
               body,
               data: { chatId, chat: message.chat },
               sound: true,
-              priority: Notifications.AndroidNotificationPriority.HIGH,
+              priority: Notifications.AndroidNotificationPriority.MAX,
+              channelId: 'default',
             },
             trigger: null,
           }).catch(err => console.log('Error scheduling local notification:', err));
         }
       }
+      // Emit delivered status if app is active but not in chat
+      if (AppState.currentState === 'active') {
+        const currentUserId = useAuthStore.getState().user?._id;
+        const senderId = message.sender?._id || message.sender;
+        if (currentUserId && senderId !== currentUserId) {
+          api.put(`/messages/${chatId}/deliver`).catch(() => {});
+          markDelivered(chatId, currentUserId);
+        }
+      }
     } else {
-      // If we are currently inside this chat room and the message is from someone else
+      // If we are currently inside this chat room (active) and the message is from someone else
       const currentUserId = useAuthStore.getState().user?._id;
       const senderId = message.sender?._id || message.sender;
       if (currentUserId && senderId !== currentUserId) {
@@ -108,17 +142,50 @@ const connectSocket = (userId) => {
     });
   });
 
-  socket.on('message_deleted', ({ messageId, chatId }) => {
-    useChatStore.getState().removeMessage(chatId, messageId);
+  socket.on('messages_delivered', ({ chatId, userId }) => {
+    const messages = useChatStore.getState().messages[chatId] || [];
+    messages.forEach(m => {
+      if (!m.deliveredTo?.includes(userId)) {
+        useChatStore.getState().updateMessage(chatId, m._id, {
+          deliveredTo: [...(m.deliveredTo || []), userId],
+        });
+      }
+    });
+  });
+
+  socket.on('message_deleted', ({ messageId, chatId, forEveryone, newContent }) => {
+    if (forEveryone) {
+      useChatStore.getState().removeMessage(chatId, messageId, newContent || 'Permanently deleted'); 
+    } else {
+      useChatStore.getState().purgeMessage(chatId, messageId);  // "Delete for me" — just remove
+    }
+  });
+
+  // Self-destructed disappearing media — shows "Message disappeared"
+  socket.on('message_disappeared', ({ messageId, chatId }) => {
+    useChatStore.getState().disappearMessage(chatId, messageId);
+  });
+
+  // Real-time message edit sync
+  socket.on('message_edited', ({ messageId, chatId, content }) => {
+    useChatStore.getState().updateMessage(chatId, messageId, { content, isEdited: true });
   });
 
   socket.on('reaction_updated', ({ messageId, reactions, chatId }) => {
     useChatStore.getState().updateMessage(chatId, messageId, { reactions });
   });
 
+  socket.on('poll_voted', ({ messageId, pollData, chatId }) => {
+    useChatStore.getState().updateMessage(chatId, messageId, { pollData });
+  });
+
   socket.on('user_online', ({ userId }) => {
     const user = useAuthStore.getState().user;
     // Could update online status in a users store / per chat participant
+  });
+
+  socket.on('chat_updated', (updatedChat) => {
+    useChatStore.getState().updateChat(updatedChat._id, updatedChat);
   });
 
   socket.on('user_offline', ({ userId, lastSeen }) => {
@@ -150,6 +217,20 @@ const connectSocket = (userId) => {
     }
   });
 
+  // Story expired — emitted by server cleanup job; individual screens handle UI update
+  socket.on('story_expired', ({ storyId }) => {
+    console.log('[Socket] story_expired:', storyId);
+  });
+
+  // Group invite accepted — mark that invite message as used so UI shows "Link Expired"
+  socket.on('invite_accepted', ({ messageId, chatId }) => {
+    useChatStore.getState().updateMessage(chatId?.toString(), messageId, { inviteAccepted: true });
+  });
+
+  socket.on('security_alert', (data) => {
+    Alert.alert(data.title, data.message);
+  });
+
   return socket;
 };
 
@@ -165,9 +246,10 @@ const leaveChat = (chatId) => socket?.emit('leave_chat', chatId);
 const sendTyping = (chatId, userId, username) => socket?.emit('typing', { chatId, userId, username });
 const stopTyping = (chatId, userId) => socket?.emit('stop_typing', { chatId, userId });
 const markRead = (chatId, userId) => socket?.emit('mark_read', { chatId, userId });
+const markDelivered = (chatId, userId) => socket?.emit('mark_delivered', { chatId, userId });
 const setCameraActive = (userId, isActive) => socket?.emit('camera_active', { userId, isActive });
 
 export {
   getSocket, connectSocket, disconnectSocket,
-  joinChat, leaveChat, sendTyping, stopTyping, markRead, setCameraActive,
+  joinChat, leaveChat, sendTyping, stopTyping, markRead, markDelivered, setCameraActive,
 };

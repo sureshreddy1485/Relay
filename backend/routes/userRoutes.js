@@ -4,7 +4,7 @@ const {
   searchUsers, getUserProfile, updateProfile, sendFriendRequest,
   acceptFriendRequest, declineFriendRequest, blockUser, unblockUser,
   getFriendRequests, updateCameraStatus, deactivateAccount, deleteAccount,
-  removeFriend, getBlockedUsers, getFriends, updatePushToken,
+  removeFriend, getBlockedUsers, getFriends, updatePushToken, toggleGroupDMPrivacy,
 } = require('../controllers/userController');
 const { protect } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -21,6 +21,7 @@ router.put('/profile/deactivate', protect, deactivateAccount);
 router.delete('/profile/delete', protect, deleteAccount);
 router.put('/camera-status', protect, updateCameraStatus);
 router.put('/push-token', protect, updatePushToken);
+router.put('/privacy/dm-group/:id', protect, toggleGroupDMPrivacy);
 router.get('/:username', protect, getUserProfile);
 router.post('/:id/friend-request', protect, sendFriendRequest);
 router.post('/:id/accept-request', protect, acceptFriendRequest);

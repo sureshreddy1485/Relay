@@ -22,13 +22,18 @@ const useChatStore = create((set, get) => ({
   },
   hideNotification: () => set({ inAppNotification: null }),
 
-  fetchChats: async () => {
-    set({ isLoadingChats: true });
+  fetchChats: async (silent = false) => {
+    // Only show the loading spinner on the very first load (no chats yet)
+    if (!silent && get().chats.length === 0) {
+      set({ isLoadingChats: true });
+    }
     try {
       const { data } = await api.get('/chats');
       const unreadCounts = {};
       (data.chats || []).forEach(chat => {
-        unreadCounts[chat._id] = chat.unreadCount || 0;
+        if (chat._id) {
+          unreadCounts[chat._id.toString()] = chat.unreadCount || 0;
+        }
       });
       set({ chats: data.chats, unreadCounts, isLoadingChats: false });
     } catch (e) {
@@ -43,7 +48,9 @@ const useChatStore = create((set, get) => ({
     try {
       const { data } = await api.get(`/messages/${chatId}?page=${page}&limit=50`);
       const existing = get().messages[chatId] || [];
-      const all = page === 1 ? data.messages : [...data.messages, ...existing];
+      const all = page === 1 
+        ? data.messages 
+        : [...existing, ...data.messages.filter(m => !existing.some(e => e._id === m._id))];
       set({
         messages: { ...get().messages, [chatId]: all },
         isLoadingMessages: false,
@@ -56,31 +63,48 @@ const useChatStore = create((set, get) => ({
   addMessage: (chatId, message) => {
     const current = get().messages[chatId] || [];
     if (current.some(m => m._id === message._id)) return; // Prevent duplicates
-    set({ messages: { ...get().messages, [chatId]: [...current, message] } });
     // Update latest message in chat list
     const chats = get().chats.map(c =>
       c._id === chatId ? { ...c, latestMessage: message, updatedAt: message.createdAt } : c
     );
     // Sort by latest
     chats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-    set({ chats });
+    
+    set({ 
+      messages: { ...get().messages, [chatId]: [message, ...current] },
+      chats
+    });
   },
 
   replaceMessage: (chatId, tempId, realMessage) => {
     const current = get().messages[chatId] || [];
     let updated;
+    
+    // Preserve readBy and deliveredTo from optimistic message (fixes race condition)
+    const existingTemp = current.find(m => m._id === tempId);
+    if (existingTemp) {
+      if (existingTemp.readBy && existingTemp.readBy.length > 0) {
+        realMessage.readBy = [...new Set([...(realMessage.readBy || []), ...existingTemp.readBy])];
+      }
+      if (existingTemp.deliveredTo && existingTemp.deliveredTo.length > 0) {
+        realMessage.deliveredTo = [...new Set([...(realMessage.deliveredTo || []), ...existingTemp.deliveredTo])];
+      }
+    }
+
     if (current.some(m => m._id === realMessage._id)) {
-      updated = current.filter(m => m._id !== tempId);
+      updated = current.filter(m => m._id !== tempId).map(m => m._id === realMessage._id ? { ...m, readBy: realMessage.readBy, deliveredTo: realMessage.deliveredTo } : m);
     } else {
       updated = current.map(m => m._id === tempId ? realMessage : m);
     }
-    set({ messages: { ...get().messages, [chatId]: updated } });
-    
     const chats = get().chats.map(c =>
       c._id === chatId ? { ...c, latestMessage: realMessage, updatedAt: realMessage.createdAt } : c
     );
     chats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-    set({ chats });
+    
+    set({ 
+      messages: { ...get().messages, [chatId]: updated },
+      chats 
+    });
   },
 
   removeOptimisticMessage: (chatId, tempId) => {
@@ -90,23 +114,45 @@ const useChatStore = create((set, get) => ({
   },
 
   updateMessage: (chatId, messageId, updates) => {
-    const current = get().messages[chatId] || [];
-    const updated = current.map(m => m._id === messageId ? { ...m, ...updates } : m);
-    set({ messages: { ...get().messages, [chatId]: updated } });
+    const cId = chatId?.toString();
+    const mId = messageId?.toString();
+    const current = get().messages[cId] || [];
+    const updated = current.map(m => m._id?.toString() === mId ? { ...m, ...updates } : m);
+    set({ messages: { ...get().messages, [cId]: updated } });
   },
 
-  removeMessage: (chatId, messageId) => {
-    const current = get().messages[chatId] || [];
+  // Called when a message is explicitly deleted by a user (Delete for Everyone)
+  removeMessage: (chatId, messageId, newContent = 'Permanently deleted') => {
+    const cId = chatId?.toString();
+    const mId = messageId?.toString();
+    const current = get().messages[cId] || [];
     const updated = current.map(m =>
-      m._id === messageId ? { ...m, deletedForEveryone: true, content: '', mediaUrl: '' } : m
+      m._id?.toString() === mId
+        ? { ...m, deletedForEveryone: true, content: newContent, mediaUrl: '', isSelfDestructing: false, destructAfterSeconds: null, expiresAt: null }
+        : m
     );
-    set({ messages: { ...get().messages, [chatId]: updated } });
+    set({ messages: { ...get().messages, [cId]: updated } });
+  },
+
+  // Called when disappearing media self-destructs after viewing
+  disappearMessage: (chatId, messageId) => {
+    const cId = chatId?.toString();
+    const mId = messageId?.toString();
+    const current = get().messages[cId] || [];
+    const updated = current.map(m =>
+      m._id?.toString() === mId
+        ? { ...m, deletedForEveryone: true, content: 'Message disappeared', mediaUrl: null, isSelfDestructing: false, destructAfterSeconds: null, expiresAt: null }
+        : m
+    );
+    set({ messages: { ...get().messages, [cId]: updated } });
   },
 
   purgeMessage: (chatId, messageId) => {
-    const current = get().messages[chatId] || [];
-    const updated = current.filter(m => m._id !== messageId);
-    set({ messages: { ...get().messages, [chatId]: updated } });
+    const cId = chatId?.toString();
+    const mId = messageId?.toString();
+    const current = get().messages[cId] || [];
+    const updated = current.filter(m => m._id?.toString() !== mId);
+    set({ messages: { ...get().messages, [cId]: updated } });
   },
 
   setTyping: (chatId, userId, isTyping) => {
@@ -118,12 +164,16 @@ const useChatStore = create((set, get) => ({
   },
 
   incrementUnread: (chatId) => {
-    const count = (get().unreadCounts[chatId] || 0) + 1;
-    set({ unreadCounts: { ...get().unreadCounts, [chatId]: count } });
+    if (!chatId) return;
+    const idStr = chatId.toString();
+    const count = (get().unreadCounts[idStr] || 0) + 1;
+    set({ unreadCounts: { ...get().unreadCounts, [idStr]: count } });
   },
 
   clearUnread: (chatId) => {
-    set({ unreadCounts: { ...get().unreadCounts, [chatId]: 0 } });
+    if (!chatId) return;
+    const idStr = chatId.toString();
+    set({ unreadCounts: { ...get().unreadCounts, [idStr]: 0 } });
   },
 
   addChat: (chat) => {

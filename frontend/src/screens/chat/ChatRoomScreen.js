@@ -2,16 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, Image, StatusBar, Alert,
-  ActivityIndicator, Pressable, Animated, ScrollView, Modal,
+  ActivityIndicator, Pressable, Animated, ScrollView, Modal, LayoutAnimation,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-import { Video, ResizeMode, Audio } from 'expo-av';
+import * as MediaLibrary from 'expo-media-library';
+import { Audio } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
+
 import useChatStore from '../../store/useChatStore';
 import useAuthStore from '../../store/useAuthStore';
 import { Colors } from '../../theme/colors';
@@ -19,7 +22,20 @@ import api, { uploadApi } from '../../services/api';
 import { joinChat, leaveChat, sendTyping, stopTyping, markRead } from '../../services/socketService';
 import MessageBubble from '../../components/MessageBubble';
 import UserInfoSheet from '../../components/UserInfoSheet';
+import { CHAT_THEMES, GROUP_THEMES } from '../../components/ThemeSelectSheet';
+import { getSocket } from '../../services/socketService';
 import DisappearingMsgSheet from '../../components/DisappearingMsgSheet';
+import CreatePollSheet from '../../components/CreatePollSheet';
+import * as ScreenCapture from 'expo-screen-capture';
+import { useAlert } from '../../components/CustomAlert';
+
+const FullScreenVideo = ({ url }) => {
+  const player = useVideoPlayer(url, p => {
+    p.loop = true;
+    p.play();
+  });
+  return <VideoView style={styles.fullScreenVideo} player={player} contentFit="contain" nativeControls allowsFullscreen />;
+};
 
 // Pulsing camera dot component
 function CamDot() {
@@ -102,9 +118,12 @@ function TypingBubble({ username }) {
 }
 
 export default function ChatRoomScreen({ route, navigation }) {
-  const { chat } = route.params;
+  const { showAlert } = useAlert();
+  const initialChat = route.params.chat;
+  const storeChat = useChatStore(s => s.chats.find(c => c._id === initialChat._id));
+  const chat = storeChat || initialChat;
   const { user } = useAuthStore();
-  const { messages, fetchMessages, addMessage, typingUsers, clearUnread } = useChatStore();
+  const { chats, messages, fetchMessages, addMessage, typingUsers, clearUnread } = useChatStore();
   const insets = useSafeAreaInsets();
 
   const [text, setText]               = useState('');
@@ -117,11 +136,70 @@ export default function ChatRoomScreen({ route, navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDisappear, setShowDisappear] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedMessages, setSelectedMessages] = useState(new Set());
+  const [forwardMessage, setForwardMessage] = useState(null);
   const flatRef      = useRef(null);
   const typingTimeout = useRef(null);
+
+  const toggleSelectMessage = (id) => {
+    setSelectedMessages(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      if (next.size === 0) setSelectionMode(false);
+      else setSelectionMode(true);
+      return next;
+    });
+  };
+
+  const deleteSelectedMessages = () => {
+    showAlert('Delete Messages', `Delete ${selectedMessages.size} messages?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete for me', onPress: () => confirmDeleteSelected('me'), style: 'destructive' },
+      { text: 'Delete for everyone', onPress: () => confirmDeleteSelected('everyone'), style: 'destructive' }
+    ]);
+  };
+
+  const confirmDeleteSelected = async (type) => {
+    try {
+      const ids = Array.from(selectedMessages);
+      await Promise.all(ids.map(id => api.delete(`/messages/${id}?type=${type}`)));
+      ids.forEach(id => {
+        if (type === 'everyone') {
+          useChatStore.getState().updateMessage(chat._id, id, {
+            deletedForEveryone: true,
+            content: 'Message disappeared',
+            mediaUrl: null,
+            reactions: []
+          });
+        } else {
+          useChatStore.getState().removeMessage(chat._id, id);
+        }
+      });
+      setSelectionMode(false);
+      setSelectedMessages(new Set());
+    } catch (e) {
+      showAlert('Error', e.message || 'Failed to delete');
+    }
+  };
+
+  const handleForward = async (targetChatId) => {
+    try {
+      await api.post(`/messages/${forwardMessage._id}/forward`, { chatIds: [targetChatId] });
+      setForwardMessage(null);
+      showAlert('Success', 'Message forwarded successfully!');
+    } catch (e) {
+      showAlert('Error', e.message || 'Failed to forward');
+    }
+  };
   const searchRef    = useRef(null);
   const inputRef     = useRef(null);
+  const isRelayBotChat = !chat.isGroupChat && chat.users?.some(u => u.username === 'relay_bot' || u.username === 'relay');
+  const isMicaChat = !chat.isGroupChat && chat.users?.some(u => u.username === 'mica');
+  const isBotChat = isRelayBotChat || isMicaChat;
   const [showJumpUnread, setShowJumpUnread] = useState(false);
   const unreadIndexRef = useRef(-1);
   const [fullScreenMedia, setFullScreenMedia] = useState(null);
@@ -137,14 +215,60 @@ export default function ChatRoomScreen({ route, navigation }) {
   const [gifResults, setGifResults] = useState([]);
   const [isFetchingGifs, setIsFetchingGifs] = useState(false);
   const [gifError, setGifError] = useState('');
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [pendingDisappearingMedia, setPendingDisappearingMedia] = useState(null);
 
   useEffect(() => {
     if (fullScreenMedia && fullScreenMedia.isSelfDestructing && !fullScreenMedia.isMine) {
-      setMediaCountdownSeconds(fullScreenMedia.destructAfterSeconds);
+      if (fullScreenMedia.type === 'video') {
+        setMediaCountdownSeconds(null); // No timer for view-once videos
+      } else {
+        setMediaCountdownSeconds(fullScreenMedia.destructAfterSeconds);
+      }
     } else {
       setMediaCountdownSeconds(null);
     }
   }, [fullScreenMedia]);
+
+  const isCapturePrevented = useRef(false);
+
+  useEffect(() => {
+    let shouldDisable = false;
+    if (chat.disappearAfter > 0) shouldDisable = true;
+    if (chat.allowScreenshots === false) shouldDisable = true;
+    if (isBotChat) shouldDisable = true;
+    
+    // Block if full screen media is open and it's self-destructing
+    if (fullScreenMedia?.isSelfDestructing) {
+      shouldDisable = true;
+    }
+    
+    // Only block screenshot if there are ACTIVE disappearing messages sent by OTHERS
+    if (!shouldDisable && chatMessages?.some(m => {
+      if (m.deletedForEveryone) return false;
+      const isDisappearing = Boolean(m.isSelfDestructing);
+      const senderId = (m.sender?._id || m.sender)?.toString();
+      const currentUserId = user?._id?.toString();
+      return isDisappearing && senderId !== currentUserId;
+    })) {
+      shouldDisable = true;
+    }
+    
+    if (shouldDisable && !isCapturePrevented.current) {
+      ScreenCapture.preventScreenCaptureAsync().catch(() => {});
+      isCapturePrevented.current = true;
+    } else if (!shouldDisable && isCapturePrevented.current) {
+      ScreenCapture.allowScreenCaptureAsync().catch(() => {});
+      isCapturePrevented.current = false;
+    }
+    
+    return () => {
+      if (isCapturePrevented.current) {
+        ScreenCapture.allowScreenCaptureAsync().catch(() => {});
+        isCapturePrevented.current = false;
+      }
+    };
+  }, [chat.disappearAfter, chatMessages, user?._id, fullScreenMedia]);
 
   useEffect(() => {
     if (mediaCountdownSeconds === null || !fullScreenMedia) return;
@@ -154,8 +278,8 @@ export default function ChatRoomScreen({ route, navigation }) {
       if (fullScreenMedia.messageId) {
         api.post(`/messages/${fullScreenMedia.messageId}/destruct`)
           .then(() => {
-            useChatStore.getState().purgeMessage(chat._id, fullScreenMedia.messageId);
-          })
+              useChatStore.getState().disappearMessage(chat._id, fullScreenMedia.messageId);
+            })
           .catch((err) => console.log('Error self-destructing media:', err));
       }
       return;
@@ -175,15 +299,30 @@ export default function ChatRoomScreen({ route, navigation }) {
       const filename = url.split('/').pop() || 'download';
       const localUri = `${FileSystem.documentDirectory}${filename}`;
       const { uri } = await FileSystem.downloadAsync(url, localUri);
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri);
+      
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status === 'granted') {
+        await MediaLibrary.saveToLibraryAsync(uri);
+        showAlert('Saved', 'Media saved to your device gallery!');
       } else {
-        Alert.alert('Error', 'Sharing is not available on this device');
+        showAlert('Permission Denied', 'Need gallery permissions to save media.');
       }
     } catch (e) {
-      Alert.alert('Error', 'Failed to save media: ' + e.message);
+      showAlert('Error', 'Failed to save media: ' + e.message);
     } finally {
       setIsSavingMedia(false);
+    }
+  };
+
+  const handleCloseMediaViewer = () => {
+    const isDisappearing = fullScreenMedia?.isSelfDestructing && !fullScreenMedia?.isMine;
+    const msgId = fullScreenMedia?.messageId;
+    setFullScreenMedia(null);
+    setMediaCountdownSeconds(null);
+    if (isDisappearing && msgId) {
+      api.post(`/messages/${msgId}/destruct`)
+        .then(() => useChatStore.getState().disappearMessage(chat._id, msgId))
+        .catch((err) => console.log('Error self-destructing media:', err));
     }
   };
 
@@ -198,7 +337,7 @@ export default function ChatRoomScreen({ route, navigation }) {
   const otherUser     = chat.isGroupChat ? null : chat.users?.find(u => u._id !== user?._id);
   const headerName    = chat.isGroupChat ? chat.chatName : (otherUser?.displayName || otherUser?.username);
   const headerAvatar  = chat.isGroupChat ? chat.groupPicture : otherUser?.profilePicture;
-  const isOnline      = !chat.isGroupChat && otherUser?.isOnline;
+  const isOnline      = !chat.isGroupChat && (otherUser?.isOnline || otherUser?.username === 'mica_bot' || otherUser?.username === 'relay_bot');
   const isCameraActive = !chat.isGroupChat && otherUser?.isCameraActive;
 
   // Filtered messages for search
@@ -213,32 +352,49 @@ export default function ChatRoomScreen({ route, navigation }) {
     fetchMessages(chat._id);
     clearUnread(chat._id);
     markRead(chat._id, user?._id);
-    return () => { leaveChat(chat._id); };
+
+    // ── Real-time group refresh: update member count & user list live ──
+    const socket = getSocket();
+    const handleChatUpdated = (updatedChat) => {
+      if (updatedChat._id === chat._id || updatedChat._id?.toString() === chat._id?.toString()) {
+        useChatStore.getState().updateChat(chat._id, updatedChat);
+      }
+    };
+    if (socket) socket.on('chat_updated', handleChatUpdated);
+
+    return () => {
+      leaveChat(chat._id);
+      useChatStore.getState().selectChat(null);
+      if (socket) socket.off('chat_updated', handleChatUpdated);
+    };
   }, [chat._id]);
 
   // On first load, find the first unread message index
   useEffect(() => {
     if (chatMessages.length > 0 && !searchQuery) {
       // Find the first message not sent by me and not read by me
-      const firstUnreadIdx = chatMessages.findIndex(m => {
+      // Inverted list: index 0 is newest. Let's find the oldest unread (highest index)
+      let oldestUnreadIdx = -1;
+      for (let i = 0; i < chatMessages.length; i++) {
+        const m = chatMessages[i];
         const senderId = m.sender?._id || m.sender;
-        return senderId !== user?._id && !m.readBy?.includes(user?._id);
-      });
-
-      if (firstUnreadIdx > 0 && firstUnreadIdx < chatMessages.length - 3) {
-        unreadIndexRef.current = firstUnreadIdx;
-        setShowJumpUnread(true);
-        // Scroll to bottom (recent messages)
-        setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 100);
-      } else {
-        // Already at bottom or few unread — just scroll down
-        setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
+        if (senderId !== user?._id && !m.readBy?.includes(user?._id)) {
+          oldestUnreadIdx = i;
+        } else if (oldestUnreadIdx !== -1) {
+          // If we found unread ones, and now hit a read one, we stop
+          break;
+        }
       }
 
-      // Auto-mark as read
-      const lastMsg = chatMessages[chatMessages.length - 1];
-      const senderId = lastMsg?.sender?._id || lastMsg?.sender;
-      if (senderId && senderId !== user?._id && !lastMsg?.readBy?.includes(user?._id)) {
+      if (oldestUnreadIdx > 3) {
+        unreadIndexRef.current = oldestUnreadIdx;
+        setShowJumpUnread(true);
+      }
+
+      // Auto-mark as read based on the newest message
+      const newestMsg = chatMessages[0];
+      const senderId = newestMsg?.sender?._id || newestMsg?.sender;
+      if (senderId && senderId !== user?._id && !newestMsg?.readBy?.includes(user?._id)) {
         api.put(`/messages/${chat._id}/read`).catch(() => {});
         markRead(chat._id, user?._id);
         clearUnread(chat._id);
@@ -259,12 +415,45 @@ export default function ChatRoomScreen({ route, navigation }) {
     typingTimeout.current = setTimeout(() => stopTyping(chat._id, user?._id), 1500);
   };
 
-  const sendMessage = async (mediaFile = null) => {
+  const handleEdit = (msg) => {
+    // Allow text messages and messages with no explicit messageType (legacy)
+    if (msg.mediaUrl || msg.deletedForEveryone || (msg.messageType && msg.messageType !== 'text')) {
+      showAlert('Cannot Edit', 'Only text messages can be edited.');
+      return;
+    }
+    const diff = (Date.now() - new Date(msg.createdAt).getTime()) / 60000;
+    if (diff > 15) {
+      showAlert('Cannot Edit', 'Messages can only be edited within 15 minutes of sending.');
+      return;
+    }
+    setEditingMessage(msg);
+    setText(msg.content || '');
+    setTimeout(() => inputRef.current?.focus(), 100);
+  };
+
+  const sendMessage = async (mediaFile = null, pollData = null) => {
     const content = text.trim();
-    if (!content && !mediaFile) return;
+    if (!content && !mediaFile && !pollData) return;
     setIsSending(true);
     setText('');
     stopTyping(chat._id, user?._id);
+
+    if (editingMessage) {
+      const editId = editingMessage._id;
+      setEditingMessage(null);
+      try {
+        const { data } = await api.patch(`/messages/${editId}/edit`, { content });
+        useChatStore.getState().updateMessage(chat._id, editId, { ...data.message, isEdited: true });
+        setTimeout(() => inputRef.current?.focus(), 50);
+        setHighlightedMessageId(editId);
+        setTimeout(() => setHighlightedMessageId(null), 1500);
+      } catch (e) {
+        showAlert('Error', e.message || 'Failed to edit message');
+      } finally {
+        setIsSending(false);
+      }
+      return;
+    }
 
     const tempId = `optimistic-${Date.now()}`;
     const optimisticMessage = {
@@ -280,7 +469,9 @@ export default function ChatRoomScreen({ route, navigation }) {
       createdAt: new Date().toISOString(),
       isOptimistic: true,
       mediaUrl: mediaFile ? mediaFile.uri : null,
-      mediaType: mediaFile ? (mediaFile.type.startsWith('video/') ? 'video' : 'image') : null,
+      mediaType: mediaFile ? mediaFile.type : null,
+      messageType: pollData ? 'poll' : (mediaFile?.messageType || (mediaFile ? (mediaFile.type.startsWith('video/') ? 'video' : mediaFile.type.startsWith('audio/') ? 'audio' : 'image') : 'text')),
+      pollData: pollData || null,
       isSelfDestructing: mediaFile ? !!mediaFile.isSelfDestructing : false,
       destructAfterSeconds: mediaFile ? mediaFile.destructAfterSeconds : null,
       isLive: mediaFile ? !!mediaFile.isLive : false,
@@ -296,11 +487,17 @@ export default function ChatRoomScreen({ route, navigation }) {
     useChatStore.getState().addMessage(chat._id, optimisticMessage);
     const savedReplyTo = replyTo;
     setReplyTo(null);
+    // Scroll to bottom so the new message is visible
+    setTimeout(() => flatRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
 
     try {
       const formData = new FormData();
       if (content) formData.append('content', content);
       formData.append('chatId', chat._id);
+      if (pollData) {
+        formData.append('messageType', 'poll');
+        formData.append('pollData', JSON.stringify(pollData));
+      }
       if (savedReplyTo) formData.append('replyTo', savedReplyTo._id);
       if (mediaFile) {
         formData.append('media', { 
@@ -308,6 +505,7 @@ export default function ChatRoomScreen({ route, navigation }) {
           name: mediaFile.name || 'media.jpg', 
           type: mediaFile.type || 'image/jpeg' 
         });
+        if (mediaFile.messageType) formData.append('messageType', mediaFile.messageType);
         if (mediaFile.isSelfDestructing) {
           formData.append('isSelfDestructing', 'true');
           formData.append('destructAfterSeconds', String(mediaFile.destructAfterSeconds));
@@ -321,7 +519,7 @@ export default function ChatRoomScreen({ route, navigation }) {
       setTimeout(() => inputRef.current?.focus(), 50);
     } catch (e) {
       useChatStore.getState().removeOptimisticMessage(chat._id, tempId);
-      Alert.alert('Error', e.message || 'Failed to send');
+      showAlert('Error', e.message || 'Failed to send');
     } finally {
       setIsSending(false);
     }
@@ -329,24 +527,26 @@ export default function ChatRoomScreen({ route, navigation }) {
 
   const pickImage = async () => {
     setShowAttach(false);
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], quality: 0.85 });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], quality: 0.85, allowsMultipleSelection: true });
     if (!result.canceled) {
-      const asset = result.assets[0];
-      const isVideo = asset.type === 'video' || asset.uri.endsWith('.mp4') || asset.uri.endsWith('.mov') || asset.uri.endsWith('.MOV') || asset.uri.endsWith('.mkv') || asset.uri.endsWith('.3gp');
-      await sendMessage({
-        uri: asset.uri,
-        name: isVideo ? 'video.mp4' : 'media.jpg',
-        type: isVideo ? 'video/mp4' : 'image/jpeg'
-      });
+      for (const asset of result.assets) {
+        const isVideo = asset.type === 'video' || asset.uri.endsWith('.mp4') || asset.uri.endsWith('.mov') || asset.uri.endsWith('.MOV') || asset.uri.endsWith('.mkv') || asset.uri.endsWith('.3gp');
+        await sendMessage({
+          uri: asset.uri,
+          name: isVideo ? 'video.mp4' : 'media.jpg',
+          type: isVideo ? 'video/mp4' : 'image/jpeg'
+        });
+      }
     }
   };
 
   const pickDocument = async () => {
     setShowAttach(false);
-    const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+    const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: true });
     if (result.type !== 'cancel' && result.assets) {
-      const file = result.assets[0];
-      await sendMessage({ uri: file.uri, name: file.name, type: file.mimeType });
+      for (const file of result.assets) {
+        await sendMessage({ uri: file.uri, name: file.name, type: file.mimeType, messageType: 'document' });
+      }
     }
   };
 
@@ -354,7 +554,7 @@ export default function ChatRoomScreen({ route, navigation }) {
     setShowAttach(false);
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission Denied', 'Camera permission is required to take photos/videos.');
+      showAlert('Permission Denied', 'Camera permission is required to take photos/videos.');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -373,15 +573,11 @@ export default function ChatRoomScreen({ route, navigation }) {
     }
   };
 
-  const pickDisappearingMedia = () => {
+  const pickDisappearingMedia = async () => {
     setShowAttach(false);
-    setShowMediaTimerModal(true);
-  };
-
-  const selectAndSendDisappearingMedia = async (seconds) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission Denied', 'Media library permission is required.');
+      showAlert('Permission Denied', 'Media library permission is required.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -391,14 +587,35 @@ export default function ChatRoomScreen({ route, navigation }) {
     if (!result.canceled) {
       const asset = result.assets[0];
       const isVideo = asset.type === 'video' || asset.uri.endsWith('.mp4') || asset.uri.endsWith('.mov') || asset.uri.endsWith('.MOV') || asset.uri.endsWith('.mkv') || asset.uri.endsWith('.3gp');
-      await sendMessage({
-        uri: asset.uri,
-        name: isVideo ? 'video.mp4' : 'media.jpg',
-        type: isVideo ? 'video/mp4' : 'image/jpeg',
-        isSelfDestructing: true,
-        destructAfterSeconds: seconds
-      });
+      
+      if (isVideo) {
+        // Videos don't ask for timer, they are view once.
+        await sendMessage({
+          uri: asset.uri,
+          name: 'video.mp4',
+          type: 'video/mp4',
+          isSelfDestructing: true,
+          destructAfterSeconds: 0
+        });
+      } else {
+        // Pictures ask for timer
+        setPendingDisappearingMedia(asset);
+        setShowMediaTimerModal(true);
+      }
     }
+  };
+
+  const selectAndSendDisappearingMedia = async (seconds) => {
+    if (!pendingDisappearingMedia) return;
+    const asset = pendingDisappearingMedia;
+    await sendMessage({
+      uri: asset.uri,
+      name: 'media.jpg',
+      type: 'image/jpeg',
+      isSelfDestructing: true,
+      destructAfterSeconds: seconds
+    });
+    setPendingDisappearingMedia(null);
   };
 
   // ── Voice Messages ────────────────────────────────────────────────────────
@@ -418,7 +635,7 @@ export default function ChatRoomScreen({ route, navigation }) {
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Permission Denied', 'Microphone permission is required to record voice messages.');
+        showAlert('Permission Denied', 'Microphone permission is required to record voice messages.');
         return;
       }
       await Audio.setAudioModeAsync({
@@ -432,7 +649,7 @@ export default function ChatRoomScreen({ route, navigation }) {
       setIsRecording(true);
     } catch (err) {
       console.error('Failed to start recording', err);
-      Alert.alert('Error', 'Could not start recording. Please try again.');
+      showAlert('Error', 'Could not start recording. Please try again.');
     }
   };
 
@@ -464,7 +681,7 @@ export default function ChatRoomScreen({ route, navigation }) {
       }
     } catch (err) {
       console.error('Failed to send recording', err);
-      Alert.alert('Error', 'Failed to send voice message.');
+      showAlert('Error', 'Failed to send voice message.');
     }
   };
 
@@ -566,7 +783,7 @@ export default function ChatRoomScreen({ route, navigation }) {
       useChatStore.getState().replaceMessage(chat._id, tempId, data.message);
     } catch (e) {
       console.log('Error sending GIF:', e);
-      Alert.alert('Error', 'Failed to send GIF.');
+      showAlert('Error', 'Failed to send GIF.');
     }
   };
 
@@ -583,7 +800,7 @@ export default function ChatRoomScreen({ route, navigation }) {
         setHighlightedMessageId(null);
       }, 1500);
     } else {
-      Alert.alert('Older Message', 'This message is older and has not been loaded yet.');
+      showAlert('Older Message', 'This message is older and has not been loaded yet.');
     }
   };
 
@@ -594,13 +811,27 @@ export default function ChatRoomScreen({ route, navigation }) {
     }
   };
 
+  // Smart last-seen relative-time formatter
+  const formatLastSeen = (dateStr) => {
+    if (!dateStr) return null;
+    const diffMs  = Date.now() - new Date(dateStr).getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHr  = Math.floor(diffMs / 3600000);
+    const diffDay = Math.floor(diffMs / 86400000);
+    if (diffMin < 1)   return 'Last seen just now';
+    if (diffMin < 60)  return `Last seen ${diffMin} min${diffMin === 1 ? '' : 's'} ago`;
+    if (diffHr  < 24)  return `Last seen ${diffHr} hr${diffHr === 1 ? '' : 's'} ago`;
+    if (diffDay < 365) return `Last seen ${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
+    return `Last seen ${new Date(dateStr).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  };
+
   // Status string for header
   const statusText = isCameraActive
     ? '📷 Using camera'
     : isOnline
     ? 'Online'
     : otherUser?.lastSeen
-    ? `Last seen ${new Date(otherUser.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    ? formatLastSeen(otherUser.lastSeen)
     : chat.isGroupChat
     ? `${chat.users?.length || 0} members`
     : null;
@@ -616,89 +847,30 @@ export default function ChatRoomScreen({ route, navigation }) {
                         disappearSeconds === 86400 ? 'time-outline' :
                         disappearSeconds === 604800 ? 'calendar-outline' : null;
 
+  // Group chats use GROUP_THEMES; personal chats use CHAT_THEMES
+  const allThemes = chat.isGroupChat ? [...GROUP_THEMES, ...CHAT_THEMES] : CHAT_THEMES;
+  const themeObj = allThemes.find(t => t.id === chat.theme) || allThemes[0];
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeObj.bg || Colors.dark.bg }]}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.dark.card} />
 
       {/* ── Header (flat, no gradient) ────────────────────────────────────── */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
-        </TouchableOpacity>
+      <View style={[styles.header, { paddingTop: (insets.top || StatusBar.currentHeight || 0) + 8 }]}>
 
-        <TouchableOpacity
-          style={styles.headerInfo}
-          onPress={() => {
-            if (chat.isGroupChat) navigation.navigate('GroupInfo', { chat });
-            else setSelectedUser(otherUser);
-          }}
-          activeOpacity={0.8}
-        >
-          {/* Avatar + cam indicator */}
-          <View style={styles.avatarWrap}>
-            {headerAvatar ? (
-              <Image
-                source={{ uri: headerAvatar }}
-                style={[styles.headerAvatar, isCameraActive && styles.avatarCamBorder]}
-              />
-            ) : (
-              <View style={[styles.headerAvatar, styles.avatarFallback, isCameraActive && styles.avatarCamBorder]}>
-                <Text style={styles.avatarText}>{headerName?.charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
-            {isCameraActive && <CamDot />}
-            {!isCameraActive && isOnline && <View style={styles.onlineDot} />}
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerName} numberOfLines={1}>{headerName}</Text>
-            {statusText && (
-              <View style={styles.headerStatusRow}>
-                {disappearIcon && (
-                  <Ionicons name={disappearIcon} size={12} color={Colors.primary} style={styles.headerDisappearIcon} />
-                )}
-                <Text style={[styles.headerStatus, { color: statusColor }]} numberOfLines={1}>
-                  {statusText}
-                </Text>
-              </View>
+        {selectionMode ? (
+          <View style={styles.selectionHeader}>
+            <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedMessages(new Set()); }} style={styles.headerBtn}>
+              <Ionicons name="close" size={24} color={Colors.dark.text} />
+            </TouchableOpacity>
+            <Text style={styles.selectionCount}>{selectedMessages.size} selected</Text>
+            {selectedMessages.size > 0 && (
+              <TouchableOpacity onPress={deleteSelectedMessages} style={styles.headerBtn}>
+                <Ionicons name="trash-outline" size={24} color="#EF4444" />
+              </TouchableOpacity>
             )}
           </View>
-        </TouchableOpacity>
-
-        {/* Right icons */}
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => setShowSearch(v => !v)}
-          >
-            <Ionicons
-              name={showSearch ? 'close-outline' : 'search-outline'}
-              size={22}
-              color={showSearch ? Colors.primary : Colors.dark.text}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => {
-              if (chat.isGroupChat) {
-                const myId = user?._id;
-                const isGroupOwner = chat.groupAdmin?._id === myId || chat.groupAdmin === myId;
-                const isGroupAdmin = chat.admins?.some(a => (a._id || a) === myId) || isGroupOwner;
-                if (!isGroupAdmin) {
-                  Alert.alert('Permission Denied', 'Only group admins and the owner can change disappearing messages settings.');
-                  return;
-                }
-              }
-              setShowDisappear(true);
-            }}
-          >
-            <Ionicons name="ellipsis-vertical" size={22} color={Colors.dark.text} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* ── In-chat search bar ─────────────────────────────────────────────── */}
-      {showSearch && (
+        ) : showSearch ? (
         <View style={styles.searchBar}>
           <Ionicons name="search-outline" size={17} color={Colors.dark.muted} />
           <TextInput
@@ -721,7 +893,121 @@ export default function ChatRoomScreen({ route, navigation }) {
             </Text>
           )}
         </View>
-      )}
+        ) : (
+          <>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+              <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.headerInfo}
+              onPress={() => {
+                if (chat.isGroupChat) navigation.navigate('GroupInfo', { chat });
+                else setSelectedUser(otherUser);
+              }}
+              activeOpacity={0.8}
+            >
+              {/* Avatar + cam indicator */}
+              <View style={styles.avatarWrap}>
+                {headerAvatar ? (
+                  <Image
+                    source={{ uri: headerAvatar }}
+                    style={[styles.headerAvatar, isCameraActive && styles.avatarCamBorder]}
+                  />
+                ) : (
+                  <View style={[styles.headerAvatar, styles.avatarFallback, isCameraActive && styles.avatarCamBorder]}>
+                    <Text style={styles.avatarText}>{headerName?.charAt(0).toUpperCase()}</Text>
+                  </View>
+                )}
+                {isCameraActive && <CamDot />}
+                {!isCameraActive && isOnline && <View style={styles.onlineDot} />}
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.headerName} numberOfLines={1}>{headerName}</Text>
+                {statusText && (
+                  <View style={styles.headerStatusRow}>
+                    {disappearIcon && (
+                      <Ionicons name={disappearIcon} size={12} color={Colors.primary} style={styles.headerDisappearIcon} />
+                    )}
+                    <Text style={[styles.headerStatus, { color: statusColor }]} numberOfLines={1}>
+                      {statusText}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+
+            {/* Right icons */}
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                onPress={() => setShowSearch(v => !v)}
+              >
+                <Ionicons
+                  name={showSearch ? 'close-outline' : 'search-outline'}
+                  size={22}
+                  color={showSearch ? Colors.primary : Colors.dark.text}
+                />
+              </TouchableOpacity>
+              
+              {(!chat.isGroupChat && otherUser && otherUser.username !== 'mica_bot' && otherUser.username !== 'relay_bot' && otherUser.username !== 'relay') && (
+                (() => {
+                  const isAlreadyFriend = user?.friends?.some(f => (f._id || f).toString() === otherUser._id.toString());
+                  return (
+                    <TouchableOpacity
+                      style={styles.iconBtn}
+                      onPress={async () => {
+                        if (isAlreadyFriend) return; // no-op, icon is just a tick
+                        try {
+                          await api.post(`/users/${otherUser._id}/friend-request`);
+                          showAlert('✅', 'Friend request sent!');
+                        } catch (e) {
+                          showAlert('Info', e.response?.data?.message || e.message);
+                        }
+                      }}
+                    >
+                      <Ionicons 
+                        name={isAlreadyFriend ? "checkmark-circle" : "person-add-outline"} 
+                        size={22} 
+                        color={Colors.primary} 
+                      />
+                    </TouchableOpacity>
+                  );
+                })()
+              )}
+
+              {(() => {
+                const isBotChat = !chat.isGroupChat && (
+                  otherUser?.username === 'mica_bot' ||
+                  otherUser?.username === 'relay_bot' ||
+                  otherUser?.username === 'relay'
+                );
+                if (isBotChat) return null;
+                return (
+                  <TouchableOpacity
+                    style={styles.iconBtn}
+                    onPress={() => {
+                      if (chat.isGroupChat) {
+                        const myId = user?._id;
+                        const isGroupOwner = chat.groupAdmin?._id === myId || chat.groupAdmin === myId;
+                        const isGroupAdmin = chat.admins?.some(a => (a._id || a) === myId) || isGroupOwner;
+                        if (!isGroupAdmin) {
+                          showAlert('Permission Denied', 'Only group admins and the owner can change disappearing messages settings.');
+                          return;
+                        }
+                      }
+                      setShowDisappear(true);
+                    }}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={22} color={Colors.dark.text} />
+                  </TouchableOpacity>
+                );
+              })()}
+            </View>
+          </>
+        )}
+      </View>
 
       {/* ── Messages + input ──────────────────────────────────────────────── */}
       <KeyboardAvoidingView
@@ -732,6 +1018,7 @@ export default function ChatRoomScreen({ route, navigation }) {
         <FlatList
           ref={flatRef}
           data={displayMessages}
+          inverted
           keyExtractor={(item) => item._id}
           renderItem={({ item }) => (
             <MessageBubble
@@ -740,11 +1027,28 @@ export default function ChatRoomScreen({ route, navigation }) {
               chat={chat}
               chatUsers={chat.users || []}
               isGroup={chat.isGroupChat}
+              chatTheme={chat.theme}
               searchQuery={searchQuery}
-              onSenderPress={(sender) => setSelectedUser(sender)}
-              onReply={setReplyTo}
+              onSenderPress={(sender) => {
+                if (sender?.username) {
+                  navigation.navigate('UserProfile', { username: sender.username });
+                }
+              }}
+              onReply={(msg) => {
+                setReplyTo(msg);
+                setTimeout(() => flatRef.current?.scrollToOffset({ offset: 0, animated: true }), 80);
+              }}
+              onForward={(msg) => setForwardMessage(msg)}
+              onEdit={handleEdit}
               onReplyPress={handleReplyPress}
               highlightedMessageId={highlightedMessageId}
+              onReact={async (msgId, emoji) => {
+                try {
+                  await api.post(`/messages/${msgId}/react`, { emoji });
+                } catch (e) {
+                  console.error('Failed to react:', e);
+                }
+              }}
               onMediaPress={(url, type) => setFullScreenMedia({ 
                 url, 
                 type, 
@@ -758,13 +1062,15 @@ export default function ChatRoomScreen({ route, navigation }) {
                   await api.delete(`/messages/${id}?type=${type}`); 
                   if (type === 'me') {
                     useChatStore.getState().purgeMessage(chat._id, id);
+                  } else if (type === 'everyone') {
+                    useChatStore.getState().removeMessage(chat._id, id);
                   }
-                }
-                catch (e) { Alert.alert('Error', e.message); }
+                } catch(e) { showAlert('Error', e.message); }
               }}
-              onReact={async (id, emoji) => {
-                try { await api.post(`/messages/${id}/react`, { emoji }); } catch (_) {}
-              }}
+              selectionMode={selectionMode}
+              isSelected={selectedMessages.has(item._id)}
+              onSelectToggle={() => toggleSelectMessage(item._id)}
+              onLongPress={() => setSelectionMode(true)}
             />
           )}
           onEndReached={loadMore}
@@ -816,21 +1122,40 @@ export default function ChatRoomScreen({ route, navigation }) {
         ))}
 
         {/* Reply preview */}
-        {replyTo && (
+        {replyTo && !isRelayBotChat && (
           <View style={styles.replyPreview}>
             <View style={styles.replyBar} />
             <View style={{ flex: 1 }}>
               <Text style={styles.replyName}>{replyTo.sender?.displayName || replyTo.sender?.username}</Text>
               <Text style={styles.replyContent} numberOfLines={1}>{replyTo.content || '📎 Media'}</Text>
             </View>
-            <TouchableOpacity onPress={() => setReplyTo(null)}>
+            <TouchableOpacity onPress={() => {
+              setReplyTo(null);
+            }}>
+              <Ionicons name="close" size={20} color={Colors.dark.muted} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Edit preview */}
+        {editingMessage && !isRelayBotChat && (
+          <View style={styles.replyPreview}>
+            <View style={[styles.replyBar, { backgroundColor: Colors.accent }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.replyName, { color: Colors.accent }]}>Editing Message</Text>
+              <Text style={styles.replyContent} numberOfLines={1}>{editingMessage.content}</Text>
+            </View>
+            <TouchableOpacity onPress={() => { 
+              setEditingMessage(null); 
+              setText(''); 
+            }}>
               <Ionicons name="close" size={20} color={Colors.dark.muted} />
             </TouchableOpacity>
           </View>
         )}
 
         {/* Attachment menu */}
-        {showAttach && (
+        {showAttach && !isRelayBotChat && (
           <View style={styles.attachMenu}>
             <TouchableOpacity style={styles.attachOption} onPress={pickImage}>
               <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.attachIcon}>
@@ -874,11 +1199,17 @@ export default function ChatRoomScreen({ route, navigation }) {
               </LinearGradient>
               <Text style={styles.attachLabel}>Disappearing</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.attachOption} onPress={() => { setShowAttach(false); setShowPollModal(true); }}>
+              <LinearGradient colors={['#F97316', '#EA580C']} style={styles.attachIcon}>
+                <Ionicons name="bar-chart" size={22} color="#FFF" />
+              </LinearGradient>
+              <Text style={styles.attachLabel}>Poll</Text>
+            </TouchableOpacity>
           </View>
         )}
 
         {/* Emoji picker panel */}
-        {showEmoji && (
+        {showEmoji && !isRelayBotChat && (
           <View style={styles.emojiPanel}>
             <ScrollView contentContainerStyle={styles.emojiGrid} showsVerticalScrollIndicator={false}>
               {['😀','😂','🤣','😍','🥰','😘','😊','😎','🤩','🥳',
@@ -893,7 +1224,6 @@ export default function ChatRoomScreen({ route, navigation }) {
                   style={styles.emojiItem}
                   onPress={() => {
                     setText(prev => prev + emoji);
-                    inputRef.current?.focus();
                   }}
                 >
                   <Text style={styles.emojiItemText}>{emoji}</Text>
@@ -904,13 +1234,25 @@ export default function ChatRoomScreen({ route, navigation }) {
         )}
 
         {/* Input bar — paddingBottom includes gesture nav inset */}
-        <View style={[styles.inputBar, { paddingBottom: (insets.bottom || 8) + 6 }]}>
+        {!isRelayBotChat && (
+          <View style={[styles.inputBar, { paddingBottom: (insets.bottom || 8) + 6 }]}>
           <TouchableOpacity onPress={() => setShowAttach(!showAttach)} style={styles.inputIconBtn}>
             <Ionicons name={showAttach ? 'close' : 'add-circle-outline'} size={26} color={Colors.primary} />
           </TouchableOpacity>
 
           <View style={styles.inputWrap}>
-            <TouchableOpacity onPress={() => setShowEmoji(!showEmoji)} style={styles.emojiToggle}>
+            <TouchableOpacity 
+              onPress={() => {
+                if (showEmoji) {
+                  setShowEmoji(false);
+                  setTimeout(() => inputRef.current?.focus(), 100);
+                } else {
+                  Keyboard.dismiss();
+                  setShowEmoji(true);
+                }
+              }} 
+              style={styles.emojiToggle}
+            >
               <Ionicons name={showEmoji ? 'keypad-outline' : 'happy-outline'} size={22} color={showEmoji ? Colors.primary : Colors.dark.muted} />
             </TouchableOpacity>
              <TextInput
@@ -936,6 +1278,7 @@ export default function ChatRoomScreen({ route, navigation }) {
             </TouchableOpacity>
           ) : null}
         </View>
+        )}
       </KeyboardAvoidingView>
 
       {/* User info bottom sheet */}
@@ -952,20 +1295,31 @@ export default function ChatRoomScreen({ route, navigation }) {
       <DisappearingMsgSheet
         visible={showDisappear}
         currentSeconds={chat.disappearAfter || 0}
+        onClose={() => setShowDisappear(false)}
         onSelect={async (seconds) => {
           try {
-            await api.put(`/chats/${chat._id}/disappear`, { seconds });
-            // Update the global chat store so list updates immediately
+            const res = await api.put(`/chats/${chat._id}/disappear`, { seconds });
+            if (res.data && res.data.message) {
+              addMessage(chat._id, res.data.message);
+            }
             useChatStore.getState().updateChat(chat._id, { disappearAfter: seconds });
-          } catch (e) { Alert.alert('Error', e.message); }
+          } catch (e) { showAlert('Error', e.message); }
+        }}
+      />
+
+      <CreatePollSheet
+        visible={showPollModal}
+        onClose={() => setShowPollModal(false)}
+        onCreate={(pollData) => {
+          sendMessage(null, pollData);
         }}
       />
 
       {/* Full-screen Media Viewer Modal */}
-      <Modal visible={!!fullScreenMedia} transparent animationType="fade" onRequestClose={() => setFullScreenMedia(null)}>
+      <Modal visible={!!fullScreenMedia} transparent animationType="fade" onRequestClose={handleCloseMediaViewer}>
         <View style={styles.mediaViewerContainer}>
           <View style={[styles.mediaViewerHeader, { paddingTop: (insets.top || 16) + 10 }]}>
-            <TouchableOpacity onPress={() => setFullScreenMedia(null)} style={styles.mediaViewerBtn}>
+            <TouchableOpacity onPress={handleCloseMediaViewer} style={styles.mediaViewerBtn}>
               <Ionicons name="close" size={26} color="#FFF" />
             </TouchableOpacity>
 
@@ -996,14 +1350,7 @@ export default function ChatRoomScreen({ route, navigation }) {
               <Image source={{ uri: fullScreenMedia.url }} style={styles.fullScreenImage} resizeMode="contain" />
             )}
             {fullScreenMedia?.type === 'video' && (
-              <Video
-                source={{ uri: fullScreenMedia.url }}
-                style={styles.fullScreenVideo}
-                resizeMode={ResizeMode.CONTAIN}
-                shouldPlay
-                useNativeControls
-                isLooping
-              />
+              <FullScreenVideo url={fullScreenMedia.url} />
             )}
           </View>
         </View>
@@ -1178,6 +1525,33 @@ export default function ChatRoomScreen({ route, navigation }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Forward Modal */}
+      <Modal visible={!!forwardMessage} transparent animationType="slide" onRequestClose={() => setForwardMessage(null)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setForwardMessage(null)}>
+          <Pressable style={styles.forwardModalContent}>
+            <View style={styles.mediaTimerModalHeader}>
+              <Text style={styles.mediaTimerModalTitle}>Forward to...</Text>
+              <TouchableOpacity onPress={() => setForwardMessage(null)} style={styles.mediaTimerCloseBtn}>
+                <Ionicons name="close" size={20} color={Colors.dark.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 400 }}>
+              {chats.map(c => {
+                const isMe = !c.isGroupChat && c.users?.every(u => (u._id||u) === user._id);
+                const other = !c.isGroupChat && c.users?.find(u => (u._id||u) !== user._id);
+                const name = c.isGroupChat ? c.chatName : (other?.displayName || other?.username || (isMe ? 'Saved Messages' : 'Unknown'));
+                return (
+                  <TouchableOpacity key={c._id} style={styles.forwardChatOption} onPress={() => handleForward(c._id)}>
+                    <Text style={styles.forwardChatText} numberOfLines={1}>{name}</Text>
+                    <Ionicons name="send" size={16} color={Colors.primary} />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -1190,10 +1564,18 @@ const styles = StyleSheet.create({
   // ── Header (no gradient) ──────────────────────────────────────────────────
   header: {
     flexDirection: 'row', alignItems: 'center',
-    paddingTop: HEADER_TOP + 8, paddingBottom: 10, paddingHorizontal: 10,
+    paddingBottom: 10, paddingHorizontal: 10,
     gap: 8, backgroundColor: Colors.dark.card,
     borderBottomWidth: 1, borderBottomColor: Colors.dark.border,
   },
+  headerBtn: { padding: 4 },
+  selectionHeader: {
+    flexDirection: 'row', alignItems: 'center', flex: 1, paddingHorizontal: 4, gap: 16
+  },
+  selectionCount: {
+    fontSize: 18, fontWeight: '700', color: Colors.dark.text, flex: 1
+  },
+  searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   backBtn: { padding: 4 },
   headerInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatarWrap: { position: 'relative' },
@@ -1267,8 +1649,7 @@ const styles = StyleSheet.create({
   inputBar: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingHorizontal: 12, paddingTop: 10,
-    backgroundColor: Colors.dark.card,
-    borderTopWidth: 1, borderTopColor: Colors.dark.border,
+    backgroundColor: 'transparent',
   },
   inputIconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   inputWrap: {
@@ -1656,5 +2037,33 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: Colors.dark.muted,
+  },
+  forwardModalContent: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: Colors.dark.card,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    padding: 20,
+    alignItems: 'stretch',
+  },
+  forwardChatOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.dark.bg,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 0.5,
+    borderColor: Colors.dark.border,
+  },
+  forwardChatText: {
+    fontSize: 15,
+    color: Colors.dark.text,
+    fontWeight: '600',
+    flex: 1,
   },
 });

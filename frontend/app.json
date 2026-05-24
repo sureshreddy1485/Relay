@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Nexo",
-    "slug": "nexo",
+    "name": "Relay",
+    "slug": "relay",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,19 +11,20 @@
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0F"
     },
+    "backgroundColor": "#0A0A0A",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nexo.app"
+      "bundleIdentifier": "com.relay.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A0F"
       },
-      "package": "com.nexo.app",
+      "package": "com.relay.app",
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
@@ -40,26 +41,37 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Nexo to access your camera."
+          "cameraPermission": "Allow Relay to access your camera."
         }
       ],
       [
         "expo-av",
         {
-          "microphonePermission": "Allow Nexo to access your microphone."
+          "microphonePermission": "Allow Relay to access your microphone."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Nexo to access your photos."
+          "photosPermission": "Allow Relay to access your photos."
         }
       ],
-      "react-native-video"
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#2DD4BF",
+          "sounds": [
+            "./assets/kin_notification_sound.wav"
+          ]
+        }
+      ],
+      "react-native-video",
+      "expo-video"
     ],
     "extra": {
       "eas": {
-        "projectId": "your-eas-project-id"
+        "projectId": "736a5f5a-bf9f-4a72-a9c1-199db18f025b"
       }
     }
   }

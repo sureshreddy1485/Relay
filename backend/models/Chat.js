@@ -21,7 +21,9 @@ const chatSchema = new mongoose.Schema(
       trim: true,
     },
     isPublic: { type: Boolean, default: false },
+    joinPrivacy: { type: String, enum: ['anyone', 'invite_only', 'closed'], default: 'anyone' },
     joinRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    invitedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     bannedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     // Per-user settings
     pinnedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
@@ -38,6 +40,11 @@ const chatSchema = new mongoose.Schema(
     allowDirectMessages: { type: Boolean, default: true },
     // Disappearing messages (seconds, 0 = off)
     disappearAfter: { type: Number, default: 0 },
+    // Custom Chat Theme
+    theme: { type: String, default: 'default' },
+    // Security
+    allowScreenshots: { type: Boolean, default: true },
+    allowForwarding: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

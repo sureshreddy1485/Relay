@@ -31,6 +31,7 @@ const userSchema = new mongoose.Schema(
       ],
       select: false,
     },
+    lastPasswordChange: { type: Date, default: Date.now },
     securityKey: {
       type: String,
       required: [true, 'Security key is required'],
@@ -98,10 +99,13 @@ const userSchema = new mongoose.Schema(
         default: 'automatic',
       },
       allowDMFromGroups: { type: Boolean, default: true },
+      allowedDMGroups: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
+      disallowedDMGroups: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
     },
     theme: { type: String, enum: ['dark', 'light', 'system'], default: 'system' },
     isVerified: { type: Boolean, default: false },
     isAnonymous: { type: Boolean, default: false },
+    role: { type: String, enum: ['user', 'system_bot', 'admin'], default: 'user' },
   },
   { timestamps: true }
 );

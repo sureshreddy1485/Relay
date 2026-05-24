@@ -13,6 +13,11 @@ import { disconnectSocket } from '../../services/socketService';
 import api, { uploadApi } from '../../services/api';
 import { HEADER_TOP } from '../../components/TabHeader';
 import TabHeader from '../../components/TabHeader';
+import * as Updates from 'expo-updates';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Reusable row components ──────────────────────────────────────────────────
 
@@ -60,16 +65,18 @@ const SwitchRow = ({ icon, label, subtitle, value, onChange, iconBg, iconColor }
 // ─── Privacy picker helper ────────────────────────────────────────────────────
 const VISIBILITY_OPTIONS = ['everyone', 'friends', 'nobody'];
 
+import { useAlert } from '../../components/CustomAlert';
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function SettingsScreen({ navigation }) {
   const { user, updateUser, logout } = useAuthStore();
+  const { showAlert } = useAlert();
 
   const [privacy, setPrivacy] = useState({
     lastSeenVisibility:       user?.privacy?.lastSeenVisibility || 'everyone',
     profilePictureVisibility: user?.privacy?.profilePictureVisibility || 'everyone',
     storiesVisibility:        user?.privacy?.storiesVisibility || 'everyone',
     readReceipts:             user?.privacy?.readReceipts || 'automatic',
-    allowDMFromGroups:        user?.privacy?.allowDMFromGroups !== false,
   });
 
   const [profileSheetVisible, setProfileSheetVisible] = useState(false);
@@ -79,6 +86,27 @@ export default function SettingsScreen({ navigation }) {
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [loadingBlocked, setLoadingBlocked] = useState(false);
   const [unblockingId, setUnblockingId] = useState(null);
+  
+  const [appThemeSheetVisible, setAppThemeSheetVisible] = useState(false);
+  const [currentAppTheme, setCurrentAppTheme] = useState('relay');
+
+  React.useEffect(() => {
+    AsyncStorage.getItem('app_theme').then(t => {
+      if (t) setCurrentAppTheme(t);
+    });
+  }, []);
+
+  const handleAppThemeSelect = async (themeId) => {
+    setAppThemeSheetVisible(false);
+    if (themeId === currentAppTheme) return;
+    
+    await AsyncStorage.setItem('app_theme', themeId);
+    showAlert('Theme Changed', 'The app will now restart to apply the new theme.', [
+      { text: 'OK', onPress: () => {
+        try { Updates.reloadAsync(); } catch (e) {}
+      } }
+    ]);
+  };
 
   const fetchBlockedUsers = async () => {
     try {
@@ -86,7 +114,7 @@ export default function SettingsScreen({ navigation }) {
       const { data } = await api.get('/users/blocked');
       setBlockedUsers(data.blockedUsers || []);
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to fetch blocked users');
+      showAlert('Error', e.message || 'Failed to fetch blocked users');
     } finally {
       setLoadingBlocked(false);
     }
@@ -99,9 +127,9 @@ export default function SettingsScreen({ navigation }) {
       setBlockedUsers(prev => prev.filter(u => u._id !== targetId));
       const updatedBlocked = (user.blockedUsers || []).filter(id => id.toString() !== targetId.toString());
       updateUser({ blockedUsers: updatedBlocked });
-      Alert.alert('Success', 'User has been unblocked.');
+      showAlert('Success', 'User has been unblocked.');
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to unblock user');
+      showAlert('Error', e.message || 'Failed to unblock user');
     } finally {
       setUnblockingId(null);
     }
@@ -118,7 +146,7 @@ export default function SettingsScreen({ navigation }) {
       const { data } = await api.get('/users/friends');
       setFriendsList(data.friends || []);
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to fetch friends');
+      showAlert('Error', e.message || 'Failed to fetch friends');
     } finally {
       setLoadingFriends(false);
     }
@@ -129,11 +157,11 @@ export default function SettingsScreen({ navigation }) {
     try {
       await api.post(`/users/${targetId}/remove-friend`);
       setFriendsList(prev => prev.filter(f => f._id !== targetId));
-      const updatedFriends = (user.friends || []).filter(id => id.toString() !== targetId.toString());
+      const updatedFriends = (user.friends || []).filter(id => (id._id || id).toString() !== targetId.toString());
       updateUser({ friends: updatedFriends });
-      Alert.alert('Removed', 'Friend removed silently');
+      showAlert('Removed', 'Friend removed silently');
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to remove friend');
+      showAlert('Error', e.message || 'Failed to remove friend');
     } finally {
       setRemovingFriendId(null);
     }
@@ -147,14 +175,14 @@ export default function SettingsScreen({ navigation }) {
       useChatStore.getState().selectChat(data.chat);
       navigation.replace('ChatRoom', { chat: data.chat });
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to open chat');
+      showAlert('Error', e.message || 'Failed to open chat');
     }
   };
 
   const pickAndUploadProfilePicture = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow photo library access.');
+      showAlert('Permission needed', 'Please allow photo library access.');
       return;
     }
 
@@ -175,14 +203,14 @@ export default function SettingsScreen({ navigation }) {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       updateUser(data.user);
-      Alert.alert('✨', 'Profile picture updated successfully!');
+      showAlert('✨', 'Profile picture updated successfully!');
     } catch (e) {
-      Alert.alert('Upload failed', e.message || 'Try again');
+      showAlert('Upload failed', e.message || 'Try again');
     }
   };
 
   const removeProfilePicture = async () => {
-    Alert.alert('Remove Profile Picture', 'Are you sure you want to remove your profile picture?', [
+    showAlert('Remove Profile Picture', 'Are you sure you want to remove your profile picture?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -191,9 +219,9 @@ export default function SettingsScreen({ navigation }) {
           try {
             const { data } = await api.put('/users/profile', { removeProfilePicture: true });
             updateUser(data.user);
-            Alert.alert('✨', 'Profile picture removed successfully!');
+            showAlert('✨', 'Profile picture removed successfully!');
           } catch (e) {
-            Alert.alert('Removal failed', e.message || 'Try again');
+            showAlert('Removal failed', e.message || 'Try again');
           }
         }
       }
@@ -205,7 +233,7 @@ export default function SettingsScreen({ navigation }) {
       const { data } = await api.put('/users/profile', { privacy: newPrivacy });
       updateUser(data.user);
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to save');
+      showAlert('Error', e.message || 'Failed to save');
     }
   };
 
@@ -214,7 +242,7 @@ export default function SettingsScreen({ navigation }) {
   const getFieldTitle = () => {
     if (visibilitySheetField === 'lastSeenVisibility') return 'Last Seen Visibility';
     if (visibilitySheetField === 'profilePictureVisibility') return 'Profile Photo Visibility';
-    if (visibilitySheetField === 'storiesVisibility') return 'Stories Visibility';
+    if (visibilitySheetField === 'storiesVisibility') return 'Moments Visibility';
     if (visibilitySheetField === 'readReceipts') return 'Read Receipts';
     return '';
   };
@@ -223,14 +251,8 @@ export default function SettingsScreen({ navigation }) {
     setVisibilitySheetField(field);
   };
 
-  const toggleDM = (val) => {
-    const updated = { ...privacy, allowDMFromGroups: val };
-    setPrivacy(updated);
-    savePrivacy(updated);
-  };
-
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+    showAlert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign Out', style: 'destructive',
@@ -240,7 +262,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleTempDelete = () => {
-    Alert.alert(
+    showAlert(
       'Temporary Deactivation',
       'Are you sure you want to temporarily deactivate your account? You can log back in anytime to reactivate it.',
       [
@@ -254,7 +276,7 @@ export default function SettingsScreen({ navigation }) {
               disconnectSocket();
               await logout();
             } catch (e) {
-              Alert.alert('Error', e.message || 'Deactivation failed');
+              showAlert('Error', e.message || 'Deactivation failed');
             }
           }
         }
@@ -263,7 +285,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handlePermanentDelete = () => {
-    Alert.alert(
+    showAlert(
       '🚨 Permanent Delete 🚨',
       'WARNING: This will permanently delete your account, chats, and messages. This action CANNOT be undone. Are you absolutely sure?',
       [
@@ -277,12 +299,81 @@ export default function SettingsScreen({ navigation }) {
               disconnectSocket();
               await logout();
             } catch (e) {
-              Alert.alert('Error', e.message || 'Delete failed');
+              showAlert('Error', e.message || 'Delete failed');
             }
           }
         }
       ]
     );
+  };
+
+  const handleCheckUpdate = async () => {
+    if (__DEV__) {
+      showAlert('Development Mode', 'Over-the-air updates are perfectly configured, but they cannot be tested inside Expo Go. They will work flawlessly in your built app!');
+      return;
+    }
+    try {
+      const update = await Updates.checkForUpdateAsync();
+      if (update.isAvailable) {
+        showAlert('Update Available', 'Downloading update...');
+        await Updates.fetchUpdateAsync();
+        showAlert('Update Ready', 'App will restart to apply the update.', [
+          { text: 'OK', onPress: () => Updates.reloadAsync() }
+        ]);
+      } else {
+        showAlert('Up to Date', 'You are on the latest version.');
+      }
+    } catch (e) {
+      showAlert('Error', 'Failed to check for updates: ' + e.message);
+    }
+  };
+
+  const handleBackup = async () => {
+    try {
+      const backupData = JSON.stringify(useChatStore.getState().messages);
+      const filename = `${user?.username || 'user'}_${new Date().toISOString().replace(/[:.]/g, '-')}_backup.json`;
+      
+      if (Platform.OS === 'android') {
+        const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (permissions.granted) {
+          const uri = await FileSystem.StorageAccessFramework.createFileAsync(
+            permissions.directoryUri,
+            filename,
+            'application/json'
+          );
+          await FileSystem.writeAsStringAsync(uri, backupData, { encoding: FileSystem.EncodingType.UTF8 });
+          showAlert('Success', 'Backup saved locally in the selected folder!');
+        } else {
+          showAlert('Permission Denied', 'Unable to save backup locally.');
+        }
+      } else {
+        // Fallback for iOS
+        const fileUri = FileSystem.documentDirectory + filename;
+        await FileSystem.writeAsStringAsync(fileUri, backupData);
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri);
+        } else {
+          showAlert('Success', 'Backup saved to ' + fileUri);
+        }
+      }
+    } catch (e) {
+      showAlert('Backup Failed', e.message);
+    }
+  };
+
+  const handleRestore = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: '*/*' });
+      if (!result.canceled && result.assets) {
+        const fileUri = result.assets[0].uri;
+        const backupData = await FileSystem.readAsStringAsync(fileUri);
+        const parsed = JSON.parse(backupData);
+        useChatStore.setState({ messages: parsed });
+        showAlert('Restore Success', 'Chats restored successfully. Note: This only restores messages locally.');
+      }
+    } catch (e) {
+      showAlert('Restore Failed', e.message);
+    }
   };
 
   const capitalize = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
@@ -330,10 +421,9 @@ export default function SettingsScreen({ navigation }) {
           <SettingRow
             icon="desktop-outline"
             label="Connected Devices"
-            value="1 device"
             iconBg="#F59E0B20"
             iconColor="#F59E0B"
-            onPress={() => Alert.alert('Devices', 'Multi-device management coming soon.')}
+            onPress={() => navigation.navigate('DeviceManagement')}
           />
           <SettingRow
             icon="people-outline"
@@ -346,6 +436,20 @@ export default function SettingsScreen({ navigation }) {
             }}
           />
         </View>
+
+        {/* ── Appearance (Hidden for now) ──────────────────────────────────────────────────
+        <SectionTitle label="Appearance" />
+        <View style={styles.section}>
+          <SettingRow
+            icon="color-palette-outline"
+            label="App Theme"
+            iconBg="#8B5CF620"
+            iconColor="#8B5CF6"
+            value={currentAppTheme === 'cyan' ? 'Cyan' : 'Relay (Cyan)'}
+            onPress={() => setAppThemeSheetVisible(true)}
+          />
+        </View>
+        */}
 
         {/* ── Privacy & Security ────────────────────────────────────────── */}
         <SectionTitle label="Privacy & Security" />
@@ -368,7 +472,7 @@ export default function SettingsScreen({ navigation }) {
           />
           <SettingRow
             icon="book-outline"
-            label="Stories"
+            label="Moments"
             iconBg="#EC489920"
             iconColor="#EC4899"
             value={capitalize(privacy.storiesVisibility)}
@@ -381,15 +485,6 @@ export default function SettingsScreen({ navigation }) {
             iconColor="#3B82F6"
             value={capitalize(privacy.readReceipts)}
             onPress={() => pickVisibility('readReceipts')}
-          />
-          <SwitchRow
-            icon="chatbubble-ellipses-outline"
-            label="Allow DMs from group members"
-            subtitle="People in your groups can message you directly"
-            iconBg="#06B6D420"
-            iconColor="#06B6D4"
-            value={privacy.allowDMFromGroups}
-            onChange={toggleDM}
           />
           <SettingRow
             icon="ban-outline"
@@ -411,7 +506,33 @@ export default function SettingsScreen({ navigation }) {
             label="Push Notifications"
             iconBg="#EAB30820"
             iconColor="#EAB308"
-            onPress={() => Alert.alert('Notifications', 'Manage in your device settings.')}
+            onPress={() => showAlert('Notifications', 'Manage in your device settings.')}
+          />
+        </View>
+
+        {/* ── App & Data ────────────────────────────────────────────────── */}
+        <SectionTitle label="App & Data" />
+        <View style={styles.section}>
+          <SettingRow
+            icon="cloud-upload-outline"
+            label="Backup Chats"
+            iconBg="#3B82F620"
+            iconColor="#3B82F6"
+            onPress={handleBackup}
+          />
+          <SettingRow
+            icon="cloud-download-outline"
+            label="Restore Chats"
+            iconBg="#10B98120"
+            iconColor="#10B981"
+            onPress={handleRestore}
+          />
+          <SettingRow
+            icon="refresh-circle-outline"
+            label="Check for Updates"
+            iconBg="#8B5CF620"
+            iconColor="#8B5CF6"
+            onPress={handleCheckUpdate}
           />
         </View>
 
@@ -439,7 +560,7 @@ export default function SettingsScreen({ navigation }) {
           />
         </View>
 
-        <Text style={styles.version}>Nexo v1.0.0</Text>
+        <Text style={styles.version}>Relay v1.0.0</Text>
       </ScrollView>
 
       {/* ── Profile Actions Sheet (Bottom Sheet Modal) ────────────────────── */}
@@ -456,7 +577,7 @@ export default function SettingsScreen({ navigation }) {
                 if (user?.profilePicture) {
                   setProfilePicViewerVisible(true);
                 } else {
-                  Alert.alert('No Profile Picture', 'You haven\'t uploaded a profile picture yet.');
+                  showAlert('No Profile Picture', 'You haven\'t uploaded a profile picture yet.');
                 }
               }}>
                 <Ionicons name="person-outline" size={20} color={Colors.dark.text} />
@@ -671,7 +792,7 @@ export default function SettingsScreen({ navigation }) {
                     <TouchableOpacity
                       style={[styles.unblockBtn, { backgroundColor: '#EF4444', paddingHorizontal: 10, paddingVertical: 10 }]}
                       onPress={() => {
-                        Alert.alert('Remove Friend', `Are you sure you want to silently remove ${item.displayName || item.username} from friends?`, [
+                        showAlert('Remove Friend', `Are you sure you want to silently remove ${item.displayName || item.username} from friends?`, [
                           { text: 'Cancel', style: 'cancel' },
                           { text: 'Remove', style: 'destructive', onPress: () => handleRemoveFriendSilent(item._id) }
                         ]);
@@ -692,6 +813,44 @@ export default function SettingsScreen({ navigation }) {
             {/* Cancel Button */}
             <TouchableOpacity style={styles.sheetCancelBtn} onPress={() => setShowFriendsModal(false)} activeOpacity={0.8}>
               <Text style={styles.sheetCancelText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── App Theme Selection Sheet ────────────────────────── */}
+      <Modal visible={appThemeSheetVisible} transparent animationType="slide" onRequestClose={() => setAppThemeSheetVisible(false)}>
+        <TouchableOpacity style={styles.sheetOverlay} activeOpacity={1} onPress={() => setAppThemeSheetVisible(false)}>
+          <View style={styles.sheetContainer}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Select App Theme</Text>
+
+            <View style={styles.sheetActionsWrap}>
+              <TouchableOpacity
+                style={styles.sheetActionItem}
+                onPress={() => handleAppThemeSelect('relay')}
+              >
+                <Ionicons name="sparkles-outline" size={20} color="#06B6D4" />
+                <Text style={styles.sheetActionLabel}>Relay (Cyan)</Text>
+                {currentAppTheme === 'relay' && (
+                  <Ionicons name="checkmark" size={20} color={Colors.primary} style={{ marginLeft: 'auto' }} />
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.sheetActionItem}
+                onPress={() => handleAppThemeSelect('cyan')}
+              >
+                <Ionicons name="water-outline" size={20} color="#06B6D4" />
+                <Text style={styles.sheetActionLabel}>Cyan</Text>
+                {currentAppTheme === 'cyan' && (
+                  <Ionicons name="checkmark" size={20} color={Colors.primary} style={{ marginLeft: 'auto' }} />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.sheetCancelBtn} onPress={() => setAppThemeSheetVisible(false)} activeOpacity={0.8}>
+              <Text style={styles.sheetCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

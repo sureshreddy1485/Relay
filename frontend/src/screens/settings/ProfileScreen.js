@@ -10,10 +10,12 @@ import useAuthStore from '../../store/useAuthStore';
 import { Colors } from '../../theme/colors';
 import { uploadApi } from '../../services/api';
 import { HEADER_TOP } from '../../components/TabHeader';
+import { useAlert } from '../../components/CustomAlert';
 
 const COVER_HEIGHT = 170;
 
 export default function ProfileScreen({ navigation }) {
+  const { showAlert } = useAlert();
   const { user, updateUser } = useAuthStore();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingCover, setUploadingCover]   = useState(false);
@@ -42,7 +44,7 @@ export default function ProfileScreen({ navigation }) {
       });
       updateUser(data.user);
     } catch (e) {
-      Alert.alert('Upload failed', e.message || 'Try again');
+      showAlert('Upload failed', e.message || 'Try again');
     } finally {
       setter(false);
     }
@@ -51,7 +53,7 @@ export default function ProfileScreen({ navigation }) {
   const stats = [
     { label: 'Friends', value: user?.friends?.length || 0 },
     { label: 'Groups',  value: '—' },
-    { label: 'Stories', value: '—' },
+    { label: 'Moments', value: '—' },
   ];
 
   return (

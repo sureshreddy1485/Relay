@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, ActivityIndicator, Image, StatusBar, Platform,
@@ -11,11 +12,13 @@ import api, { uploadApi } from '../../services/api';
 import useChatStore from '../../store/useChatStore';
 
 export default function CreateGroupScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const preSelected = route.params?.preSelectedUsers || [];
   const [name, setName]               = useState('');
   const [description, setDescription] = useState('');
   const [groupUsername, setGroupUsername] = useState('');
   const [isPublic, setIsPublic]       = useState(true);
+  const [joinPrivacy, setJoinPrivacy] = useState('anyone');
   const [search, setSearch]           = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selected, setSelected]       = useState(preSelected);
@@ -36,7 +39,7 @@ export default function CreateGroupScreen({ navigation, route }) {
     setSearchResults([]);
     try {
       const { data } = await api.get(`/users/search?q=${search.trim()}`);
-      setSearchResults(data.users);
+      setSearchResults(data.users.filter(u => u.username !== 'relay_bot' && u.username !== 'relay'));
     } catch (_) {} finally { setIsSearching(false); }
   };
 
@@ -73,8 +76,21 @@ export default function CreateGroupScreen({ navigation, route }) {
       formData.append('description', description.trim());
       formData.append('users', JSON.stringify(selected.map(u => u._id)));
       formData.append('isPublic', isPublic ? 'true' : 'false');
+      formData.append('joinPrivacy', joinPrivacy);
       if (groupUsername.trim()) {
-        formData.append('groupUsername', groupUsername.trim());
+        const rawUsername = groupUsername.trim().replace(/^@/, '');
+        const usernameRegex = /^[a-zA-Z_][a-zA-Z0-9_.]*$/;
+        if (!usernameRegex.test(rawUsername)) {
+          Alert.alert('Error', 'Group username must start with a letter or underscore and contain only letters, numbers, underscores, and dots.');
+          setIsCreating(false);
+          return;
+        }
+        if (rawUsername.length < 8) {
+          Alert.alert('Error', 'Group username must be at least 8 characters long');
+          setIsCreating(false);
+          return;
+        }
+        formData.append('groupUsername', rawUsername);
       }
       if (avatar) formData.append('groupPicture', { uri: avatar.uri, name: 'group.jpg', type: 'image/jpeg' });
       const { data } = await uploadApi.post('/chats/group', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -90,7 +106,7 @@ export default function CreateGroupScreen({ navigation, route }) {
       <StatusBar barStyle="light-content" backgroundColor={Colors.dark.card} />
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: (insets.top || StatusBar.currentHeight || 0) + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
           <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
         </TouchableOpacity>
@@ -180,6 +196,26 @@ export default function CreateGroupScreen({ navigation, route }) {
             >
               <View style={[styles.toggleDot, isPublic && styles.toggleDotActive]} />
             </TouchableOpacity>
+          </View>
+          <View style={styles.fieldDivider} />
+          <View style={{ padding: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={Colors.dark.muted} />
+              <Text style={{ color: Colors.dark.text, fontSize: 15 }}>Who can join?</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {['anyone', 'invite_only', 'closed'].map(option => (
+                <TouchableOpacity
+                  key={option}
+                  onPress={() => setJoinPrivacy(option)}
+                  style={[{ flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: Colors.dark.border, alignItems: 'center' }, joinPrivacy === option && { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]}
+                >
+                  <Text style={[{ fontSize: 13, color: Colors.dark.muted, fontWeight: '500' }, joinPrivacy === option && { color: Colors.primary, fontWeight: '700' }]}>
+                    {option === 'anyone' ? 'Anyone' : option === 'invite_only' ? 'Request' : 'Closed'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
 
@@ -305,7 +341,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 54,
     paddingBottom: 12,
     backgroundColor: Colors.dark.card,
     borderBottomWidth: 1, borderBottomColor: Colors.dark.border,

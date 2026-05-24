@@ -105,3 +105,9 @@ For Play Store release use: `eas build -p android --profile production`
 | Database | MongoDB Atlas | Cloud-hosted |
 | Media Storage | Cloudinary | Cloud-hosted |
 | App | Expo EAS Build | `.apk` file |
+
+| `GROQ_API_KEY` | `your_groq_api_key_here` (get from https://console.groq.com) |
+
+for killing task:
+netstat -ano | findstr :port number
+taskkill /PID process id /F

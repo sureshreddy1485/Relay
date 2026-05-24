@@ -28,12 +28,19 @@ const sanitizeUser = (user, currentUserId) => {
     u.isCameraActive = false;
   }
   
+  if (u.role === 'system_bot' || u.username === 'mica_bot') {
+    u.isOnline = true;
+    u.lastSeen = null;
+  }
+  
   // Delete sensitive fields that shouldn't leak
   delete u.friends;
   delete u.friendRequests;
   delete u.sentRequests;
   delete u.blockedUsers;
   delete u.privacy;
+  
+  u.isFriend = isFriend;
   
   return u;
 };

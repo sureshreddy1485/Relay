@@ -70,11 +70,21 @@ const socketHandler = (io) => {
       socket.to(message.chat._id || message.chat).emit('new_message', message);
     });
 
-    // ─── Read receipts ───────────────────────────────────────────────
-    socket.on('mark_read', ({ chatId, userId }) => {
-      socket.to(chatId).emit('messages_read', { chatId, userId });
+    // ─── Delivery & Read receipts ────────────────────────────────────
+    socket.on('mark_read', async ({ chatId, userId }) => {
+      try {
+        const user = await User.findById(userId).select('privacy');
+        if (user?.privacy?.readReceipts !== 'hide') {
+          socket.to(chatId).emit('messages_read', { chatId, userId });
+        }
+      } catch (err) {
+        console.error('Error in mark_read socket event:', err);
+      }
     });
 
+    socket.on('mark_delivered', ({ chatId, userId }) => {
+      socket.to(chatId).emit('messages_delivered', { chatId, userId });
+    });
     // ─── Camera active indicator ─────────────────────────────────────
     socket.on('camera_active', async ({ userId, isActive }) => {
       await User.findByIdAndUpdate(userId, { isCameraActive: isActive });

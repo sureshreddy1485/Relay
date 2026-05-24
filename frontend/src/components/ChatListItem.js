@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import useChatStore from '../store/useChatStore';
@@ -17,9 +17,16 @@ const formatTime = (dateStr) => {
 };
 
 const getReadIcon = (msg, currentUserId) => {
-  if (!msg || msg.sender?._id !== currentUserId) return null;
+  if (!msg) return null;
+  const senderId = msg.sender?._id?.toString() || msg.sender?.toString();
+  if (senderId !== currentUserId?.toString()) return null;
+  
   const readCount = msg.readBy?.length || 0;
   if (readCount > 0) return <Ionicons name="checkmark-done" size={14} color={Colors.primary} />;
+  
+  const deliveredCount = msg.deliveredTo?.length || 0;
+  if (deliveredCount > 0) return <Ionicons name="checkmark-done" size={14} color={Colors.dark.muted} />;
+
   return <Ionicons name="checkmark" size={14} color={Colors.dark.muted} />;
 };
 
@@ -38,22 +45,24 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
   const otherUser     = chat.isGroupChat ? null : chat.users?.find(u => u._id !== currentUser?._id);
   const name          = chat.isGroupChat ? chat.chatName : (otherUser?.displayName || otherUser?.username || 'Unknown');
   const avatar        = chat.isGroupChat ? chat.groupPicture : otherUser?.profilePicture;
-  const isOnline      = !chat.isGroupChat && !!otherUser?.isOnline;
+  const isRelay       = !chat.isGroupChat && (otherUser?.username === 'relay_bot' || otherUser?.username === 'relay');
+  const isOnline      = !chat.isGroupChat && (otherUser?.isOnline || otherUser?.username === 'mica_bot') && !isRelay;
   const isCameraActive = !chat.isGroupChat && !!otherUser?.isCameraActive;
   const isPinned      = currentUser?.pinnedChats?.includes(chat._id);
   const isMuted       = currentUser?.mutedChats?.includes(chat._id);
   const disappear     = disappearIcon(chat.disappearAfter);
-  const unreadCount   = useChatStore(s => s.unreadCounts[chat._id] || 0);
+  const unreadCount   = useChatStore(s => s.unreadCounts[chat._id?.toString()] || 0);
 
   const lastMsg = chat.latestMessage;
   let lastMsgText = 'No messages yet';
   if (lastMsg) {
     if (lastMsg.deletedForEveryone)                              lastMsgText = '🚫 Deleted';
+    else if (lastMsg.messageType === 'group_invite')             lastMsgText = '💌 Group Invitation';
     else if (lastMsg.mediaType === 'image')                      lastMsgText = '📷 Photo';
     else if (lastMsg.mediaType === 'video')                      lastMsgText = '🎥 Video';
     else if (lastMsg.mediaType === 'audio' || lastMsg.mediaType === 'voice') lastMsgText = '🎤 Voice';
     else if (lastMsg.mediaType === 'document')                   lastMsgText = '📎 Document';
-    else                                                          lastMsgText = lastMsg.content || '';
+    else                                                          lastMsgText = (lastMsg.content || '').replace(/\*\*/g, '');
   }
 
   return (
@@ -83,6 +92,9 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
             <View style={[styles.statusDot, styles.dotCam]}>
               <Ionicons name="videocam" size={7} color="#FFF" />
             </View>
+          ) : isRelay ? (
+            /* Relay always shows cyan dot */
+            <View style={[styles.statusDot, styles.dotRelay]} />
           ) : (
             /* Green = online, Dark = offline */
             <View style={[styles.statusDot, isOnline ? styles.dotOnline : styles.dotOffline]} />
@@ -136,6 +148,9 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
+const { width } = Dimensions.get('window');
+const isSmall = width <= 380;
+
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row', alignItems: 'center',
@@ -145,13 +160,13 @@ const styles = StyleSheet.create({
 
   // Avatar
   avatarWrap: { position: 'relative' },
-  avatar: { width: 54, height: 54, borderRadius: 27 },
+  avatar: { width: isSmall ? 48 : 54, height: isSmall ? 48 : 54, borderRadius: isSmall ? 24 : 27 },
   camBorder: { borderWidth: 2, borderColor: Colors.camera },
   avatarFallback: {
     backgroundColor: Colors.primary + '40', alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: Colors.primary + '60',
   },
-  avatarText: { fontSize: 22, fontWeight: '700', color: Colors.primary },
+  avatarText: { fontSize: isSmall ? 18 : 22, fontWeight: '700', color: Colors.primary },
 
   // Status dot
   statusDot: {
@@ -161,6 +176,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   dotOnline:  { backgroundColor: Colors.accentGreen },
+  dotRelay:   { backgroundColor: Colors.primary },
   dotOffline: { backgroundColor: '#3A3A3A' },         // dark charcoal = offline
   dotCam:     { backgroundColor: Colors.camera },
 
@@ -170,7 +186,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', marginBottom: 4,
   },
-  name: { fontSize: 16, fontWeight: '700', color: Colors.dark.text, flex: 1, marginRight: 6 },
+  name: { fontSize: isSmall ? 15 : 16, fontWeight: '700', color: Colors.dark.text, flex: 1, marginRight: 6 },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   pinIcon: { marginRight: 2 },
   time: { fontSize: 12, color: Colors.dark.muted },

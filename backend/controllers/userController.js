@@ -52,9 +52,11 @@ const updateProfile = asyncHandler(async (req, res) => {
   if (privacy !== undefined) user.privacy = { ...user.privacy, ...privacy };
 
   if (req.body.removeProfilePicture === 'true' || req.body.removeProfilePicture === true) {
+    if (user.profilePicture) await deleteFromCloudinary(user.profilePicture);
     user.profilePicture = "";
   }
   if (req.body.removeCoverPhoto === 'true' || req.body.removeCoverPhoto === true) {
+    if (user.coverPhoto) await deleteFromCloudinary(user.coverPhoto);
     user.coverPhoto = "";
   }
 
@@ -64,6 +66,7 @@ const updateProfile = asyncHandler(async (req, res) => {
   if (files.profilePicture?.[0]) {
     try {
       const result = await uploadToCloudinary(files.profilePicture[0].buffer, 'profiles', 'image');
+      if (user.profilePicture) await deleteFromCloudinary(user.profilePicture);
       user.profilePicture = result.secure_url;
     } catch (cloudinaryErr) {
       console.error('Profile Picture Cloudinary Upload Failed:', cloudinaryErr);
@@ -75,6 +78,7 @@ const updateProfile = asyncHandler(async (req, res) => {
   if (files.coverPhoto?.[0]) {
     try {
       const result = await uploadToCloudinary(files.coverPhoto[0].buffer, 'covers', 'image');
+      if (user.coverPhoto) await deleteFromCloudinary(user.coverPhoto);
       user.coverPhoto = result.secure_url;
     } catch (cloudinaryErr) {
       console.error('Cover Photo Cloudinary Upload Failed:', cloudinaryErr);
@@ -101,6 +105,17 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
   }
   if (targetUser.friendRequests.includes(req.user._id)) {
     res.status(400); throw new Error('Request already sent');
+  }
+
+  if (targetUser.username === 'mica_bot') {
+    if (!targetUser.friends.includes(req.user._id)) targetUser.friends.push(req.user._id);
+    await targetUser.save();
+    
+    const sender = await User.findById(req.user._id);
+    if (!sender.friends.includes(targetUser._id)) sender.friends.push(targetUser._id);
+    await sender.save();
+    
+    return res.status(200).json({ success: true, message: 'Friend request auto-accepted by Mica!' });
   }
 
   targetUser.friendRequests.push(req.user._id);
@@ -224,16 +239,9 @@ const blockUser = asyncHandler(async (req, res) => {
   user.friends = user.friends.filter(id => id.toString() !== req.params.id);
   await user.save();
 
-  // Dismantle any 1-to-1 direct chat between blocker and blocked user
-  const chatToDelete = await Chat.findOne({
-    isGroupChat: false,
-    users: { $all: [req.user._id, req.params.id] },
-  });
-  if (chatToDelete) {
-    await Chat.findByIdAndDelete(chatToDelete._id);
-    const Message = require('../models/Message');
-    await Message.deleteMany({ chat: chatToDelete._id });
-  }
+  // Note: We intentionally do NOT dismantle the 1-to-1 chat when blocking, 
+  // to mimic WhatsApp behavior where the blocked user can still see the chat
+  // and send messages (which will simply never reach the blocker).
 
   res.status(200).json({ success: true, message: 'User blocked' });
 });
@@ -282,58 +290,87 @@ const deactivateAccount = asyncHandler(async (req, res) => {
 // @access Private
 const deleteAccount = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  
-  // 1. Fetch user to delete his profile picture from Cloudinary
+  const Message = require('../models/Message');
+  const Story = require('../models/Story');
+
+  // 1. Delete profile picture & cover photo from Cloudinary
   const userObj = await User.findById(userId);
-  if (userObj && userObj.profilePicture) {
-    try {
-      await deleteFromCloudinary(userObj.profilePicture);
-    } catch (_) {}
+  if (userObj) {
+    if (userObj.profilePicture) await deleteFromCloudinary(userObj.profilePicture).catch(() => {});
+    if (userObj.coverPhoto)     await deleteFromCloudinary(userObj.coverPhoto).catch(() => {});
   }
 
-  // 2. Remove user ID from all other users' friends, blockedUsers, and friendRequests lists
-  await User.updateMany(
-    {},
-    {
-      $pull: {
-        friends: userId,
-        blockedUsers: userId,
-        friendRequests: userId
-      }
-    }
+  // 2. Delete all story media from Cloudinary, then the DB docs
+  const userStories = await Story.find({ user: userId }).select('mediaPublicId mediaUrl mediaType');
+  await Promise.allSettled(
+    userStories.map(s => {
+      const ref = s.mediaPublicId || s.mediaUrl;
+      return ref ? deleteFromCloudinary(ref) : Promise.resolve();
+    })
   );
-
-  // 3. Delete all Stories created by this user
-  const Story = require('../models/Story');
   await Story.deleteMany({ user: userId });
 
-  // 4. Delete all Messages sent by this user
-  const Message = require('../models/Message');
+  // 3. Delete all message media sent by this user from Cloudinary
+  const userMessages = await Message.find({
+    sender: userId,
+    $or: [{ mediaPublicId: { $exists: true, $ne: '' } }, { mediaUrl: { $exists: true, $ne: '' } }],
+  }).select('mediaPublicId mediaUrl');
+  await Promise.allSettled(
+    userMessages.map(m => {
+      const ref = m.mediaPublicId || m.mediaUrl;
+      return ref ? deleteFromCloudinary(ref) : Promise.resolve();
+    })
+  );
   await Message.deleteMany({ sender: userId });
+
+  // 4. Remove user from other users' friends/blocked/requests lists
+  await User.updateMany(
+    {},
+    { $pull: { friends: userId, blockedUsers: userId, friendRequests: userId } }
+  );
 
   // 5. Handle Chats (DMs and Groups)
   const userChats = await Chat.find({ users: userId });
   for (const chat of userChats) {
     if (!chat.isGroupChat) {
-      // For DMs, delete the chat completely and its messages
+      // DM: delete all remaining messages (from the other user) + their media + the chat
+      const dmMessages = await Message.find({
+        chat: chat._id,
+        $or: [{ mediaPublicId: { $exists: true, $ne: '' } }, { mediaUrl: { $exists: true, $ne: '' } }],
+      }).select('mediaPublicId mediaUrl');
+      await Promise.allSettled(
+        dmMessages.map(m => {
+          const ref = m.mediaPublicId || m.mediaUrl;
+          return ref ? deleteFromCloudinary(ref) : Promise.resolve();
+        })
+      );
       await Chat.findByIdAndDelete(chat._id);
       await Message.deleteMany({ chat: chat._id });
     } else {
-      // For Groups, pull the user and check group ownership/membership
+      // Group: just remove this user
       chat.users = chat.users.filter(uId => uId.toString() !== userId.toString());
       chat.admins = chat.admins.filter(aId => aId.toString() !== userId.toString());
 
       if (chat.users.length === 0) {
-        // No members left -> dismantle
+        // Last member — delete group pic + all messages + chat
+        if (chat.groupPicture) await deleteFromCloudinary(chat.groupPicture).catch(() => {});
+        const grpMessages = await Message.find({
+          chat: chat._id,
+          $or: [{ mediaPublicId: { $exists: true, $ne: '' } }, { mediaUrl: { $exists: true, $ne: '' } }],
+        }).select('mediaPublicId mediaUrl');
+        await Promise.allSettled(
+          grpMessages.map(m => {
+            const ref = m.mediaPublicId || m.mediaUrl;
+            return ref ? deleteFromCloudinary(ref) : Promise.resolve();
+          })
+        );
         await Chat.findByIdAndDelete(chat._id);
         await Message.deleteMany({ chat: chat._id });
       } else {
-        // If he was the owner, transfer ownership to the first remaining member
+        // Transfer ownership if this user was the group owner
         if (chat.groupAdmin && chat.groupAdmin.toString() === userId.toString()) {
           chat.groupAdmin = chat.users[0];
-          if (!chat.admins.includes(chat.users[0])) {
-            chat.admins.push(chat.users[0]);
-          }
+          if (!chat.admins.includes(chat.users[0])) chat.admins.push(chat.users[0]);
         }
         await chat.save();
       }
@@ -345,6 +382,7 @@ const deleteAccount = asyncHandler(async (req, res) => {
 
   res.status(200).json({ success: true, message: 'Account and all related data permanently deleted' });
 });
+
 
 // @desc  Remove a friend
 // @route POST /api/users/:id/remove-friend
@@ -394,9 +432,56 @@ const updatePushToken = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Push token updated' });
 });
 
+// @desc  Toggle DM permission for a specific group
+// @route PUT /api/users/privacy/dm-group/:id
+// @access Private
+const toggleGroupDMPrivacy = asyncHandler(async (req, res) => {
+  const { allowed } = req.body;
+  const groupId = req.params.id;
+  const user = await User.findById(req.user._id);
+  
+  if (!user) { res.status(404); throw new Error('User not found'); }
+  
+  if (!user.privacy) user.privacy = {};
+  if (!user.privacy.allowedDMGroups) user.privacy.allowedDMGroups = [];
+  if (!user.privacy.disallowedDMGroups) user.privacy.disallowedDMGroups = [];
+  
+  if (allowed) {
+    // User ALLOWS DMs from this group
+    if (!user.privacy.allowedDMGroups.includes(groupId)) {
+      user.privacy.allowedDMGroups.push(groupId);
+    }
+    user.privacy.disallowedDMGroups = user.privacy.disallowedDMGroups.filter(id => id.toString() !== groupId.toString());
+  } else {
+    // User DISALLOWS DMs from this group
+    if (!user.privacy.disallowedDMGroups.includes(groupId)) {
+      user.privacy.disallowedDMGroups.push(groupId);
+    }
+    user.privacy.allowedDMGroups = user.privacy.allowedDMGroups.filter(id => id.toString() !== groupId.toString());
+  }
+  
+  const updated = await user.save();
+
+  // Real-time update for group members
+  const io = req.app.get('io');
+  if (io) {
+    const Chat = require('../models/Chat');
+    const fullChat = await Chat.findById(groupId)
+      .populate('users', '-password -securityKey')
+      .populate('groupAdmin admins', 'username displayName profilePicture');
+    if (fullChat) {
+      fullChat.users.forEach((u) => {
+        io.to((u._id || u).toString()).emit('chat_updated', fullChat);
+      });
+    }
+  }
+
+  res.status(200).json({ success: true, privacy: updated.privacy });
+});
+
 module.exports = {
   searchUsers, getUserProfile, updateProfile, sendFriendRequest,
   acceptFriendRequest, declineFriendRequest, blockUser, unblockUser,
   getFriendRequests, updateCameraStatus, deactivateAccount, deleteAccount,
-  removeFriend, getBlockedUsers, getFriends, updatePushToken,
+  removeFriend, getBlockedUsers, getFriends, updatePushToken, toggleGroupDMPrivacy,
 };

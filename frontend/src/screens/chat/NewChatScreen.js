@@ -10,8 +10,10 @@ import { Colors } from '../../theme/colors';
 import api from '../../services/api';
 import useChatStore from '../../store/useChatStore';
 import useAuthStore from '../../store/useAuthStore';
+import { useAlert } from '../../components/CustomAlert';
 
 export default function NewChatScreen({ navigation }) {
+  const { showAlert } = useAlert();
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -23,7 +25,7 @@ export default function NewChatScreen({ navigation }) {
 
   const handleSearch = async () => {
     if (search.trim().length < 3) {
-      Alert.alert('Enter username', 'Type the full username to search.');
+      showAlert('Enter username', 'Type the full username to search.');
       return;
     }
     setIsSearching(true);
@@ -31,7 +33,7 @@ export default function NewChatScreen({ navigation }) {
     setResults([]);
     try {
       const { data } = await api.get(`/users/search?q=${search.trim()}`);
-      setResults(data.users);
+      setResults(data.users.filter(u => u.username !== 'relay' && u.username !== 'relay_bot'));
     } catch (_) {} finally {
       setIsSearching(false);
     }
@@ -45,7 +47,7 @@ export default function NewChatScreen({ navigation }) {
       useChatStore.getState().selectChat(data.chat);
       navigation.replace('ChatRoom', { chat: data.chat });
     } catch (e) {
-      Alert.alert('Error', e.message);
+      showAlert('Error', e.message);
     } finally {
       setIsCreating(null);
     }
@@ -57,9 +59,9 @@ export default function NewChatScreen({ navigation }) {
       await api.post(`/users/${targetId}/friend-request`);
       const updatedSent = [...(currentUser.sentRequests || []), targetId];
       updateUser({ sentRequests: updatedSent });
-      Alert.alert('✅', 'Friend request sent!');
+      showAlert('✅ Request Sent', 'Friend request has been sent successfully!');
     } catch (e) {
-      Alert.alert('Error', e.response?.data?.message || e.message);
+      showAlert('Error', e.response?.data?.message || e.message);
     } finally {
       setActionLoading(null);
     }
@@ -78,10 +80,10 @@ export default function NewChatScreen({ navigation }) {
         useChatStore.getState().selectChat(data.chat);
         navigation.replace('ChatRoom', { chat: data.chat });
       } else {
-        Alert.alert('🎉', 'Friend request accepted!');
+        showAlert('🎉 Accepted', 'Friend request accepted!');
       }
     } catch (e) {
-      Alert.alert('Error', e.response?.data?.message || e.message);
+      showAlert('Error', e.response?.data?.message || e.message);
     } finally {
       setActionLoading(null);
     }

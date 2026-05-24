@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Platform, ActivityIndicator, Alert, Image, StatusBar,
@@ -11,6 +12,7 @@ import { Colors } from '../../theme/colors';
 import { uploadApi } from '../../services/api';
 
 export default function EditProfileScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuthStore();
   const [form, setForm] = useState({
     displayName: user?.displayName || '',
@@ -69,7 +71,7 @@ export default function EditProfileScreen({ navigation }) {
       <StatusBar barStyle="light-content" />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: (insets.top || StatusBar.currentHeight || 0) + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
         </TouchableOpacity>
@@ -180,7 +182,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 54,
     paddingBottom: 12,
     backgroundColor: Colors.dark.card,
     borderBottomWidth: 1,

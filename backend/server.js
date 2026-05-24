@@ -1,3 +1,4 @@
+// Nexo API v1.1.0 — message editing, disappearing media, expo-video migration
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
@@ -20,7 +21,17 @@ const { notFound, errorHandler } = require('./middlewares/errorMiddleware');
 const socketHandler = require('./config/socketHandler');
 
 // Connect DB
-connectDB();
+connectDB().then(async () => {
+  try {
+    const User = require('./models/User');
+    await User.updateMany({ isOnline: true }, { $set: { isOnline: false, isCameraActive: false } });
+    console.log('🧹 Purged ghost online sessions');
+  } catch(e) { console.error('Failed to purge online sessions', e); }
+
+  const { initializeMicaBot, initializeRelayBot } = require('./utils/botHelper');
+  initializeMicaBot();
+  initializeRelayBot();
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -77,16 +88,69 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/stories', storyRoutes);
 
 // Health check
-app.get('/health', (req, res) => res.status(200).json({ status: 'OK', app: 'Nexo API' }));
+app.get('/health', (req, res) => res.status(200).json({ status: 'OK', app: 'Relay API' }));
 
 // ─── Error Handlers ────────────────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
 
+// ─── Background Jobs ───────────────────────────────────────────────────────
+setInterval(async () => {
+  try {
+    const Message = require('./models/Message');
+    const Story = require('./models/Story');
+    const { deleteFromCloudinary } = require('./utils/cloudinaryUpload');
+
+    // ── 1. Expired disappearing messages ────────────────────────────────────
+    const expiredMessages = await Message.find({
+      expiresAt: { $lte: new Date() },
+      deletedForEveryone: { $ne: true }
+    });
+
+    for (const message of expiredMessages) {
+      if (message.mediaPublicId || message.mediaUrl) {
+        const publicId = message.mediaPublicId || message.mediaUrl;
+        await deleteFromCloudinary(publicId); // auto-detects image/video/raw
+      }
+      
+      message.deletedForEveryone = true;
+      message.content = 'Message disappeared';
+      message.mediaUrl = '';
+      message.mediaPublicId = '';
+      message.isSelfDestructing = false;
+      message.destructAfterSeconds = 0;
+      message.expiresAt = null;
+      await message.save();
+
+      io.to(message.chat.toString()).emit('message_deleted', { messageId: message._id, chatId: message.chat, forEveryone: true });
+    }
+
+    // ── 2. Expired stories (24h) — delete media from Cloudinary then remove DB doc ──
+    const expiredStories = await Story.find({ expiresAt: { $lte: new Date() } });
+
+    for (const story of expiredStories) {
+      // Delete media from Cloudinary
+      const publicId = story.mediaPublicId || story.mediaUrl;
+      if (publicId) {
+        await deleteFromCloudinary(publicId); // auto-detects image/video/raw
+      }
+      // Notify story author so frontend can refresh
+      io.to(story.user.toString()).emit('story_expired', { storyId: story._id });
+      await story.deleteOne();
+    }
+
+    if (expiredMessages.length || expiredStories.length) {
+      console.log(`[Cleanup] Removed ${expiredMessages.length} message(s) and ${expiredStories.length} story/stories`);
+    }
+  } catch (err) {
+    console.error('Cleanup job error:', err);
+  }
+}, 60 * 1000); // Run every 60 seconds
+
 // ─── Start Server ──────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`🚀 Nexo server running on port ${PORT} [${process.env.NODE_ENV}]`);
+  console.log(`🚀 Relay server running on port ${PORT} [${process.env.NODE_ENV}]`);
 });
 
 module.exports = { app, server };

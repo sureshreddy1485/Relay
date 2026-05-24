@@ -35,8 +35,10 @@ export default function WelcomeScreen({ navigation }) {
           style={styles.logoImage} 
           resizeMode="contain"
         />
-        <Text style={styles.appName}>Nexo</Text>
-        <Text style={styles.tagline}>Next-gen messaging platform</Text>
+        <View style={{ flexDirection: 'row' }}>
+          <Text style={[styles.appName, { color: Colors.primary }]}>Relay</Text>
+        </View>
+        <Text style={styles.tagline}>For the Ones Who Matter</Text>
       </Animated.View>
 
       {/* Feature pills */}

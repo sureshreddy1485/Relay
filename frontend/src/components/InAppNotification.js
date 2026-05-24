@@ -11,9 +11,12 @@ export default function InAppNotification() {
   const { inAppNotification, hideNotification } = useChatStore();
   const navigation = useNavigation();
   const slideAnim = useRef(new Animated.Value(-120)).current;
+  // Keep track of the notification data even when it's null to allow for exit animation
+  const [displayNotification, setDisplayNotification] = React.useState(null);
 
   useEffect(() => {
     if (inAppNotification) {
+      setDisplayNotification(inAppNotification);
       Animated.spring(slideAnim, {
         toValue: 50, // slide down to 50px from top
         useNativeDriver: true,
@@ -25,19 +28,19 @@ export default function InAppNotification() {
         toValue: -120,
         duration: 250,
         useNativeDriver: true,
-      }).start();
+      }).start(() => {
+        setDisplayNotification(null);
+      });
     }
   }, [inAppNotification]);
 
-  if (!inAppNotification) return null;
+  if (!displayNotification) return null;
 
   const handlePress = () => {
-    // If we have chat data, navigate to ChatRoom
-    if (inAppNotification.chat) {
-      // First select the chat in global store
-      useChatStore.getState().selectChat(inAppNotification.chat);
-      useChatStore.getState().clearUnread(inAppNotification.chatId);
-      navigation.navigate('ChatRoom', { chat: inAppNotification.chat });
+    if (displayNotification.chat) {
+      useChatStore.getState().selectChat(displayNotification.chat);
+      useChatStore.getState().clearUnread(displayNotification.chatId);
+      navigation.navigate('ChatRoom', { chat: displayNotification.chat });
     }
     hideNotification();
   };
@@ -46,19 +49,19 @@ export default function InAppNotification() {
     <Animated.View style={[styles.container, { transform: [{ translateY: slideAnim }] }]}>
       <TouchableOpacity activeOpacity={0.9} onPress={handlePress} style={styles.card}>
         <View style={styles.avatarWrap}>
-          {inAppNotification.avatar ? (
-            <Image source={{ uri: inAppNotification.avatar }} style={styles.avatar} />
+          {displayNotification.avatar ? (
+            <Image source={{ uri: displayNotification.avatar }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, { backgroundColor: Colors.primary + '44' }]}>
               <Text style={styles.avatarInitials}>
-                {inAppNotification.title?.charAt(0).toUpperCase()}
+                {displayNotification.title?.charAt(0).toUpperCase()}
               </Text>
             </View>
           )}
         </View>
         <View style={styles.content}>
-          <Text style={styles.title} numberOfLines={1}>{inAppNotification.title}</Text>
-          <Text style={styles.body} numberOfLines={2}>{inAppNotification.body}</Text>
+          <Text style={styles.title} numberOfLines={1}>{displayNotification.title}</Text>
+          <Text style={styles.body} numberOfLines={2}>{displayNotification.body}</Text>
         </View>
         <TouchableOpacity style={styles.closeBtn} onPress={hideNotification} hitSlop={10}>
           <Ionicons name="close" size={20} color={Colors.dark.muted} />

@@ -1,10 +1,9 @@
 import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform, DeviceEventEmitter, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChatsListScreen from '../screens/chat/ChatsListScreen';
-import CommunitiesScreen from '../screens/communities/CommunitiesScreen';
 import StoriesScreen from '../screens/stories/StoriesScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import { Colors } from '../theme/colors';
@@ -12,15 +11,24 @@ import useChatStore from '../store/useChatStore';
 import useAuthStore from '../store/useAuthStore';
 import api from '../services/api';
 
-const Tab = createBottomTabNavigator();
+import { getSocket } from '../services/socketService';
 
-const TabBarIcon = ({ name, color, badge }) => (
+const Tab = createMaterialTopTabNavigator();
+
+const { width } = Dimensions.get('window');
+const isSmall = width <= 380;
+
+const TabBarIcon = ({ name, color, badge, isDot }) => (
   <View style={{ alignItems: 'center', justifyContent: 'center' }}>
     <Ionicons name={name} size={24} color={color} />
     {badge > 0 && (
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-      </View>
+      isDot ? (
+        <View style={styles.dotBadge} />
+      ) : (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+        </View>
+      )
     )}
   </View>
 );
@@ -59,27 +67,47 @@ export default function TabNavigator() {
 
   React.useEffect(() => {
     fetchUnseenStories();
-    const interval = setInterval(fetchUnseenStories, 30000); // Poll every 30s to keep developer console logs clean
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchUnseenStories, 30000); // Poll every 30s as fallback
+    
+    const socket = getSocket();
+    if (socket) {
+      socket.on('new_story', fetchUnseenStories);
+    }
+
+    const sub = DeviceEventEmitter.addListener('story_viewed', fetchUnseenStories);
+    
+    return () => {
+      clearInterval(interval);
+      if (socket) {
+        socket.off('new_story', fetchUnseenStories);
+      }
+      sub.remove();
+    };
   }, [fetchUnseenStories]);
 
-  // Tab bar height = 62px content + device bottom inset
-  const tabBarHeight = 62 + (insets.bottom || 8);
+  // Tab bar height = base height + device bottom inset
+  const baseHeight = isSmall ? 56 : 62;
+  const tabBarHeight = baseHeight + (insets.bottom || 8);
 
   return (
     <Tab.Navigator
+      tabBarPosition="bottom"
       screenOptions={{
-        headerShown: false,
+        animationEnabled: false,
+        swipeEnabled: true,
+        tabBarShowIcon: true,
         tabBarActiveTintColor:   Colors.primary,
         tabBarInactiveTintColor: Colors.dark.muted,
         tabBarLabelStyle: styles.tabLabel,
+        tabBarIconStyle: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+        tabBarIndicatorStyle: { height: 0 },
         tabBarStyle: {
           backgroundColor:  Colors.dark.card,
           borderTopColor:   Colors.dark.border,
           borderTopWidth:   1,
           height:           tabBarHeight,
-          paddingBottom:    (insets.bottom || 8) + 6,
-          paddingTop:       10,
+          paddingBottom:    (insets.bottom || 8) + (isSmall ? 2 : 6),
+          paddingTop:       isSmall ? 6 : 10,
         },
       }}
     >
@@ -87,7 +115,7 @@ export default function TabNavigator() {
         name="Chats"
         component={ChatsListScreen}
         options={{
-          title: 'Nexo',
+          title: 'Relay',
           tabBarLabel: 'Chats',
           tabBarIcon: ({ focused, color }) => (
             <TabBarIcon
@@ -99,18 +127,10 @@ export default function TabNavigator() {
         }}
       />
       <Tab.Screen
-        name="Communities"
-        component={CommunitiesScreen}
-        options={{
-          tabBarIcon: ({ focused, color }) => (
-            <Ionicons name={focused ? 'people' : 'people-outline'} size={24} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
         name="Stories"
         component={StoriesScreen}
         options={{
+          tabBarLabel: 'Moments',
           tabBarIcon: ({ focused, color }) => (
             <TabBarIcon
               name={focused ? 'sparkles' : 'sparkles-outline'}
@@ -154,5 +174,16 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 10,
     fontWeight: '700',
+  },
+  dotBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.accent,
+    borderWidth: 1.5,
+    borderColor: Colors.dark.card,
   },
 });

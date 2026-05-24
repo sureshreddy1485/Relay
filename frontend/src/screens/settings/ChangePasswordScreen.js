@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Platform, ActivityIndicator, Alert, StatusBar,
@@ -9,6 +10,7 @@ import { Colors } from '../../theme/colors';
 import api from '../../services/api';
 
 export default function ChangePasswordScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '', securityKey: '' });
   const [show, setShow] = useState({ curr: false, new: false, key: false });
   const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +54,7 @@ export default function ChangePasswordScreen({ navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: Colors.dark.bg }}>
       <StatusBar barStyle="light-content" />
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: (insets.top || StatusBar.currentHeight || 0) + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
           <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
         </TouchableOpacity>
@@ -105,7 +107,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 54,
     paddingBottom: 12,
     backgroundColor: Colors.dark.card,
     borderBottomWidth: 1, borderBottomColor: Colors.dark.border,

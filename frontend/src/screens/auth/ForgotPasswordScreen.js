@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
@@ -12,6 +13,7 @@ import api from '../../services/api';
 const STEPS = ['identify', 'verify', 'reset', 'success'];
 
 export default function ForgotPasswordScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState(0);
   const [identifier, setIdentifier] = useState('');
   const [securityKey, setSecurityKey] = useState('');
@@ -68,7 +70,7 @@ export default function ForgotPasswordScreen({ navigation }) {
     <LinearGradient colors={['#0A0A0F', '#1A1A2E']} style={styles.container}>
       <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: Math.max(insets.top + 20, 60), paddingBottom: Math.max(insets.bottom + 20, 40) }]} keyboardShouldPersistTaps="handled">
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
           </TouchableOpacity>
@@ -176,7 +178,7 @@ export default function ForgotPasswordScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 60, paddingBottom: 40 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24 },
   backBtn: { marginBottom: 20 },
   header: { alignItems: 'center', marginBottom: 32 },
   logoGrad: { width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },

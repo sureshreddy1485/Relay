@@ -1,12 +1,38 @@
-export const Colors = {
-  primary: '#06B6D4',       // cyan-500
-  primaryDark: '#0891B2',   // cyan-600
-  primaryLight: '#22D3EE',  // cyan-400
-  accent: '#A855F7',        // purple-500
-  accentGreen: '#10B981',   // emerald-500
-  accentAmber: '#F59E0B',   // amber-500
-  camera: '#EF4444',        // red-500
+export const AppThemes = {
+  relay: {
+    primary: '#06B6D4',       // cyan
+    primaryDark: '#0891B2',   // darker cyan
+    primaryLight: '#22D3EE',  // lighter cyan
+    accent: '#06B6D4',        // cyan
+    accentGreen: '#10B981',   // green
+    accentAmber: '#0891B2',   // dark cyan
+    camera: '#EF4444',        // red-500
+    gradients: {
+      primary: ['#06B6D4', '#0891B2'],
+      dark: ['#080B14', '#151C2E'],
+      card: ['#151C2E', '#0F1320'],
+      sent: ['#06B6D4', '#0891B2'],
+    },
+  },
+  cyan: {
+    primary: '#06B6D4',
+    primaryDark: '#0891B2',
+    primaryLight: '#22D3EE',
+    accent: '#A855F7',
+    accentGreen: '#10B981',
+    accentAmber: '#F59E0B',
+    camera: '#EF4444',
+    gradients: {
+      primary: ['#06B6D4', '#0891B2'],
+      dark: ['#080B14', '#151C2E'],
+      card: ['#151C2E', '#0F1320'],
+      sent: ['#06B6D4', '#0891B2'],
+    },
+  }
+};
 
+export const Colors = {
+  ...AppThemes.relay,
   dark: {
     bg: '#080B14',
     card: '#0F1320',
@@ -21,7 +47,6 @@ export const Colors = {
       received: '#151C2E',
     },
   },
-
   light: {
     bg: '#F0FDFF',
     card: '#FFFFFF',
@@ -35,12 +60,5 @@ export const Colors = {
       sent: '#06B6D4',
       received: '#E0F7FA',
     },
-  },
-
-  gradients: {
-    primary: ['#06B6D4', '#0891B2'],
-    dark: ['#080B14', '#151C2E'],
-    card: ['#151C2E', '#0F1320'],
-    sent: ['#06B6D4', '#0891B2'],
   },
 };

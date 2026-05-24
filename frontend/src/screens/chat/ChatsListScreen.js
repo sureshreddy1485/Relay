@@ -2,10 +2,11 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, TextInput, StatusBar, RefreshControl,
-  Platform, Alert, Animated, Modal, TouchableWithoutFeedback, Image
+  Platform, Alert, Animated, Modal, TouchableWithoutFeedback, Image, BackHandler
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import useChatStore from '../../store/useChatStore';
 import useAuthStore from '../../store/useAuthStore';
@@ -13,10 +14,14 @@ import ChatListItem from '../../components/ChatListItem';
 import TabHeader from '../../components/TabHeader';
 import { Colors } from '../../theme/colors';
 import api from '../../services/api';
+import { getSocket } from '../../services/socketService';
+import { useAlert } from '../../components/CustomAlert';
 
 export default function ChatsListScreen({ navigation }) {
+  const { showAlert } = useAlert();
   const { chats, fetchChats, isLoadingChats } = useChatStore();
   const { user } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   const [search, setSearch]           = useState('');
   const [showSearch, setShowSearch]   = useState(false);
@@ -28,6 +33,23 @@ export default function ChatsListScreen({ navigation }) {
   const [friendRequests, setFriendRequests]       = useState([]);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [isFabOpen, setIsFabOpen] = useState(false);
+  const fabAnim = React.useRef(new Animated.Value(0)).current;
+
+  const toggleFab = () => {
+    const toValue = isFabOpen ? 0 : 1;
+    setIsFabOpen(!isFabOpen);
+    Animated.spring(fabAnim, {
+      toValue,
+      friction: 6,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const fabRotate = fabAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '45deg']
+  });
 
   const fetchFriendRequests = async () => {
     setIsLoadingRequests(true);
@@ -43,12 +65,50 @@ export default function ChatsListScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
-      fetchChats();
+      // Silent refresh when switching tabs — no spinner if data already exists
+      fetchChats(true);
       fetchFriendRequests();
-      // Exit selection mode when navigating back
       setSelectionMode(false);
       setSelected(new Set());
     }, [])
+  );
+
+  // Real-time: auto-refresh friend request badge when a new request arrives
+  useEffect(() => {
+    const socket = getSocket();
+    const handleNewRequest = () => fetchFriendRequests();
+    const handleRequestAccepted = () => { fetchFriendRequests(); fetchChats(true); };
+    if (socket) {
+      socket.on('friend_request_received', handleNewRequest);
+      socket.on('friend_request_accepted', handleRequestAccepted);
+    }
+    return () => {
+      if (socket) {
+        socket.off('friend_request_received', handleNewRequest);
+        socket.off('friend_request_accepted', handleRequestAccepted);
+      }
+    };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (showSearch) {
+          setShowSearch(false);
+          setSearch('');
+          return true; // Prevent default (exit app)
+        }
+        if (selectionMode) {
+          setSelectionMode(false);
+          setSelected(new Set());
+          return true; // Prevent default
+        }
+        return false; // Let default behavior happen
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => backHandler.remove();
+    }, [showSearch, selectionMode])
   );
 
   const onRefresh = async () => {
@@ -59,9 +119,17 @@ export default function ChatsListScreen({ navigation }) {
 
   const filtered = chats.filter(c => {
     if (!search) return true;
-    const otherUser = c.isGroupChat ? null : c.users?.find(u => u._id !== user?._id);
-    const name = c.isGroupChat ? c.chatName : (otherUser?.displayName || otherUser?.username || '');
-    return name.toLowerCase().includes(search.toLowerCase());
+    const searchLower = search.toLowerCase();
+    if (c.isGroupChat) {
+      const matchName = c.chatName?.toLowerCase().includes(searchLower);
+      const matchUsername = c.groupUsername?.toLowerCase().includes(searchLower);
+      return matchName || matchUsername;
+    } else {
+      const otherUser = c.users?.find(u => u._id !== user?._id);
+      const matchName = (otherUser?.displayName || '')?.toLowerCase().includes(searchLower);
+      const matchUsername = (otherUser?.username || '')?.toLowerCase().includes(searchLower);
+      return matchName || matchUsername;
+    }
   });
 
   const pinned = filtered.filter(c => user?.pinnedChats?.includes(c._id));
@@ -86,8 +154,60 @@ export default function ChatsListScreen({ navigation }) {
     setSelected(new Set());
   };
 
+  const pinSelected = async () => {
+    try {
+      const currentPinned = new Set(user?.pinnedChats?.map(c => c.toString()) || []);
+      const allSelectedArePinned = [...selected].every(id => currentPinned.has(id.toString()));
+
+      const idsToToggle = [...selected].filter(id => {
+        const isPinned = currentPinned.has(id.toString());
+        return allSelectedArePinned ? isPinned : !isPinned;
+      });
+
+      for (const id of idsToToggle) {
+        await api.put(`/chats/${id}/pin`);
+      }
+      
+      idsToToggle.forEach(id => {
+        if (currentPinned.has(id.toString())) currentPinned.delete(id.toString());
+        else currentPinned.add(id.toString());
+      });
+      useAuthStore.getState().updateUser({ pinnedChats: Array.from(currentPinned) });
+    } catch (e) {
+      showAlert('Error', e.message || 'Pin failed');
+    } finally {
+      cancelSelection();
+    }
+  };
+
+  const muteSelected = async () => {
+    try {
+      const currentMuted = new Set(user?.mutedChats?.map(c => c.toString()) || []);
+      const allSelectedAreMuted = [...selected].every(id => currentMuted.has(id.toString()));
+
+      const idsToToggle = [...selected].filter(id => {
+        const isMuted = currentMuted.has(id.toString());
+        return allSelectedAreMuted ? isMuted : !isMuted;
+      });
+
+      for (const id of idsToToggle) {
+        await api.put(`/chats/${id}/mute`);
+      }
+      
+      idsToToggle.forEach(id => {
+        if (currentMuted.has(id.toString())) currentMuted.delete(id.toString());
+        else currentMuted.add(id.toString());
+      });
+      useAuthStore.getState().updateUser({ mutedChats: Array.from(currentMuted) });
+    } catch (e) {
+      showAlert('Error', e.message || 'Mute failed');
+    } finally {
+      cancelSelection();
+    }
+  };
+
   const deleteSelected = () => {
-    Alert.alert(
+    showAlert(
       `Delete ${selected.size} chat${selected.size > 1 ? 's' : ''}?`,
       'This will remove these conversations from your list.',
       [
@@ -99,7 +219,7 @@ export default function ChatsListScreen({ navigation }) {
               await Promise.all([...selected].map(id => api.put(`/chats/${id}/archive`)));
               await fetchChats();
             } catch (e) {
-              Alert.alert('Error', e.message || 'Delete failed');
+              showAlert('Error', e.message || 'Delete failed');
             } finally {
               cancelSelection();
             }
@@ -151,26 +271,36 @@ export default function ChatsListScreen({ navigation }) {
       <StatusBar barStyle="light-content" backgroundColor={Colors.dark.card} />
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      {selectionMode ? (
-        /* Selection mode header */
-        <View style={styles.selectionHeader}>
+      {selectionMode ? (() => {
+        const currentPinned = new Set(user?.pinnedChats?.map(c => typeof c === 'object' ? c._id?.toString() : c?.toString()) || []);
+        const allSelectedArePinned = selected.size > 0 && [...selected].every(id => currentPinned.has(id.toString()));
+        const currentMuted = new Set(user?.mutedChats?.map(c => typeof c === 'object' ? c._id?.toString() : c?.toString()) || []);
+        const allSelectedAreMuted = selected.size > 0 && [...selected].every(id => currentMuted.has(id.toString()));
+
+        return (
+          /* Selection mode header */
+        <View style={[styles.selectionHeader, { paddingTop: (insets.top || StatusBar.currentHeight || 0) + 8 }]}>
           <TouchableOpacity onPress={cancelSelection} style={styles.iconBtn}>
             <Ionicons name="close" size={24} color={Colors.dark.text} />
           </TouchableOpacity>
-          <Text style={styles.selectionCount}>{selected.size} selected</Text>
-          <TouchableOpacity
-            onPress={deleteSelected}
-            style={styles.deleteBtn}
-            disabled={selected.size === 0}
-          >
-            <Ionicons name="trash-outline" size={20} color="#FFF" />
-            <Text style={styles.deleteBtnText}>Delete</Text>
-          </TouchableOpacity>
+          <Text style={styles.selectionCount}>{selected.size}</Text>
+          <View style={styles.selectionActions}>
+            <TouchableOpacity onPress={pinSelected} style={styles.actionBtnHeader} disabled={selected.size === 0}>
+              <MaterialCommunityIcons name={allSelectedArePinned ? "pin-off-outline" : "pin-outline"} size={22} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={muteSelected} style={styles.actionBtnHeader} disabled={selected.size === 0}>
+              <MaterialCommunityIcons name={allSelectedAreMuted ? "volume-high" : "volume-off"} size={22} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={deleteSelected} style={styles.deleteBtnHeader} disabled={selected.size === 0}>
+              <Ionicons name="trash-outline" size={20} color="#FFF" />
+            </TouchableOpacity>
+          </View>
         </View>
-      ) : (
+        );
+      })() : (
         /* Normal header */
         <TabHeader
-          title="Nexo"
+          title="Relay"
           right={
             <>
               <TouchableOpacity
@@ -232,8 +362,8 @@ export default function ChatsListScreen({ navigation }) {
       ) : filtered.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Ionicons name="chatbubbles-outline" size={64} color={Colors.dark.muted} />
-          <Text style={styles.emptyTitle}>No Chats Found</Text>
-          <Text style={styles.emptyText}>Start a new conversation!</Text>
+          <Text style={styles.emptyTitle}>No Chats Yet</Text>
+          <Text style={styles.emptyText}>Tap the + button to find people and start chatting!</Text>
         </View>
       ) : (
         <FlatList
@@ -268,7 +398,7 @@ export default function ChatsListScreen({ navigation }) {
                     onPress={async () => {
                       const id = longPressChat._id;
                       setLongPressChat(null);
-                      Alert.alert(
+                      showAlert(
                         'Delete Chat',
                         'Are you sure you want to permanently delete this chat and all of its messages?',
                         [
@@ -281,7 +411,7 @@ export default function ChatsListScreen({ navigation }) {
                                 await api.delete(`/chats/${id}`);
                                 useChatStore.getState().removeChat(id);
                               } catch (e) {
-                                Alert.alert('Error', e.message || 'Delete failed');
+                                showAlert('Error', e.message || 'Delete failed');
                               }
                             }
                           }
@@ -303,7 +433,7 @@ export default function ChatsListScreen({ navigation }) {
                         ? (user.mutedChats || []).filter(c => c.toString() !== id.toString())
                         : [...(user.mutedChats || []), id];
                       useAuthStore.getState().updateUser({ mutedChats: updatedMuted });
-                    } catch(e){ Alert.alert('Error', e.message || 'Failed'); }
+                    } catch(e){ showAlert('Error', e.message || 'Failed'); }
                   }}>
                     <Ionicons name={user?.mutedChats?.some(c => c.toString() === longPressChat._id?.toString()) ? "volume-high-outline" : "volume-mute-outline"} size={20} color={Colors.dark.text} />
                     <Text style={styles.sheetActionLabel}>{user?.mutedChats?.some(c => c.toString() === longPressChat._id?.toString()) ? 'Unmute' : 'Mute'}</Text>
@@ -328,13 +458,13 @@ export default function ChatsListScreen({ navigation }) {
                         ? (user.pinnedChats || []).filter(c => c.toString() !== id.toString())
                         : [...(user.pinnedChats || []), id];
                       useAuthStore.getState().updateUser({ pinnedChats: updatedPinned });
-                    } catch(e){ Alert.alert('Error', e.message || 'Failed'); }
+                    } catch(e){ showAlert('Error', e.message || 'Failed'); }
                   }}>
                     <Ionicons name={user?.pinnedChats?.some(c => c.toString() === longPressChat._id?.toString()) ? "pin-sharp" : "pin-outline"} size={20} color={Colors.dark.text} />
                     <Text style={styles.sheetActionLabel}>{user?.pinnedChats?.some(c => c.toString() === longPressChat._id?.toString()) ? 'Unpin Chat' : 'Pin Chat'}</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={styles.sheetActionItem} onPress={() => { setLongPressChat(null); Alert.alert('Clear', 'Not implemented'); }}>
+                  <TouchableOpacity style={styles.sheetActionItem} onPress={() => { setLongPressChat(null); showAlert('Clear', 'Not implemented'); }}>
                     <Ionicons name="refresh-outline" size={20} color={Colors.dark.text} />
                     <Text style={styles.sheetActionLabel}>Clear Chat</Text>
                   </TouchableOpacity>
@@ -347,7 +477,7 @@ export default function ChatsListScreen({ navigation }) {
                         if (!targetUser) return;
                         const chatToDeleteId = longPressChat._id;
                         setLongPressChat(null);
-                        Alert.alert(
+                        showAlert(
                           'Block User',
                           `Are you sure you want to block ${targetUser.displayName || targetUser.username}?`,
                           [
@@ -365,9 +495,9 @@ export default function ChatsListScreen({ navigation }) {
                                   // Instantly remove chat from UI
                                   useChatStore.getState().removeChat(chatToDeleteId);
                                   
-                                  Alert.alert('Blocked', 'User has been blocked');
+                                  showAlert('Blocked', 'User has been blocked');
                                 } catch (e) {
-                                  Alert.alert('Error', e.message);
+                                  showAlert('Error', e.message);
                                 }
                               }
                             }
@@ -453,7 +583,7 @@ export default function ChatsListScreen({ navigation }) {
                             fetchFriendRequests();
                             fetchChats();
                           } catch (e) {
-                            Alert.alert('Error', e.message || 'Failed');
+                            showAlert('Error', e.message || 'Failed');
                           }
                         }}
                       >
@@ -466,7 +596,7 @@ export default function ChatsListScreen({ navigation }) {
                             await api.post(`/users/${item._id}/decline-request`);
                             fetchFriendRequests();
                           } catch (e) {
-                            Alert.alert('Error', e.message || 'Failed');
+                            showAlert('Error', e.message || 'Failed');
                           }
                         }}
                       >
@@ -485,20 +615,57 @@ export default function ChatsListScreen({ navigation }) {
         </TouchableOpacity>
       </Modal>
 
-      {/* ── Floating Action Button (FAB) ────────────────────────────────────── */}
+
+
+      {/* ── Floating Action Button ─────────────────────────────────────────── */}
       {!selectionMode && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => navigation.navigate('NewChat')}
-          activeOpacity={0.85}
-        >
-          <LinearGradient
-            colors={[Colors.primary, Colors.primaryDark]}
-            style={styles.fabGrad}
+        <View style={styles.fabContainer}>
+          {isFabOpen && (
+            <View style={styles.fabOptions}>
+              <TouchableOpacity
+                style={styles.fabOptionItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  toggleFab();
+                  navigation.navigate('NewChat');
+                }}
+              >
+                <View style={styles.fabOptionLabel}>
+                  <Text style={styles.fabOptionText}>Find People</Text>
+                </View>
+                <View style={[styles.fabOptionIconWrap, { backgroundColor: Colors.primary }]}>
+                  <Ionicons name="person-add-outline" size={20} color="#FFF" />
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.fabOptionItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  toggleFab();
+                  navigation.navigate('Communities');
+                }}
+              >
+                <View style={styles.fabOptionLabel}>
+                  <Text style={styles.fabOptionText}>Communities</Text>
+                </View>
+                <View style={[styles.fabOptionIconWrap, { backgroundColor: Colors.primary }]}>
+                  <Ionicons name="people-outline" size={20} color="#FFF" />
+                </View>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={toggleFab}
+            style={styles.fabMain}
           >
-            <Ionicons name="chatbubble-ellipses-outline" size={24} color="#FFF" />
-          </LinearGradient>
-        </TouchableOpacity>
+            <Animated.View style={{ transform: [{ rotate: fabRotate }] }}>
+              <Ionicons name="add" size={32} color="#FFF" />
+            </Animated.View>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -513,18 +680,15 @@ const styles = StyleSheet.create({
   // Selection mode header
   selectionHeader: {
     flexDirection: 'row', alignItems: 'center',
-    paddingTop: HEADER_TOP + 8, paddingBottom: 10, paddingHorizontal: 14,
+    paddingBottom: 10, paddingHorizontal: 14,
     backgroundColor: Colors.dark.card,
     borderBottomWidth: 1, borderBottomColor: Colors.dark.border,
     gap: 12,
   },
   selectionCount: { flex: 1, fontSize: 17, fontWeight: '700', color: Colors.dark.text },
-  deleteBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#FF4444', borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 8,
-  },
-  deleteBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  selectionActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  actionBtnHeader: { padding: 8, backgroundColor: Colors.dark.surface, borderRadius: 10 },
+  deleteBtnHeader: { padding: 8, backgroundColor: '#FF4444', borderRadius: 10 },
 
   // Search
   searchWrap: {
@@ -555,6 +719,72 @@ const styles = StyleSheet.create({
     width: 22, height: 22, borderRadius: 11,
     backgroundColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center',
+  },
+  reqRejectBtn: {
+    padding: 8, backgroundColor: Colors.dark.surface,
+    borderRadius: 8, borderWidth: 1, borderColor: Colors.dark.border,
+  },
+  reqAcceptBtn: {
+    padding: 8, backgroundColor: Colors.primary + '20',
+    borderRadius: 8, borderWidth: 1, borderColor: Colors.primary + '50',
+  },
+  
+  // FAB Styles
+  fabContainer: {
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    alignItems: 'flex-end',
+    zIndex: 999,
+  },
+  fabOptions: {
+    marginBottom: 16,
+    alignItems: 'flex-end',
+    gap: 16,
+  },
+  fabOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  fabOptionLabel: {
+    backgroundColor: Colors.dark.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  fabOptionText: {
+    color: Colors.dark.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  fabOptionIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  fabMain: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
   },
 
   // Empty

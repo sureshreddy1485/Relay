@@ -2,14 +2,51 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, Image, StyleSheet, TouchableOpacity,
   Dimensions, StatusBar, Platform, Animated, Modal,
-  FlatList, Alert, ActivityIndicator,
+  FlatList, Alert, ActivityIndicator, DeviceEventEmitter, KeyboardAvoidingView, TextInput, Keyboard, ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../theme/colors';
 import api from '../../services/api';
 import useAuthStore from '../../store/useAuthStore';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
+import { useAlert } from '../../components/CustomAlert';
+import { useIsFocused } from '@react-navigation/native';
+
+const StoryVideo = ({ url, paused, mediaLoading, setMediaLoading }) => {
+  const player = useVideoPlayer(url, p => {
+    p.loop = false;
+  });
+
+  useEffect(() => {
+    if (!player) return;
+    if (paused || mediaLoading) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  }, [paused, mediaLoading, player]);
+
+  // Handle load events via a wrapper if needed or just let it play
+  // Actually, we can use an event listener, but for simplicity, we'll just wait for ready
+  useEffect(() => {
+    if (!player) return;
+    const sub = player.addListener('statusChange', (status) => {
+      if (status.status === 'readyToPlay') {
+        setMediaLoading(false);
+        if (!paused) player.play();
+      } else if (status.status === 'loading') {
+        setMediaLoading(true);
+      } else if (status.status === 'error') {
+        setMediaLoading(false);
+        console.log('Story video load error');
+      }
+    });
+    return () => sub.remove();
+  }, [player, paused]);
+
+  return <VideoView style={styles.storyImage} player={player} contentFit="contain" nativeControls={false} />;
+};
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const STORY_DURATION = 5000;
@@ -32,31 +69,87 @@ const formatViewedTime = (dateStr) => {
 };
 
 export default function StoryViewerScreen({ route, navigation }) {
-  const { stories: initialStories, user: storyUser } = route.params;
+  const { showAlert } = useAlert();
+  const { stories: initialStories, user: initialStoryUser, allStories, initialUserIndex } = route.params;
   const { user: me } = useAuthStore();
+  
+  const [currentUserIndex, setCurrentUserIndex] = useState(initialUserIndex ?? -1);
+  const [storyUser, setStoryUser] = useState(initialStoryUser);
   const [activeStories, setActiveStories] = useState(initialStories || []);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showViewers, setShowViewers] = useState(false);
   const [viewers, setViewers] = useState([]);
   const [viewerCount, setViewerCount] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [isLoadingViewers, setIsLoadingViewers] = useState(false);
   const [mediaLoading, setMediaLoading] = useState(true);
+  const [replyText, setReplyText] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
   const animRef = useRef(null);
+  const inputRef = useRef(null);
 
   const currentStory = activeStories[currentIndex];
   const isMyStory = storyUser?._id === me?._id;
+
+  const handleReply = async () => {
+    if (!replyText.trim()) return;
+    setIsReplying(true);
+    setPaused(true);
+    try {
+      const { data: chatData } = await api.post('/chats', { userId: storyUser._id });
+      await api.post('/messages', {
+        chatId: chatData.chat._id,
+        content: replyText.trim(),
+        messageType: 'story_reply',
+        storyData: {
+          mediaUrl: currentStory.mediaUrl || '',
+          mediaType: currentStory.mediaType || 'image',
+          caption: currentStory.caption || '',
+        }
+      });
+      setReplyText('');
+    } catch (e) {
+      showAlert('Error', 'Failed to send reply');
+    } finally {
+      setIsReplying(false);
+      setPaused(false);
+    }
+  };
 
   // Reset loading when story changes
   useEffect(() => {
     setMediaLoading(true);
   }, [currentIndex]);
 
-  // Mark story as viewed
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setPaused(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      if (!showEmoji) setPaused(false);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [showEmoji]);
+
+  useEffect(() => {
+    if (showEmoji) {
+      setPaused(true);
+    }
+  }, [showEmoji]);
+
   useEffect(() => {
     if (currentStory?._id && !isMyStory) {
-      api.put(`/stories/${currentStory._id}/view`).catch(() => {});
+      api.put(`/stories/${currentStory._id}/view`).then(() => {
+        DeviceEventEmitter.emit('story_viewed');
+        // Also tell StoriesScreen to grey out this user's ring
+        if (storyUser?._id) {
+          DeviceEventEmitter.emit('story_user_viewed', { userId: storyUser._id.toString() });
+        }
+      }).catch(() => {});
     }
     // Update viewer count for own stories
     if (currentStory?._id && isMyStory) {
@@ -64,13 +157,35 @@ export default function StoryViewerScreen({ route, navigation }) {
     }
   }, [currentStory?._id]);
 
+
+
+  const progressValue = useRef(0);
+
+  useEffect(() => {
+    const listener = progress.addListener(({ value }) => {
+      progressValue.current = value;
+    });
+    return () => progress.removeListener(listener);
+  }, [progress]);
+
+  // Reset progress when story changes
+  useEffect(() => {
+    progress.setValue(0);
+    progressValue.current = 0;
+  }, [currentIndex]);
+
+  const isFocused = useIsFocused();
+
   // Auto-advance timer
   useEffect(() => {
-    if (paused || !currentStory || mediaLoading) return;
-    progress.setValue(0);
+    if (paused || !currentStory || mediaLoading || !isFocused) return;
+    
+    // Resume from current progress
+    const remainingDuration = STORY_DURATION * (1 - progressValue.current);
+    
     const anim = Animated.timing(progress, {
       toValue: 1,
-      duration: STORY_DURATION,
+      duration: remainingDuration,
       useNativeDriver: false,
     });
     animRef.current = anim;
@@ -78,24 +193,69 @@ export default function StoryViewerScreen({ route, navigation }) {
       if (finished) goNext();
     });
     return () => anim.stop();
-  }, [currentIndex, paused, mediaLoading, activeStories]);
+  }, [currentIndex, paused, mediaLoading, activeStories, isFocused]);
 
   const goNext = () => {
     if (currentIndex < activeStories.length - 1) {
       setCurrentIndex(i => i + 1);
     } else {
-      navigation.goBack();
+      // Jump to next user's story if available
+      if (allStories && currentUserIndex !== -1 && currentUserIndex < allStories.length - 1) {
+        const nextUserIndex = currentUserIndex + 1;
+        const nextUserObj = allStories[nextUserIndex];
+        setCurrentUserIndex(nextUserIndex);
+        setStoryUser(nextUserObj.user);
+        setActiveStories(nextUserObj.stories);
+        setCurrentIndex(0);
+      } else {
+        navigation.goBack();
+      }
     }
   };
 
   const goPrev = () => {
-    if (currentIndex > 0) setCurrentIndex(i => i - 1);
+    if (currentIndex > 0) {
+      setCurrentIndex(i => i - 1);
+    } else {
+      if (allStories && currentUserIndex > 0) {
+        const prevUserIndex = currentUserIndex - 1;
+        const prevUserObj = allStories[prevUserIndex];
+        setCurrentUserIndex(prevUserIndex);
+        setStoryUser(prevUserObj.user);
+        setActiveStories(prevUserObj.stories);
+        setCurrentIndex(prevUserObj.stories.length - 1);
+      }
+    }
   };
 
-  const handleTap = (evt) => {
-    const x = evt.nativeEvent.locationX;
-    if (x < SCREEN_WIDTH * 0.3) goPrev();
-    else goNext();
+  const touchStartYRef = useRef(0);
+  const touchStartTimeRef = useRef(0);
+
+  const handlePressIn = (evt) => {
+    touchStartYRef.current = evt.nativeEvent.pageY;
+    touchStartTimeRef.current = Date.now();
+    setPaused(true);
+  };
+
+  const handlePressOut = (evt) => {
+    const touchDuration = Date.now() - touchStartTimeRef.current;
+    const touchEndY = evt.nativeEvent.pageY;
+    
+    if (touchStartYRef.current - touchEndY > 50 && isMyStory) {
+      openViewers();
+    } else if (touchEndY - touchStartYRef.current > 50) {
+      // Swiped down to close
+      navigation.goBack();
+    } else {
+      if (!showEmoji && !isReplying) setPaused(false);
+      
+      // Only navigate next/prev if it was a quick tap
+      if (touchDuration < 250) {
+        const x = evt.nativeEvent.locationX;
+        if (x < SCREEN_WIDTH * 0.3) goPrev();
+        else goNext();
+      }
+    }
   };
 
   const openViewers = async () => {
@@ -122,9 +282,9 @@ export default function StoryViewerScreen({ route, navigation }) {
   const deleteCurrentStory = async () => {
     setPaused(true);
     animRef.current?.stop();
-    Alert.alert(
-      'Delete Story',
-      'Are you sure you want to delete this story?',
+    showAlert(
+      'Delete Moment',
+      'Are you sure you want to delete this moment?',
       [
         { text: 'Cancel', style: 'cancel', onPress: () => setPaused(false) },
         {
@@ -133,7 +293,7 @@ export default function StoryViewerScreen({ route, navigation }) {
           onPress: async () => {
             try {
               await api.delete(`/stories/${currentStory._id}`);
-              Alert.alert('Deleted', 'Story deleted successfully');
+              showAlert('Deleted', 'Moment deleted successfully');
               
               const updatedStories = activeStories.filter(s => s._id !== currentStory._id);
               if (updatedStories.length === 0) {
@@ -146,7 +306,7 @@ export default function StoryViewerScreen({ route, navigation }) {
                 setPaused(false);
               }
             } catch (e) {
-              Alert.alert('Error', e.message || 'Failed to delete story');
+              showAlert('Error', e.message || 'Failed to delete moment');
               setPaused(false);
             }
           }
@@ -166,7 +326,7 @@ export default function StoryViewerScreen({ route, navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
 
       {/* Progress bars */}
@@ -194,7 +354,15 @@ export default function StoryViewerScreen({ route, navigation }) {
 
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.userInfo}>
+        <TouchableOpacity style={styles.userInfo} onPress={() => { 
+          if (isMyStory) {
+            setPaused(true);
+            navigation.navigate('Tabs', { screen: 'Settings' });
+          } else {
+            setPaused(true); 
+            setSelectedUser(storyUser); 
+          }
+        }}>
           {storyUser?.profilePicture ? (
             <Image source={{ uri: storyUser.profilePicture }} style={styles.avatar} />
           ) : (
@@ -206,11 +374,11 @@ export default function StoryViewerScreen({ route, navigation }) {
           )}
           <View>
             <Text style={styles.username}>
-              {isMyStory ? 'Your Story' : (storyUser?.displayName || storyUser?.username)}
+              {isMyStory ? 'Your Moment' : (storyUser?.displayName || storyUser?.username)}
             </Text>
             <Text style={styles.timeText}>{timeAgo(currentStory?.createdAt)}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.headerActions}>
           {isMyStory && (
@@ -225,7 +393,7 @@ export default function StoryViewerScreen({ route, navigation }) {
       </View>
 
       {/* Story Media */}
-      <TouchableOpacity activeOpacity={1} onPress={handleTap} style={styles.mediaWrap}>
+      <TouchableOpacity activeOpacity={1} onPressIn={handlePressIn} onPressOut={handlePressOut} style={styles.mediaWrap}>
         {mediaLoading && (
           <ActivityIndicator color={Colors.primary} size="large" style={{ position: 'absolute', zIndex: 10 }} />
         )}
@@ -238,19 +406,11 @@ export default function StoryViewerScreen({ route, navigation }) {
             onLoadEnd={() => setMediaLoading(false)}
           />
         ) : (
-          <Video
-            source={{ uri: currentStory?.mediaUrl }}
-            resizeMode={ResizeMode.CONTAIN}
-            shouldPlay={!paused && !mediaLoading}
-            isMuted={false}
-            style={styles.storyImage}
-            useNativeControls={false}
-            onLoadStart={() => setMediaLoading(true)}
-            onLoad={() => setMediaLoading(false)}
-            onError={(err) => {
-              console.log('Story video load error:', err);
-              setMediaLoading(false);
-            }}
+          <StoryVideo
+            url={currentStory?.mediaUrl}
+            paused={paused}
+            mediaLoading={mediaLoading}
+            setMediaLoading={setMediaLoading}
           />
         )}
       </TouchableOpacity>
@@ -264,15 +424,63 @@ export default function StoryViewerScreen({ route, navigation }) {
 
       {/* Bottom bar */}
       <View style={styles.bottomBar}>
-        <Text style={styles.counter}>{currentIndex + 1} / {activeStories.length}</Text>
-
-        {isMyStory && (
+        {isMyStory ? (
           <TouchableOpacity style={styles.viewerBtn} onPress={openViewers}>
             <Ionicons name="eye-outline" size={20} color="#FFF" />
             <Text style={styles.viewerBtnText}>{viewerCount}</Text>
           </TouchableOpacity>
+        ) : (
+          <View style={styles.replyWrap}>
+            <TouchableOpacity onPress={() => { 
+              if (showEmoji) {
+                setShowEmoji(false);
+                setTimeout(() => inputRef.current?.focus(), 100);
+              } else {
+                Keyboard.dismiss(); 
+                setShowEmoji(true); 
+              }
+            }} style={{ padding: 6 }}>
+              <Ionicons name={showEmoji ? 'keyboard-outline' : 'happy-outline'} size={24} color="rgba(255,255,255,0.8)" />
+            </TouchableOpacity>
+            <TextInput
+              ref={inputRef}
+              style={styles.replyInput}
+              placeholder="Reply..."
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              value={replyText}
+              onChangeText={setReplyText}
+              onFocus={() => setShowEmoji(false)}
+            />
+            {replyText.trim().length > 0 && (
+              <TouchableOpacity style={styles.sendReplyBtn} onPress={handleReply} disabled={isReplying}>
+                {isReplying ? <ActivityIndicator size="small" color={Colors.primary} /> : <Ionicons name="send" size={20} color={Colors.primary} />}
+              </TouchableOpacity>
+            )}
+          </View>
         )}
       </View>
+
+      {showEmoji && (
+        <View style={styles.emojiPanel}>
+          <ScrollView contentContainerStyle={styles.emojiGrid} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {['😀','😂','🤣','😍','🥰','😘','😊','😎','🤩','🥳',
+              '😢','😭','😤','😡','🤯','😱','🥺','😴','🤔','🙄',
+              '👍','👎','👏','🙌','🤝','💪','🔥','❤️','💔','💯',
+              '🎉','🎊','✨','⭐','🌟','💫','🫡','🫠','🤭','😏',
+              '👀','💀','☠️','🤡','👻','😈','💩','🙈','🙉','🙊',
+              '💖','💝','💕','💞','🧡','💛','💚','💙','💜','🖤',
+              '✅','❌','⚡','🌈','☀️','🌙','🍕','🍔','☕','🎵'].map(emoji => (
+              <TouchableOpacity
+                key={emoji}
+                style={styles.emojiItem}
+                onPress={() => setReplyText(prev => prev + emoji)}
+              >
+                <Text style={styles.emojiItemText}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {/* Viewers Bottom Sheet */}
       <Modal visible={showViewers} transparent animationType="slide" onRequestClose={closeViewers}>
@@ -319,6 +527,11 @@ export default function StoryViewerScreen({ route, navigation }) {
                         )}
                       </View>
                     </View>
+                    {item.emoji && (
+                      <View style={styles.viewerReactionBadge}>
+                        <Text style={styles.viewerReactionEmoji}>{item.emoji}</Text>
+                      </View>
+                    )}
                   </View>
                 )}
               />
@@ -330,7 +543,137 @@ export default function StoryViewerScreen({ route, navigation }) {
           </View>
         </TouchableOpacity>
       </Modal>
-    </View>
+
+      {/* ── Member Profile Sheet ──────────────────────────────────── */}
+      <Modal visible={!!selectedUser} transparent animationType="slide" onRequestClose={() => { setSelectedUser(null); setPaused(false); }}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { setSelectedUser(null); setPaused(false); }}>
+          <View style={styles.memberSheet} onStartShouldSetResponder={() => true}>
+            <View style={styles.viewerHandle} />
+
+            {/* Member Avatar */}
+            <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 20 }}>
+              {selectedUser?.profilePicture ? (
+                <Image source={{ uri: selectedUser.profilePicture }} style={styles.memberSheetAvatar} />
+              ) : (
+                <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.memberSheetAvatar}>
+                  <Text style={{ fontSize: 32, fontWeight: '800', color: '#FFF' }}>
+                    {(selectedUser?.displayName || selectedUser?.username || '?').charAt(0).toUpperCase()}
+                  </Text>
+                </LinearGradient>
+              )}
+              <Text style={styles.memberSheetName}>{selectedUser?.displayName || selectedUser?.username}</Text>
+              {(() => {
+                let areFriends = false;
+                if (selectedUser && selectedUser._id !== me?._id) {
+                   areFriends = me?.friends?.some(f => (f._id || f).toString() === selectedUser._id.toString());
+                }
+                if (selectedUser?._id === me?._id || areFriends || selectedUser?.username === 'mica_bot') {
+                  return <Text style={styles.memberSheetUsername}>@{selectedUser?.username}</Text>;
+                }
+                return <Text style={[styles.memberSheetUsername, { fontStyle: 'italic' }]}>@Hidden (Add friend to view)</Text>;
+              })()}
+            </View>
+
+            {/* Actions */}
+            {selectedUser?.role !== 'system_bot' && selectedUser?.username !== 'mica_bot' && (
+              <View style={styles.memberSheetActions}>
+                {selectedUser?._id !== me?._id && (
+                  <>
+                    {/* Message / DM */}
+                    {(() => {
+                      let isMsgAllowed = true;
+                      if (selectedUser && selectedUser._id !== me?._id) {
+                        const areFriends = me?.friends?.some(f => (f._id || f).toString() === selectedUser._id.toString());
+                        if (!areFriends) {
+                          isMsgAllowed = false; // Strictly disabled for non-friends
+                        }
+                      }
+
+                      return (
+                        <TouchableOpacity
+                          style={[styles.memberSheetItem, !isMsgAllowed && styles.memberSheetItemDisabled]}
+                          disabled={!isMsgAllowed}
+                          onPress={async () => {
+                            const memberId = selectedUser._id;
+                            setSelectedUser(null);
+                            // don't setPaused(false) here, isFocused handles it
+                            try {
+                              const { data } = await api.post('/chats', { userId: memberId });
+                              navigation.reset({
+                                index: 1,
+                                routes: [
+                                  { name: 'Tabs', params: { screen: 'Chats' } },
+                                  { name: 'ChatRoom', params: { chat: data.chat } },
+                                ],
+                              });
+                            } catch (e) { showAlert('Error', e.message); }
+                          }}
+                        >
+                          <Ionicons name="chatbubble-outline" size={20} color={isMsgAllowed ? Colors.dark.text : Colors.dark.muted} />
+                          <Text style={[styles.memberSheetLabel, !isMsgAllowed && { color: Colors.dark.muted }]}>Message</Text>
+                          {!isMsgAllowed && <Text style={styles.memberSheetSub}>DMs disabled</Text>}
+                        </TouchableOpacity>
+                      );
+                    })()}
+
+                    <View style={{ height: 1, backgroundColor: Colors.dark.border }} />
+
+                    {/* Add Friend */}
+                    {(() => {
+                      const areFriends = selectedUser && me?.friends?.some(f => (f._id || f).toString() === selectedUser._id.toString());
+                      if (areFriends) {
+                        return (
+                          <View style={styles.memberSheetItem}>
+                            <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
+                            <Text style={[styles.memberSheetLabel, { color: Colors.primary }]}>Friends</Text>
+                          </View>
+                        );
+                      }
+                      return (
+                        <TouchableOpacity
+                          style={styles.memberSheetItem}
+                          onPress={async () => {
+                            const memberId = selectedUser._id;
+                            try {
+                              await api.post(`/users/${memberId}/friend-request`);
+                              showAlert('✅', 'Friend request sent!');
+                            } catch (e) {
+                              showAlert('Info', e.response?.data?.message || e.message);
+                            }
+                          }}
+                        >
+                          <Ionicons name="person-add-outline" size={20} color={Colors.dark.text} />
+                          <Text style={styles.memberSheetLabel}>Add Friend</Text>
+                        </TouchableOpacity>
+                      );
+                    })()}
+
+                    <View style={{ height: 1, backgroundColor: Colors.dark.border }} />
+                  </>
+                )}
+
+                {/* View Profile */}
+              <TouchableOpacity
+                style={styles.memberSheetItem}
+                onPress={() => {
+                  setSelectedUser(null);
+                  navigation.navigate('UserProfile', { username: selectedUser.username });
+                }}
+              >
+                <Ionicons name="person-outline" size={20} color={Colors.dark.text} />
+                  <Text style={styles.memberSheetLabel}>View Profile</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Cancel */}
+            <TouchableOpacity style={styles.memberSheetCancel} onPress={() => { setSelectedUser(null); setPaused(false); }}>
+              <Text style={styles.memberSheetCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -368,8 +711,8 @@ const styles = StyleSheet.create({
   closeBtn: { padding: 4 },
 
   // Media
-  mediaWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  storyImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT * 0.65 },
+  mediaWrap: { flex: 1, minHeight: 0, justifyContent: 'center', alignItems: 'center', width: '100%' },
+  storyImage: { width: '100%', flex: 1 },
   videoPlaceholder: { alignItems: 'center', gap: 12 },
   videoText: { color: Colors.dark.muted, fontSize: 14 },
 
@@ -383,16 +726,29 @@ const styles = StyleSheet.create({
 
   // Bottom bar
   bottomBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 20, paddingBottom: 24, paddingTop: 8,
+    position: 'relative', width: '100%',
   },
-  counter: { color: 'rgba(255,255,255,0.4)', fontSize: 12 },
+  counter: { position: 'absolute', left: 20, color: 'rgba(255,255,255,0.4)', fontSize: 12 },
   viewerBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 8,
   },
   viewerBtnText: { color: '#FFF', fontSize: 14, fontWeight: '600' },
+  
+  replyWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 24, paddingLeft: 16, paddingRight: 8, paddingVertical: 4, flex: 1, marginLeft: 30, marginRight: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  replyInput: { flex: 1, color: '#FFF', fontSize: 14, paddingVertical: 8 },
+  sendReplyBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' },
+  reactionBarMini: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  reactionBtnMini: { padding: 4 },
+  reactionEmoji: { fontSize: 20 },
+
+  emojiPanel: { height: 250, backgroundColor: Colors.dark.card, borderTopWidth: 1, borderTopColor: Colors.dark.border },
+  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 10, paddingBottom: 40 },
+  emojiItem: { width: '12.5%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  emojiItemText: { fontSize: 28 },
 
   // Viewer sheet
   viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
@@ -426,10 +782,46 @@ const styles = StyleSheet.create({
   viewerAvatarInitial: { fontSize: 16, fontWeight: '700', color: '#FFF' },
   viewerName: { fontSize: 15, fontWeight: '600', color: Colors.dark.text },
   viewerUsername: { fontSize: 13, color: Colors.dark.muted, marginTop: 1 },
+  viewerReactionBadge: { backgroundColor: 'rgba(255,255,255,0.1)', padding: 6, borderRadius: 16 },
+  viewerReactionEmoji: { fontSize: 20 },
   viewerCloseBtn: {
     backgroundColor: Colors.dark.card, borderRadius: 14,
     paddingVertical: 14, alignItems: 'center', marginTop: 12,
     borderWidth: 1, borderColor: Colors.primary + '30',
   },
   viewerCloseBtnText: { fontSize: 16, fontWeight: '600', color: Colors.primary },
+
+  // Member Profile Sheet
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  memberSheet: {
+    backgroundColor: Colors.dark.bg,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 16, paddingBottom: 28, paddingTop: 8,
+    borderTopWidth: 2, borderTopColor: Colors.primary,
+  },
+  memberSheetAvatar: {
+    width: 80, height: 80, borderRadius: 40,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+    borderWidth: 2, borderColor: Colors.primary,
+  },
+  memberSheetName: { fontSize: 20, fontWeight: '800', color: '#FFF', textAlign: 'center' },
+  memberSheetUsername: { fontSize: 14, color: Colors.primary, marginTop: 2 },
+  memberSheetActions: {
+    backgroundColor: Colors.dark.card, borderRadius: 16,
+    overflow: 'hidden', borderWidth: 1, borderColor: Colors.primary + '30',
+    marginBottom: 12,
+  },
+  memberSheetItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingHorizontal: 18, paddingVertical: 16,
+  },
+  memberSheetItemDisabled: { opacity: 0.4 },
+  memberSheetLabel: { flex: 1, fontSize: 15, color: Colors.dark.text, fontWeight: '500' },
+  memberSheetSub: { fontSize: 11, color: Colors.dark.muted, fontStyle: 'italic' },
+  memberSheetCancel: {
+    backgroundColor: Colors.dark.card, borderRadius: 14,
+    paddingVertical: 16, alignItems: 'center',
+    borderWidth: 1, borderColor: Colors.primary + '30',
+  },
+  memberSheetCancelText: { fontSize: 16, fontWeight: '600', color: Colors.primary },
 });

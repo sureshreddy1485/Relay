@@ -16,11 +16,13 @@ export async function registerForPushNotificationsAsync() {
   let token;
 
   if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
+    Notifications.setNotificationChannelAsync('messages', {
+      name: 'Messages',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#06B6D4',
+      sound: true,
+      enableVibrate: true,
     });
   }
 
@@ -36,20 +38,24 @@ export async function registerForPushNotificationsAsync() {
       return;
     }
     
-    // In Expo Go, projectId is not strictly required. But if using EAS, it falls back to the app.json value
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId || 'your-eas-project-id';
-        
     try {
-      token = await Notifications.getExpoPushTokenAsync({
-        projectId,
-      });
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
       
-      if (token && token.data) {
-        // Send token to backend
+      let tokenOpts = {};
+      if (projectId) {
+        tokenOpts.projectId = projectId;
+      }
+
+      token = await Notifications.getExpoPushTokenAsync(tokenOpts);
+      if (token?.data) {
         await api.put('/users/push-token', { pushToken: token.data });
       }
     } catch (e) {
-      console.log('Error getting push token', e);
+      if (e.message && e.message.includes('EXPERIENCE_NOT_FOUND')) {
+        console.log('Push Token skipped: EAS Project ID not configured or invalid.');
+      } else {
+        console.log('Error getting push token:', e.message || e);
+      }
     }
   } else {
     console.log('Must use physical device for Push Notifications');

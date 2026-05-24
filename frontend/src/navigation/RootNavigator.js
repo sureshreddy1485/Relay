@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import useAuthStore from '../store/useAuthStore';
 import AuthNavigator from './AuthNavigator';
@@ -12,7 +12,7 @@ export default function RootNavigator() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={DarkTheme}>
       {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
       {isAuthenticated && <InAppNotification />}
     </NavigationContainer>

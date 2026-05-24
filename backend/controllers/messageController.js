@@ -30,7 +30,9 @@ const sendMessage = asyncHandler(async (req, res) => {
   if (!chat) { res.status(404); throw new Error('Chat not found'); }
   if (!chat.users.includes(req.user._id)) { res.status(403); throw new Error('Not a member of this chat'); }
 
-  // Check blocking for 1-to-1 chats
+  // Determine if there is a block active
+  let blockActive = false;
+  let blockedBy = [];
   if (!chat.isGroupChat) {
     const otherUserId = chat.users.find(u => u.toString() !== req.user._id.toString());
     if (otherUserId) {
@@ -38,11 +40,54 @@ const sendMessage = asyncHandler(async (req, res) => {
       const currentUser = await User.findById(req.user._id).select('blockedUsers');
       
       const isBlockedByOther = otherUser?.blockedUsers?.some(id => id.toString() === req.user._id.toString());
-      const isBlockedByCurrent = currentUser?.blockedUsers?.some(id => id.toString() === otherUserId.toString());
+      if (isBlockedByOther) {
+        blockActive = true;
+        blockedBy.push(otherUserId.toString());
+      }
       
-      if (isBlockedByOther || isBlockedByCurrent) {
-        res.status(403);
-        throw new Error('Cannot send messages. Block constraint is active between these accounts.');
+      const isBlockedByCurrent = currentUser?.blockedUsers?.some(id => id.toString() === otherUserId.toString());
+      if (isBlockedByCurrent) {
+        blockActive = true;
+        blockedBy.push(req.user._id.toString());
+      }
+      
+      if (!blockActive) {
+        const fullOtherUser = await User.findById(otherUserId).select('privacy friends');
+        const fullCurrentUser = await User.findById(req.user._id).select('privacy');
+        const areFriends = fullOtherUser?.friends?.some(f => f.toString() === req.user._id.toString());
+        if (!areFriends) {
+          const sharedGroups = await Chat.find({
+            isGroupChat: true,
+            users: { $all: [req.user._id, otherUserId] },
+          }).select('allowDirectMessages _id');
+          
+          const targetAllowsGlobal = fullOtherUser?.privacy?.allowDMFromGroups !== false;
+          const initiatorAllowsGlobal = fullCurrentUser?.privacy?.allowDMFromGroups !== false;
+          const targetAllowedGroups = fullOtherUser?.privacy?.allowedDMGroups || [];
+          const initiatorAllowedGroups = fullCurrentUser?.privacy?.allowedDMGroups || [];
+          const targetDisallowedGroups = fullOtherUser?.privacy?.disallowedDMGroups || [];
+          const initiatorDisallowedGroups = fullCurrentUser?.privacy?.disallowedDMGroups || [];
+
+          let dmAllowed = false;
+          for (const g of sharedGroups) {
+            if (g.allowDirectMessages === false) continue;
+            
+            const tAllows = targetAllowedGroups.some(id => id.toString() === g._id.toString()) || 
+                            (targetAllowsGlobal && !targetDisallowedGroups.some(id => id.toString() === g._id.toString()));
+                            
+            const iAllows = initiatorAllowedGroups.some(id => id.toString() === g._id.toString()) || 
+                            (initiatorAllowsGlobal && !initiatorDisallowedGroups.some(id => id.toString() === g._id.toString()));
+                            
+            if (tAllows && iAllows) {
+              dmAllowed = true;
+              break;
+            }
+          }
+
+          if (!dmAllowed) {
+            res.status(403); throw new Error('This user does not accept direct messages or you have disabled them');
+          }
+        }
       }
     }
   }
@@ -71,6 +116,14 @@ const sendMessage = asyncHandler(async (req, res) => {
     fileSize = req.file.size;
   }
 
+  let initialDeletedBy = [];
+  if (blockActive) {
+    const otherUserId = chat.users.find(u => u.toString() !== req.user._id.toString());
+    if (otherUserId) {
+      initialDeletedBy.push(otherUserId);
+    }
+  }
+
   const msgData = {
     sender: req.user._id,
     chat: chatId,
@@ -87,6 +140,9 @@ const sendMessage = asyncHandler(async (req, res) => {
     encryptedContent: encryptedContent || '',
     isLive: isLive === 'true' || isLive === true || false,
     destructAfterSeconds: parseInt(req.body.destructAfterSeconds) || 5,
+    deletedBy: initialDeletedBy,
+    pollData: req.body.pollData ? (typeof req.body.pollData === 'string' ? JSON.parse(req.body.pollData) : req.body.pollData) : undefined,
+    storyData: req.body.storyData ? (typeof req.body.storyData === 'string' ? JSON.parse(req.body.storyData) : req.body.storyData) : undefined,
   };
 
   if (chat.disappearAfter > 0) {
@@ -102,12 +158,19 @@ const sendMessage = asyncHandler(async (req, res) => {
   // Update chat's latest message
   await Chat.findByIdAndUpdate(chatId, { latestMessage: message._id });
 
-  // Emit via socket to all participants' personal rooms
+  // Let BotEngine process the message (async, doesn't block response)
   const io = req.app.get('io');
+  const BotEngine = require('../utils/BotEngine');
+  BotEngine.processMessage(message, chat, io);
+
+  // Emit via socket to all participants' personal rooms
   let pushMessages = [];
   
   if (io) {
     chat.users.forEach((userId) => {
+      // If block is active, skip sending to the other user
+      if (blockActive && userId.toString() !== req.user._id.toString()) return;
+
       const userSpecificMessage = message.toObject();
       if (userSpecificMessage.sender) {
         userSpecificMessage.sender = sanitizeUser(userSpecificMessage.sender, userId);
@@ -123,10 +186,10 @@ const sendMessage = asyncHandler(async (req, res) => {
         if (targetUser && targetUser.pushToken && Expo.isExpoPushToken(targetUser.pushToken)) {
           let pushBody = content || `Sent a ${messageType}`;
           if (isEncrypted) pushBody = '🔒 Encrypted Message';
-          
           pushMessages.push({
             to: targetUser.pushToken,
             sound: 'default',
+            channelId: 'messages',
             title: chat.isGroupChat ? chat.groupName : (req.user.displayName || req.user.username),
             body: pushBody,
             data: { chatId: chat._id },
@@ -177,7 +240,6 @@ const getMessages = asyncHandler(async (req, res) => {
   const messages = await populateMessage(
     Message.find({ 
       chat: chatId, 
-      deletedForEveryone: false,
       deletedBy: { $ne: req.user._id } 
     })
       .sort({ createdAt: -1 })
@@ -191,7 +253,7 @@ const getMessages = asyncHandler(async (req, res) => {
     { $push: { readBy: req.user._id } }
   );
 
-  const sanitizedMessages = messages.reverse().map(msg => {
+  const sanitizedMessages = messages.map(msg => {
     const m = msg.toObject();
     if (m.sender) {
       m.sender = sanitizeUser(m.sender, req.user._id);
@@ -215,11 +277,28 @@ const markAsRead = asyncHandler(async (req, res) => {
     { chat: req.params.chatId, readBy: { $ne: req.user._id }, sender: { $ne: req.user._id } },
     { $push: { readBy: req.user._id } }
   );
-  const io = req.app.get('io');
-  io.to(req.params.chatId).emit('messages_read', { chatId: req.params.chatId, userId: req.user._id });
+
+  const user = await User.findById(req.user._id).select('privacy');
+  if (user?.privacy?.readReceipts !== 'hide') {
+    const io = req.app.get('io');
+    io.to(req.params.chatId).emit('messages_read', { chatId: req.params.chatId, userId: req.user._id });
+  }
+
   res.status(200).json({ success: true });
 });
 
+// @desc  Mark messages as delivered
+// @route PUT /api/messages/:chatId/deliver
+// @access Private
+const markAsDelivered = asyncHandler(async (req, res) => {
+  await Message.updateMany(
+    { chat: req.params.chatId, deliveredTo: { $ne: req.user._id }, sender: { $ne: req.user._id } },
+    { $push: { deliveredTo: req.user._id } }
+  );
+  const io = req.app.get('io');
+  io.to(req.params.chatId).emit('messages_delivered', { chatId: req.params.chatId, userId: req.user._id });
+  res.status(200).json({ success: true });
+});
 // @desc  Delete message
 // @route DELETE /api/messages/:id
 // @access Private
@@ -229,34 +308,64 @@ const deleteMessage = asyncHandler(async (req, res) => {
   if (!message) { res.status(404); throw new Error('Message not found'); }
 
   if (type === 'everyone') {
-    let canDelete = message.sender.toString() === req.user._id.toString();
+    const isSender = message.sender.toString() === req.user._id.toString();
+    let canDelete = isSender;
+    let isAdminDeletion = false;
+
+    const diffMins = (Date.now() - new Date(message.createdAt).getTime()) / 60000;
 
     // Group role hierarchy check
-    if (!canDelete) {
+    if (!isSender) {
       const chat = await Chat.findById(message.chat);
       if (chat && chat.isGroupChat) {
         const isReqOwner = chat.groupAdmin.toString() === req.user._id.toString();
         const isReqAdmin = chat.admins.some(a => a.toString() === req.user._id.toString());
         const isSenderOwner = chat.groupAdmin.toString() === message.sender.toString();
-        // Owner can delete everything. Admin can delete everything except owner's.
-        if (isReqOwner) canDelete = true;
-        else if (isReqAdmin && !isSenderOwner) canDelete = true;
+        
+        if (isReqOwner) { canDelete = true; isAdminDeletion = true; }
+        else if (isReqAdmin && !isSenderOwner) { canDelete = true; isAdminDeletion = true; }
+      }
+    } else {
+      // Sender is trying to delete. Check 5 minute rule.
+      if (diffMins > 5) {
+        const chat = await Chat.findById(message.chat);
+        let isReqAdminOrOwner = false;
+        if (chat && chat.isGroupChat) {
+          isReqAdminOrOwner = (chat.groupAdmin.toString() === req.user._id.toString()) || chat.admins.some(a => a.toString() === req.user._id.toString());
+        }
+        
+        if (!isReqAdminOrOwner) {
+          res.status(400); throw new Error('You can only delete messages for everyone within 5 minutes of sending');
+        } else {
+          isAdminDeletion = true;
+        }
       }
     }
 
     if (!canDelete) {
       res.status(403); throw new Error('Not authorized to delete this message for everyone');
     }
+
     message.deletedForEveryone = true;
-    message.content = '';
+    if (isAdminDeletion) {
+      message.content = `Message deleted by admin ${req.user.displayName || req.user.username}`;
+    } else {
+      message.content = 'Permanently deleted';
+    }
+
     message.mediaUrl = '';
+    message.isSelfDestructing = false;
+    message.destructAfterSeconds = 0;
+    message.expiresAt = null;
     if (message.mediaPublicId) {
-      await deleteFromCloudinary(message.mediaPublicId, message.mediaType === 'image' ? 'image' : 'video');
+      await deleteFromCloudinary(message.mediaPublicId);
+    } else if (message.mediaUrl) {
+      await deleteFromCloudinary(message.mediaUrl);
     }
     await message.save();
 
     const io = req.app.get('io');
-    io.to(message.chat.toString()).emit('message_deleted', { messageId: message._id, chatId: message.chat, forEveryone: true });
+    io.to(message.chat.toString()).emit('message_deleted', { messageId: message._id, chatId: message.chat, forEveryone: true, newContent: message.content });
 
     res.status(200).json({ success: true, message: 'Message deleted for everyone' });
   } else {
@@ -378,37 +487,144 @@ const destructMessage = asyncHandler(async (req, res) => {
     res.status(403); throw new Error('Not authorized');
   }
 
-  // Delete from Cloudinary first while we still have publicId and mediaType
+  // Delete from Cloudinary first — auto-detects type (image/video/raw)
   if (message.mediaPublicId) {
-    try {
-      await deleteFromCloudinary(message.mediaPublicId, message.mediaType === 'image' ? 'image' : 'video');
-    } catch (_) {}
+    await deleteFromCloudinary(message.mediaPublicId);
+  } else if (message.mediaUrl) {
+    await deleteFromCloudinary(message.mediaUrl);
   }
 
-  // Clear media properties and mark expired
+  // Clear media and mark as disappeared in DB
   message.deletedForEveryone = true;
-  message.content = 'Media expired';
+  message.content = 'Message disappeared';
   message.mediaUrl = '';
   message.mediaType = '';
   message.mediaPublicId = '';
   message.messageType = 'text';
+  message.isSelfDestructing = false;
+  message.destructAfterSeconds = 0;
+  message.expiresAt = null;
 
   await message.save();
 
   const io = req.app.get('io');
   if (io) {
-    io.to(message.chat.toString()).emit('message_deleted', { 
+    // Use a distinct event so clients show "Message disappeared" not "Permanently deleted"
+    io.to(message.chat.toString()).emit('message_disappeared', { 
       messageId: message._id, 
-      chatId: message.chat, 
-      forEveryone: true 
+      chatId: message.chat,
     });
   }
 
   res.status(200).json({ success: true, message: 'Media message self-destructed successfully' });
 });
 
+// @desc  Edit message
+// @route PUT /api/messages/:id/edit
+// @access Private
+const editMessage = asyncHandler(async (req, res) => {
+  const { content } = req.body;
+  const message = await Message.findById(req.params.id);
+  if (!message) { res.status(404); throw new Error('Message not found'); }
+  if (message.sender.toString() !== req.user._id.toString()) {
+    res.status(403); throw new Error('Not authorized to edit this message');
+  }
+  if (message.deletedForEveryone) {
+    res.status(400); throw new Error('Cannot edit deleted message');
+  }
+  if (message.mediaUrl || message.messageType !== 'text') {
+    res.status(400); throw new Error('Cannot edit media messages');
+  }
+  
+  const diff = (Date.now() - new Date(message.createdAt).getTime()) / 60000;
+  if (diff > 5) {
+    res.status(400); throw new Error('Messages can only be edited within 5 minutes of sending');
+  }
+
+  message.content = content;
+  message.isEdited = true;
+  await message.save();
+
+  const updated = await populateMessage(Message.findById(message._id));
+  const io = req.app.get('io');
+  if (io) {
+    const chat = await Chat.findById(message.chat);
+    if (chat) {
+      chat.users.forEach((userId) => {
+        io.to(userId.toString()).emit('message_edited', { messageId: message._id, content: updated.content, chatId: message.chat });
+      });
+    }
+  }
+
+  res.status(200).json({ success: true, message: updated });
+});
+
+// @desc  Vote on a poll message
+// @route POST /api/messages/:id/vote
+// @access Private
+const voteOnPoll = asyncHandler(async (req, res) => {
+  const { optionId } = req.body;
+  const message = await Message.findById(req.params.id);
+  if (!message || message.messageType !== 'poll' || !message.pollData) {
+    res.status(404); throw new Error('Poll not found');
+  }
+
+  const userId = req.user._id.toString();
+  let hasChanged = false;
+
+  // Prevent users from changing or removing their vote once they've voted
+  const hasAlreadyVoted = message.pollData.options.some(opt => 
+    opt.votes.some(v => v.toString() === userId)
+  );
+
+  if (hasAlreadyVoted) {
+    res.status(400);
+    throw new Error('You have already voted and cannot change your vote.');
+  }
+
+  // If not multiple answers, remove user's vote from all other options
+  if (!message.pollData.multipleAnswers) {
+    message.pollData.options.forEach(opt => {
+      const idx = opt.votes.findIndex(v => v.toString() === userId);
+      if (idx !== -1 && opt._id.toString() !== optionId) {
+        opt.votes.splice(idx, 1);
+        hasChanged = true;
+      }
+    });
+  }
+
+  // Toggle vote for the selected option
+  const targetOption = message.pollData.options.find(opt => opt._id.toString() === optionId);
+  if (targetOption) {
+    const idx = targetOption.votes.findIndex(v => v.toString() === userId);
+    if (idx !== -1) {
+      targetOption.votes.splice(idx, 1); // un-vote
+    } else {
+      targetOption.votes.push(req.user._id); // vote
+    }
+    hasChanged = true;
+  }
+
+  if (hasChanged) {
+    await message.save();
+    const updated = await populateMessage(Message.findById(message._id));
+    const io = req.app.get('io');
+    if (io) {
+      const chat = await Chat.findById(message.chat);
+      if (chat) {
+        chat.users.forEach((uId) => {
+          io.to(uId.toString()).emit('poll_voted', { messageId: message._id, pollData: updated.pollData, chatId: message.chat });
+        });
+      }
+    }
+    res.status(200).json({ success: true, pollData: updated.pollData });
+  } else {
+    res.status(200).json({ success: true, pollData: message.pollData });
+  }
+});
+
 module.exports = {
-  sendMessage, getMessages, markAsRead, deleteMessage,
+  sendMessage, getMessages, markAsRead, markAsDelivered, deleteMessage,
   reactToMessage, forwardMessage, saveMessage, getSavedMessages,
-  destructMessage,
+  destructMessage, editMessage, voteOnPoll,
 };

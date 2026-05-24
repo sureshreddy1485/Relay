@@ -107,23 +107,23 @@ export default function DisappearingMsgSheet({ visible, currentSeconds = 0, onSe
                 key={opt.key}
                 style={[
                   styles.option,
-                  isFirst && styles.optionFirst,
-                  !isFirst && styles.optionNormal,
+                  isSelected && styles.optionSelected,
+                  !isSelected && styles.optionNormal,
                 ]}
                 onPress={() => handleSelect(opt.seconds)}
                 activeOpacity={0.7}
               >
                 {/* Icon */}
-                <View style={[styles.iconWrap, isFirst && styles.iconWrapActive]}>
+                <View style={[styles.iconWrap, isSelected && styles.iconWrapActive]}>
                   <Ionicons
                     name={opt.icon}
                     size={22}
-                    color={isFirst ? Colors.primary : Colors.dark.muted}
+                    color={isSelected ? Colors.primary : Colors.dark.muted}
                   />
                 </View>
 
                 {/* Label */}
-                <Text style={[styles.optionLabel, isFirst && styles.optionLabelActive]}>
+                <Text style={[styles.optionLabel, isSelected && styles.optionLabelActive]}>
                   {opt.label}
                 </Text>
 
@@ -181,8 +181,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  // First option (Off) — slightly highlighted
-  optionFirst: {
+  // Selected option — slightly highlighted
+  optionSelected: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 18, paddingVertical: 16, gap: 14,
     borderBottomWidth: 0.5, borderBottomColor: Colors.dark.border,

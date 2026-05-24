@@ -1,9 +1,11 @@
 import React, { useState, useRef } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
-  StatusBar, Animated, Image,
+  StatusBar, Animated, Image, Switch
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import useAuthStore from '../../store/useAuthStore';
@@ -11,11 +13,36 @@ import { Colors } from '../../theme/colors';
 import { connectSocket } from '../../services/socketService';
 
 export default function LoginScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [saveLogin, setSaveLogin] = useState(false);
+  const [savedAccounts, setSavedAccounts] = useState([]);
   const { login, isLoading, error, clearError } = useAuthStore();
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef();
+
+  React.useEffect(() => {
+    const loadSavedCredentials = async () => {
+      try {
+        const savedArr = await AsyncStorage.getItem('relay_saved_accounts');
+        if (savedArr) {
+          const accounts = JSON.parse(savedArr);
+          if (Array.isArray(accounts)) setSavedAccounts(accounts);
+        } else {
+          const saved = await AsyncStorage.getItem('relay_saved_login');
+          if (saved) {
+            const { savedIdentifier, savedPassword } = JSON.parse(saved);
+            setIdentifier(savedIdentifier);
+            setPassword(savedPassword);
+            setSaveLogin(true);
+          }
+        }
+      } catch (e) {}
+    };
+    loadSavedCredentials();
+  }, []);
 
   const shake = () => {
     Animated.sequence([
@@ -32,6 +59,22 @@ export default function LoginScreen({ navigation }) {
     const result = await login(identifier.trim(), password);
     if (result.success) {
       const user = useAuthStore.getState().user;
+      
+      let newAccounts = [...savedAccounts];
+      newAccounts = newAccounts.filter(a => a.identifier !== identifier.trim() && a.userId !== user._id);
+      
+      if (saveLogin) {
+        newAccounts.unshift({
+          userId: user._id,
+          identifier: identifier.trim(),
+          password,
+          name: user.displayName || user.username,
+          avatar: user.profilePicture
+        });
+        if (newAccounts.length > 3) newAccounts = newAccounts.slice(0, 3);
+      }
+      await AsyncStorage.setItem('relay_saved_accounts', JSON.stringify(newAccounts));
+      
       connectSocket(user._id);
     } else {
       shake();
@@ -39,10 +82,23 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <LinearGradient colors={['#080F14', '#04070B']} style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <LinearGradient colors={['#080F14', '#04070B']} style={[styles.container, { paddingTop: Math.max(insets.top, StatusBar.currentHeight || 0) }]}>
+      <StatusBar barStyle="light-content" translucent />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView 
+          ref={scrollRef}
+          contentContainerStyle={[
+            styles.scroll, 
+            { 
+              paddingTop: 20, 
+              paddingBottom: 20,
+              paddingLeft: Math.max(insets.left, 24),
+              paddingRight: Math.max(insets.right, 24)
+            }
+          ]} 
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
@@ -57,6 +113,34 @@ export default function LoginScreen({ navigation }) {
             <Text style={styles.title}>Welcome back</Text>
             <Text style={styles.subtitle}>Sign in to continue</Text>
           </View>
+
+          {savedAccounts.length > 0 && (
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ color: Colors.dark.muted, fontSize: 13, marginBottom: 10, textAlign: 'center' }}>Saved Accounts</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingHorizontal: 12 }}>
+                {savedAccounts.map((acc, idx) => (
+                  <TouchableOpacity 
+                    key={idx} 
+                    style={{ alignItems: 'center', backgroundColor: Colors.dark.card, padding: 12, borderRadius: 16, width: 90, borderWidth: 1, borderColor: identifier === acc.identifier ? Colors.primary : Colors.dark.border }}
+                    onPress={() => {
+                      setIdentifier(acc.identifier);
+                      setPassword(acc.password);
+                      setSaveLogin(true);
+                    }}
+                  >
+                    {acc.avatar ? (
+                      <Image source={{ uri: acc.avatar }} style={{ width: 44, height: 44, borderRadius: 22, marginBottom: 8 }} />
+                    ) : (
+                      <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={{ width: 44, height: 44, borderRadius: 22, marginBottom: 8, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 18 }}>{acc.name?.charAt(0).toUpperCase()}</Text>
+                      </LinearGradient>
+                    )}
+                    <Text style={{ color: Colors.dark.text, fontSize: 12, fontWeight: '600', textAlign: 'center' }} numberOfLines={1}>{acc.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           <Animated.View style={[styles.form, { transform: [{ translateX: shakeAnim }] }]}>
             {/* Error */}
@@ -102,9 +186,21 @@ export default function LoginScreen({ navigation }) {
               </View>
             </View>
 
-            <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} style={styles.forgotBtn}>
-              <Text style={styles.forgotText}>Forgot Password?</Text>
-            </TouchableOpacity>
+            <View style={styles.optionsRow}>
+              <View style={styles.saveLoginRow}>
+                <Switch
+                  value={saveLogin}
+                  onValueChange={setSaveLogin}
+                  trackColor={{ false: Colors.dark.border, true: Colors.primary }}
+                  thumbColor="#FFF"
+                  style={{ transform: [{ scale: 0.8 }] }}
+                />
+                <Text style={styles.saveLoginText}>Save details</Text>
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} style={styles.forgotBtn}>
+                <Text style={styles.forgotText}>Forgot Password?</Text>
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity onPress={handleLogin} disabled={isLoading} activeOpacity={0.85}>
               <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.loginBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
@@ -131,7 +227,7 @@ export default function LoginScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 60, paddingBottom: 40 },
+  scroll: { flexGrow: 1, paddingHorizontal: 24 },
   backBtn: { marginBottom: 20 },
   header: { alignItems: 'center', marginBottom: 40 },
   logoGrad: { width: 72, height: 72, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
@@ -154,6 +250,9 @@ const styles = StyleSheet.create({
   inputIcon: { marginRight: 10 },
   input: { flex: 1, color: Colors.dark.text, fontSize: 15, paddingVertical: 16 },
   eyeBtn: { padding: 4 },
+  optionsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  saveLoginRow: { flexDirection: 'row', alignItems: 'center' },
+  saveLoginText: { color: Colors.dark.textSecondary, fontSize: 13, marginLeft: 4 },
   forgotBtn: { alignSelf: 'flex-end' },
   forgotText: { color: Colors.primary, fontSize: 13, fontWeight: '600' },
   loginBtn: { borderRadius: 16, paddingVertical: 18, alignItems: 'center', marginTop: 8 },

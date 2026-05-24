@@ -10,10 +10,13 @@ import api from '../services/api';
 import useAuthStore from '../store/useAuthStore';
 import useChatStore from '../store/useChatStore';
 import DisappearingMsgSheet, { secondsToLabel, DISAPPEAR_OPTIONS } from './DisappearingMsgSheet';
+import ThemeSelectSheet from './ThemeSelectSheet';
+import { useAlert } from './CustomAlert';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 
 export default function UserInfoSheet({ visible, user: initialUser, chat, currentUserId, navigation, onClose }) {
+  const { showAlert } = useAlert();
   const { user: authUser, updateUser } = useAuthStore();
   const [profile, setProfile]     = useState(initialUser || null);
   const [loading, setLoading]     = useState(false);
@@ -21,6 +24,8 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
   const [pinned, setPinned]       = useState(authUser?.pinnedChats?.includes(chat?._id) || false);
   const [disappear, setDisappear] = useState(chat?.disappearAfter ?? 0);
   const [showDisappear, setShowDisappear] = useState(false);
+  const [showTheme, setShowTheme] = useState(false);
+  const [showFullAvatar, setShowFullAvatar] = useState(false);
   const slideAnim = useRef(new Animated.Value(SCREEN_H)).current;
 
   useEffect(() => {
@@ -51,7 +56,7 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
       const { data } = await api.post('/chats', { userId: profile._id });
       navigation.push('ChatRoom', { chat: data.chat });
     } catch (e) {
-      Alert.alert('Error', e.message || 'Could not open chat');
+      showAlert('Error', e.message || 'Could not open chat');
     }
   };
 
@@ -79,7 +84,16 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
       setDisappear(seconds);
       useChatStore.getState().updateChat(chat._id, { disappearAfter: seconds });
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to update');
+      showAlert('Error', e.message || 'Failed to update');
+    }
+  };
+
+  const handleThemeSelect = async (themeId) => {
+    try {
+      await api.put(`/chats/${chat._id}/theme`, { theme: themeId });
+      useChatStore.getState().updateChat(chat._id, { theme: themeId });
+    } catch (e) {
+      showAlert('Error', e.message || 'Failed to update theme');
     }
   };
 
@@ -89,7 +103,7 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
   };
 
   const handleDeleteChat = () => {
-    Alert.alert(
+    showAlert(
       'Delete Chat',
       'Are you sure you want to permanently delete this chat and all of its messages?',
       [
@@ -105,7 +119,7 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
               onClose();
               if (navigation && navigation.goBack) navigation.goBack();
             } catch (e) {
-              Alert.alert('Error', e.message || 'Delete failed');
+              showAlert('Error', e.message || 'Delete failed');
             }
           }
         }
@@ -113,11 +127,13 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
     );
   };
 
-  // Days on Nexo — use whichever createdAt is available
+  // Days on Relay — use whichever createdAt is available
   const createdAt = profile?.createdAt;
   const daysOnApp = createdAt
     ? Math.max(1, Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000))
     : null;
+
+  const isFriend = profile && authUser?.friends?.some(f => (f._id || f).toString() === profile._id.toString());
 
   if (!profile) return null;
 
@@ -128,11 +144,15 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
 
         <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
           <View style={styles.handle} />
+          
+          <TouchableOpacity onPress={onClose} style={{ position: 'absolute', top: 16, right: 16, zIndex: 10, padding: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20 }}>
+            <Ionicons name="close" size={20} color="#FFF" />
+          </TouchableOpacity>
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* ── Profile ─────────────────────────────────────────────── */}
             <View style={styles.profileSection}>
-              <View style={styles.avatarWrap}>
+              <TouchableOpacity style={styles.avatarWrap} onPress={() => { if (profile.profilePicture) setShowFullAvatar(true); }} activeOpacity={0.8}>
                 {profile.profilePicture ? (
                   <Image source={{ uri: profile.profilePicture }} style={styles.avatar} />
                 ) : (
@@ -148,7 +168,7 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
                     style={{ position: 'absolute', top: 36, alignSelf: 'center' }}
                   />
                 )}
-              </View>
+              </TouchableOpacity>
               <Text style={styles.displayName}>{profile.displayName || profile.username}</Text>
               <Text style={styles.username}>@{profile.username}</Text>
 
@@ -159,84 +179,160 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
               {daysOnApp !== null && (
                 <View style={styles.daysBadge}>
                   <Ionicons name="calendar-outline" size={13} color={Colors.dark.muted} />
-                  <Text style={styles.daysText}>{daysOnApp} {daysOnApp === 1 ? 'Day' : 'Days'} on Nexo</Text>
+                  <Text style={styles.daysText}>{daysOnApp} {daysOnApp === 1 ? 'Day' : 'Days'} on Relay</Text>
                 </View>
               )}
             </View>
 
             {/* ── Actions ─────────────────────────────────────────────── */}
             <View style={styles.actions}>
-              <ActionRow icon="chatbubble-outline" label="Open Chat" onPress={handleOpenChat} />
-              <View style={styles.divider} />
-              <SwitchRow icon="notifications-outline" label="Notifications" value={notifOn} onChange={setNotifOn} />
-              <View style={styles.divider} />
-              <SwitchRow icon="pin-outline" label="Pin Chat" value={pinned} onChange={handlePinToggle} />
-              <View style={styles.divider} />
-              <ActionRow
-                icon="people-outline"
-                label={`Start a Group with ${profile.username}`}
-                labelStyle={{ color: Colors.primary }}
-                iconColor={Colors.primary}
-                onPress={handleStartGroup}
-              />
-              <View style={styles.divider} />
-              <ActionRow
-                icon="time-outline"
-                label="Disappearing Messages"
-                value={secondsToLabel(disappear)}
-                valueStyle={{ color: Colors.primary }}
-                onPress={() => setShowDisappear(true)}
-              />
-              <View style={styles.divider} />
-              <ActionRow
-                icon="color-palette-outline"
-                label="Change Chat Theme"
-                onPress={() => Alert.alert('Themes', 'Chat themes coming soon!')}
-              />
-              <View style={styles.divider} />
-              <ActionRow
-                icon="close-circle-outline"
-                label="Delete Chat"
-                labelStyle={{ color: '#FF4444' }}
-                iconColor="#FF4444"
-                onPress={handleDeleteChat}
-              />
-              <View style={styles.divider} />
-              <ActionRow
-                icon="ban-outline"
-                label="Block User"
-                labelStyle={{ color: '#FF4444' }}
-                iconColor="#FF4444"
-                onPress={() => {
-                  Alert.alert('Block User', `Are you sure you want to block ${profile.displayName || profile.username}?`, [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Block',
-                      style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          await api.post(`/users/${profile._id}/block`);
-                          const updatedBlocked = [...(authUser.blockedUsers || []), profile._id];
-                          const updatedFriends = (authUser.friends || []).filter(id => id.toString() !== profile._id.toString());
-                          updateUser({ blockedUsers: updatedBlocked, friends: updatedFriends });
-                          
-                          // Instantly remove chat from UI lists
-                          const allChats = useChatStore.getState().chats;
-                          const chatToRemove = allChats.find(c => !c.isGroupChat && c.users?.some(u => u._id === profile._id));
-                          if (chatToRemove) {
-                            useChatStore.getState().removeChat(chatToRemove._id);
-                          }
-                          
-                          Alert.alert('Blocked', 'User has been blocked');
-                          onClose();
-                          if (navigation && navigation.goBack) navigation.goBack();
-                        } catch (e) { Alert.alert('Error', e.message); }
+              {(profile.role !== 'system_bot' && profile.username !== 'mica_bot' && profile.username !== 'relay_bot' && profile.username !== 'relay') ? (
+                <>
+                  <ActionRow icon="chatbubble-outline" label="Open Chat" onPress={handleOpenChat} />
+                  <View style={styles.divider} />
+                  <SwitchRow icon="notifications-outline" label="Notifications" value={notifOn} onChange={setNotifOn} />
+                  <View style={styles.divider} />
+                  <SwitchRow icon="pin-outline" label="Pin Chat" value={pinned} onChange={handlePinToggle} />
+                  <View style={styles.divider} />
+                  <ActionRow
+                    icon="people-outline"
+                    label={`Start a Group with ${profile.username}`}
+                    labelStyle={{ color: Colors.primary }}
+                    iconColor={Colors.primary}
+                    onPress={handleStartGroup}
+                  />
+                  <View style={styles.divider} />
+                  <ActionRow
+                    icon="time-outline"
+                    label="Disappearing Messages"
+                    value={secondsToLabel(disappear)}
+                    valueStyle={{ color: Colors.primary }}
+                    onPress={() => setShowDisappear(true)}
+                  />
+                  <View style={styles.divider} />
+                  <ActionRow
+                    icon="color-palette-outline"
+                    label="Change Chat Theme"
+                    onPress={() => setShowTheme(true)}
+                  />
+                  <View style={styles.divider} />
+                  <View style={styles.divider} />
+                  
+                  <Text style={{ color: Colors.dark.muted, fontSize: 13, fontWeight: '700', marginLeft: 16, marginTop: 8, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Security</Text>
+
+                  <SwitchRow 
+                    icon="camera-outline" 
+                    label="Allow Screenshots" 
+                    value={chat?.allowScreenshots !== false} 
+                    onChange={async (val) => {
+                      const prev = chat?.allowScreenshots;
+                      useChatStore.getState().updateChat(chat._id, { allowScreenshots: val });
+                      try {
+                        await api.put(`/chats/${chat._id}/security`, { allowScreenshots: val });
+                      } catch (e) {
+                        useChatStore.getState().updateChat(chat._id, { allowScreenshots: prev });
+                        showAlert('Error', e.message); 
                       }
-                    }
-                  ]);
-                }}
-              />
-              {authUser.friends?.some(f => (f._id || f).toString() === profile._id.toString()) && (
+                    }} 
+                  />
+                  <View style={styles.divider} />
+                  
+                  <SwitchRow 
+                    icon="arrow-redo-outline" 
+                    label="Allow Forwarding" 
+                    value={chat?.allowForwarding !== false} 
+                    onChange={async (val) => {
+                      const prev = chat?.allowForwarding;
+                      useChatStore.getState().updateChat(chat._id, { allowForwarding: val });
+                      try {
+                        await api.put(`/chats/${chat._id}/security`, { allowForwarding: val });
+                      } catch (e) {
+                        useChatStore.getState().updateChat(chat._id, { allowForwarding: prev });
+                        showAlert('Error', e.message); 
+                      }
+                    }} 
+                  />
+                  <View style={styles.divider} />
+                  
+                  {!isFriend ? (
+                    <>
+                      <ActionRow
+                        icon="person-add-outline"
+                        label="Add Friend"
+                        onPress={async () => {
+                          try {
+                            await api.post(`/users/${profile._id}/friend-request`);
+                            showAlert('✅', 'Friend request sent!');
+                          } catch (e) {
+                            showAlert('Info', e.response?.data?.message || e.message);
+                          }
+                        }}
+                      />
+                      <View style={styles.divider} />
+                    </>
+                  ) : (
+                    <>
+                      <ActionRow
+                        icon="checkmark-circle"
+                        label="Already Friends"
+                        iconColor={Colors.primary}
+                        labelStyle={{ color: Colors.primary }}
+                      />
+                      <View style={styles.divider} />
+                    </>
+                  )}
+
+                  <ActionRow
+                    icon="close-circle-outline"
+                    label="Delete Chat"
+                    labelStyle={{ color: '#FF4444' }}
+                    iconColor="#FF4444"
+                    onPress={handleDeleteChat}
+                  />
+                  <View style={styles.divider} />
+                  <ActionRow
+                    icon="ban-outline"
+                    label="Block User"
+                    labelStyle={{ color: '#FF4444' }}
+                    iconColor="#FF4444"
+                    onPress={() => {
+                      showAlert('Block User', `Are you sure you want to block ${profile.displayName || profile.username}?`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Block',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              await api.post(`/users/${profile._id}/block`);
+                              const updatedBlocked = [...(authUser.blockedUsers || []), profile._id];
+                              const updatedFriends = (authUser.friends || []).filter(id => id.toString() !== profile._id.toString());
+                              updateUser({ blockedUsers: updatedBlocked, friends: updatedFriends });
+                              
+                              const allChats = useChatStore.getState().chats;
+                              const chatToRemove = allChats.find(c => !c.isGroupChat && c.users?.some(u => u._id === profile._id));
+                              if (chatToRemove) {
+                                useChatStore.getState().removeChat(chatToRemove._id);
+                              }
+                              
+                              showAlert('Blocked', 'User has been blocked');
+                              onClose();
+                              if (navigation && navigation.goBack) navigation.goBack();
+                            } catch (e) { showAlert('Error', e.message); }
+                          }
+                        }
+                      ]);
+                    }}
+                  />
+                </>
+              ) : (
+                // System bot panel (mica, relay, relay_bot)
+                <>
+                  <ActionRow icon="information-circle-outline" label="System Assistant" onPress={() => {}} />
+                  <View style={styles.divider} />
+                  <ActionRow icon="shield-checkmark-outline" label="Managed by Relay" iconColor={Colors.primary} labelStyle={{ color: Colors.primary }} onPress={() => {}} />
+                </>
+              )}
+              {authUser.friends?.some(f => (f._id || f).toString() === profile._id.toString()) && profile.role !== 'system_bot' && (
                 <>
                   <View style={styles.divider} />
                   <ActionRow
@@ -245,7 +341,7 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
                     labelStyle={{ color: '#FF4444' }}
                     iconColor="#FF4444"
                     onPress={() => {
-                      Alert.alert('Remove Friend', `Are you sure you want to remove ${profile.displayName || profile.username} from friends?`, [
+                      showAlert('Remove Friend', `Are you sure you want to remove ${profile.displayName || profile.username} from friends?`, [
                         { text: 'Cancel', style: 'cancel' },
                         {
                           text: 'Remove',
@@ -253,12 +349,12 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
                           onPress: async () => {
                             try {
                               await api.post(`/users/${profile._id}/remove-friend`);
-                              const updatedFriends = (authUser.friends || []).filter(id => id.toString() !== profile._id.toString());
+                              const updatedFriends = (authUser.friends || []).filter(id => (id._id || id).toString() !== profile._id.toString());
                               updateUser({ friends: updatedFriends });
-                              Alert.alert('Removed', 'Friend removed silently');
+                              showAlert('Removed', 'Friend removed silently');
                               onClose();
                               if (navigation && navigation.goBack) navigation.goBack();
-                            } catch (e) { Alert.alert('Error', e.message); }
+                            } catch (e) { showAlert('Error', e.message); }
                           }
                         }
                       ]);
@@ -280,6 +376,24 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
         onSelect={handleDisappearSelect}
         onClose={() => setShowDisappear(false)}
       />
+
+      <ThemeSelectSheet
+        visible={showTheme}
+        currentThemeId={chat?.theme || 'default'}
+        onSelect={handleThemeSelect}
+        onClose={() => setShowTheme(false)}
+      />
+
+      <Modal visible={showFullAvatar} transparent animationType="fade" onRequestClose={() => setShowFullAvatar(false)}>
+        <TouchableOpacity style={styles.fullAvatarOverlay} activeOpacity={1} onPress={() => setShowFullAvatar(false)}>
+          <TouchableOpacity style={styles.fullAvatarClose} onPress={() => setShowFullAvatar(false)}>
+            <Ionicons name="close" size={30} color="#FFF" />
+          </TouchableOpacity>
+          {profile?.profilePicture && (
+            <Image source={{ uri: profile.profilePicture }} style={styles.fullAvatarImage} resizeMode="contain" />
+          )}
+        </TouchableOpacity>
+      </Modal>
     </>
   );
 }
@@ -341,4 +455,14 @@ const styles = StyleSheet.create({
   rowLabel: { flex: 1, fontSize: 15, color: Colors.dark.text, fontWeight: '500' },
   rowValue: { fontSize: 14, color: Colors.dark.muted },
   divider: { height: 0.5, backgroundColor: Colors.dark.border, marginLeft: 56 },
+  fullAvatarOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center', alignItems: 'center'
+  },
+  fullAvatarClose: {
+    position: 'absolute', top: 50, right: 20, padding: 10, zIndex: 10
+  },
+  fullAvatarImage: {
+    width: '100%', height: '80%'
+  }
 });

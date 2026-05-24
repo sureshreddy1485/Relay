@@ -1,9 +1,10 @@
 import 'react-native-gesture-handler';
-import React, { useEffect } from 'react';
-import { StatusBar, LogBox } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { StatusBar, LogBox, View, Animated, StyleSheet, Image, Text } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
-import RootNavigator from './src/navigation/RootNavigator';
+// RootNavigator dynamically imported later to allow Colors override
+// import RootNavigator from './src/navigation/RootNavigator';
 import useAuthStore from './src/store/useAuthStore';
 import { connectSocket } from './src/services/socketService';
 
@@ -17,12 +18,44 @@ Notifications.setNotificationHandler({
   }),
 });
 
+import { AlertProvider } from './src/components/CustomAlert';
+
+import { Colors, AppThemes } from './src/theme/colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export default function App() {
   const { hydrate, user, isAuthenticated } = useAuthStore();
+  const [themeLoaded, setThemeLoaded] = useState(false);
+  const [splashVisible, setSplashVisible] = useState(true);
+  const splashAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   useEffect(() => {
-    hydrate();
+    const initTheme = async () => {
+      try {
+        const savedTheme = await AsyncStorage.getItem('app_theme');
+        if (savedTheme === 'cyan') {
+          Object.assign(Colors, AppThemes.cyan);
+        } else {
+          Object.assign(Colors, AppThemes.relay);
+        }
+      } catch (e) {}
+      setThemeLoaded(true);
+      hydrate();
+    };
+    initTheme();
   }, []);
+
+  useEffect(() => {
+    if (themeLoaded) {
+      Animated.parallel([
+        Animated.timing(scaleAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(splashAnim, { toValue: 0, duration: 400, delay: 1000, useNativeDriver: true })
+      ]).start(() => {
+        setSplashVisible(false);
+      });
+    }
+  }, [themeLoaded]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -38,10 +71,25 @@ export default function App() {
     }
   }, [isAuthenticated, user?._id]);
 
+  const RootNavigator = themeLoaded ? require('./src/navigation/RootNavigator').default : null;
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar barStyle="light-content" />
-      <RootNavigator />
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#04070B' }}>
+      <StatusBar barStyle="light-content" backgroundColor="#04070B" />
+      <AlertProvider>
+        {themeLoaded && RootNavigator && <RootNavigator />}
+      </AlertProvider>
+
+      {/* Splash Animation Overlay */}
+      {splashVisible && (
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#04070B', alignItems: 'center', justifyContent: 'center', opacity: splashAnim, zIndex: 9999 }]}>
+          <Animated.View style={{ transform: [{ scale: scaleAnim }], alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row' }}>
+              <Text style={{ fontSize: 48, fontWeight: '900', color: Colors.primary || '#06B6D4', letterSpacing: 1 }}>Relay</Text>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      )}
     </GestureHandlerRootView>
   );
 }

@@ -1,7 +1,7 @@
 {
-  "name": "nexo-backend",
+  "name": "relay-backend",
   "version": "1.0.0",
-  "description": "Nexo Backend API - Realtime Messaging Platform",
+  "description": "Relay Backend API - Realtime Messaging Platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,7 +9,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
-    "nexo",
+    "relay",
     "messaging",
     "realtime",
     "socket.io"
@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "cleverbot-free": "^2.0.4",
     "cloudinary": "^2.10.0",
     "cors": "^2.8.6",
     "crypto-js": "^4.2.0",
@@ -29,6 +30,7 @@
     "express": "^5.2.1",
     "express-async-handler": "^1.2.0",
     "express-rate-limit": "^8.5.2",
+    "groq-sdk": "^1.2.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.2",

@@ -1,7 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Story = require('../models/Story');
 const User = require('../models/User');
-const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
+const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/cloudinaryUpload');
 const { sanitizeUser } = require('../utils/privacyHelper');
 
 // @desc  Create a story
@@ -26,9 +26,39 @@ const createStory = asyncHandler(async (req, res) => {
   const story = await Story.create({
     user: req.user._id,
     mediaUrl: result.secure_url,
+    mediaPublicId: result.public_id || '',
     mediaType,
     caption: caption || '',
   });
+
+  // Emit to friends and chat members
+  const io = req.app.get('io');
+  if (io) {
+    const Chat = require('../models/Chat');
+    const author = await User.findById(req.user._id);
+    const chats = await Chat.find({ users: req.user._id }).select('users');
+    const chatUserIds = new Set();
+    chats.forEach(chat => {
+      if (chat && chat.users) {
+        chat.users.forEach(u => {
+          if (u) chatUserIds.add(u.toString());
+        });
+      }
+    });
+    const friendIds = (author.friends || []).map(f => (f && f._id ? f._id.toString() : f ? f.toString() : null)).filter(Boolean);
+    const allIds = new Set([...friendIds, ...chatUserIds]);
+    
+    // Only emit if privacy allows
+    const storiesVis = author.privacy?.storiesVisibility || 'everyone';
+    if (storiesVis !== 'nobody') {
+      allIds.forEach(id => {
+        if (id !== req.user._id.toString()) {
+          if (storiesVis === 'friends' && !friendIds.includes(id)) return;
+          io.to(id).emit('new_story', { story });
+        }
+      });
+    }
+  }
 
   res.status(201).json({ success: true, story });
 });
@@ -128,6 +158,11 @@ const deleteStory = asyncHandler(async (req, res) => {
   if (story.user.toString() !== req.user._id.toString()) {
     res.status(403); throw new Error('Cannot delete others\' stories');
   }
+  // Delete media from Cloudinary — auto-detects image/video/raw
+  const mediaRef = story.mediaPublicId || story.mediaUrl;
+  if (mediaRef) {
+    await deleteFromCloudinary(mediaRef);
+  }
   await story.deleteOne();
   res.status(200).json({ success: true, message: 'Story deleted' });
 });
@@ -151,9 +186,42 @@ const getStoryViewers = asyncHandler(async (req, res) => {
       displayName: v.user.displayName,
       profilePicture: v.user.profilePicture,
       viewedAt: v.viewedAt,
+      emoji: story.reactions.find(r => r.user.toString() === v.user._id.toString())?.emoji || null,
     }));
 
   res.status(200).json({ success: true, viewers: populatedViewers, count: populatedViewers.length });
 });
 
-module.exports = { createStory, getStories, viewStory, deleteStory, getStoryViewers };
+const reactStory = asyncHandler(async (req, res) => {
+  const { emoji } = req.body;
+  if (!emoji) { res.status(400); throw new Error('Emoji is required'); }
+
+  const story = await Story.findById(req.params.id);
+  if (!story) { res.status(404); throw new Error('Story not found'); }
+
+  // Check if user already reacted
+  const existingReaction = story.reactions.find(r => r.user.toString() === req.user._id.toString());
+  if (existingReaction) {
+    existingReaction.emoji = emoji;
+    existingReaction.reactedAt = new Date();
+  } else {
+    story.reactions.push({ user: req.user._id, emoji, reactedAt: new Date() });
+  }
+  await story.save();
+
+  // Notify author if someone else reacted
+  if (story.user.toString() !== req.user._id.toString()) {
+    const io = req.app.get('io');
+    if (io) {
+      io.to(story.user.toString()).emit('story_reaction', {
+        storyId: story._id,
+        userId: req.user._id,
+        emoji
+      });
+    }
+  }
+
+  res.status(200).json({ success: true, reactions: story.reactions });
+});
+
+module.exports = { createStory, getStories, viewStory, deleteStory, getStoryViewers, reactStory };

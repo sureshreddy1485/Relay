@@ -7,7 +7,7 @@ const fileFilter = (req, file, cb) => {
   const allowedTypes = [
     'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
     'video/mp4', 'video/mpeg', 'video/quicktime', 'video/webm',
-    'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/mp4',
+    'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/mp4', 'audio/m4a', 'audio/x-m4a',
     'application/pdf', 'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
@@ -26,6 +26,7 @@ const fileFilter = (req, file, cb) => {
     else if (ext === '.mp4') mime = 'video/mp4';
     else if (ext === '.pdf') mime = 'application/pdf';
     else if (['.doc', '.docx'].includes(ext)) mime = 'application/msword';
+    else if (ext === '.m4a') mime = 'audio/m4a';
     file.mimetype = mime; // Mutate mimetype for downstream handlers
   }
 

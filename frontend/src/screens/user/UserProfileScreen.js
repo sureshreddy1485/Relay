@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, StyleSheet, Image, ActivityIndicator, TouchableOpacity,
   ScrollView, Alert, StatusBar, Dimensions
@@ -9,9 +10,13 @@ import { Colors } from '../../theme/colors';
 import api from '../../services/api';
 import useAuthStore from '../../store/useAuthStore';
 
+import { useAlert } from '../../components/CustomAlert';
+
 const { width: SCREEN_W } = Dimensions.get('window');
 
 export default function UserProfileScreen({ route, navigation }) {
+  const { showAlert } = useAlert();
+  const insets = useSafeAreaInsets();
   const { username } = route.params || {};
   const { user: authUser, updateUser } = useAuthStore();
   const [profile, setProfile] = useState(null);
@@ -30,7 +35,7 @@ export default function UserProfileScreen({ route, navigation }) {
       setProfile(data.user);
     } catch (e) {
       console.log('Error fetching user profile:', e);
-      Alert.alert('Error', 'Failed to load user profile.');
+      showAlert('Error', 'Failed to load user profile.');
     } finally {
       setLoading(false);
     }
@@ -42,23 +47,33 @@ export default function UserProfileScreen({ route, navigation }) {
       const { data } = await api.post('/chats', { userId: profile._id });
       navigation.navigate('ChatRoom', { chat: data.chat });
     } catch (e) {
-      Alert.alert('Error', e.message || 'Could not open chat');
+      showAlert('Error', e.message || 'Could not open chat');
     }
   };
 
   const handleAddFriend = async () => {
     if (!profile) return;
     try {
-      await api.post(`/users/${profile._id}/friend-request`);
-      Alert.alert('Success', 'Friend request sent!');
+      const res = await api.post(`/users/${profile._id}/friend-request`);
+      if (res.data?.message?.includes('auto-accepted')) {
+        setProfile(prev => ({ ...prev, isFriend: true }));
+        updateUser({ friends: [...(authUser.friends || []), profile._id] });
+        showAlert('Success', 'Friend request auto-accepted!');
+      } else {
+        showAlert('Success', 'Friend request sent!');
+      }
     } catch (e) {
-      Alert.alert('Info', e.response?.data?.message || e.message);
+      if (e.response?.data?.message === 'Already friends') {
+        setProfile(prev => ({ ...prev, isFriend: true }));
+        updateUser({ friends: [...(authUser.friends || []), profile._id] });
+      }
+      showAlert('Info', e.response?.data?.message || e.message);
     }
   };
 
   const handleRemoveFriend = () => {
     if (!profile) return;
-    Alert.alert(
+    showAlert(
       'Remove Friend',
       `Are you sure you want to remove ${profile.displayName || profile.username} from your friends list?`,
       [
@@ -70,12 +85,13 @@ export default function UserProfileScreen({ route, navigation }) {
             try {
               await api.post(`/users/${profile._id}/remove-friend`);
               const updatedFriends = (authUser.friends || []).filter(
-                id => id.toString() !== profile._id.toString()
+                id => (id._id || id).toString() !== profile._id.toString()
               );
               updateUser({ friends: updatedFriends });
-              Alert.alert('Success', 'Removed from friends list.');
+              setProfile(prev => ({ ...prev, isFriend: false }));
+              showAlert('Success', 'Removed from friends list.');
             } catch (e) {
-              Alert.alert('Error', e.message || 'Failed to remove friend');
+              showAlert('Error', e.message || 'Failed to remove friend');
             }
           }
         }
@@ -103,7 +119,7 @@ export default function UserProfileScreen({ route, navigation }) {
     );
   }
 
-  const isFriend = authUser?.friends?.some(
+  const isFriend = profile.isFriend || authUser?.friends?.some(
     f => (f._id || f).toString() === profile._id.toString()
   );
 
@@ -112,7 +128,7 @@ export default function UserProfileScreen({ route, navigation }) {
       <StatusBar barStyle="light-content" />
       
       {/* Custom Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: (insets.top || StatusBar.currentHeight || 0) + 8 }]}>
         <TouchableOpacity style={styles.headerBack} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
         </TouchableOpacity>
@@ -138,7 +154,11 @@ export default function UserProfileScreen({ route, navigation }) {
 
           {/* Profile Details */}
           <Text style={styles.displayName}>{profile.displayName || profile.username}</Text>
-          <Text style={styles.username}>@{profile.username}</Text>
+          {isFriend || (authUser && authUser._id === profile._id) || profile.username === 'mica_bot' ? (
+            <Text style={styles.username}>@{profile.username}</Text>
+          ) : (
+            <Text style={[styles.username, { fontStyle: 'italic' }]}>@Hidden (Add friend to view)</Text>
+          )}
 
           {/* Bio Box */}
           <View style={styles.bioContainer}>
@@ -151,12 +171,19 @@ export default function UserProfileScreen({ route, navigation }) {
 
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity onPress={handleMessage} activeOpacity={0.8}>
-            <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.primaryActionBtn}>
-              <Ionicons name="chatbubble-ellipses-outline" size={20} color="#FFF" />
-              <Text style={styles.primaryActionText}>Send Message</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          {(isFriend || (authUser && authUser._id === profile._id)) ? (
+            <TouchableOpacity onPress={handleMessage} activeOpacity={0.8}>
+              <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.primaryActionBtn}>
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#FFF" />
+                <Text style={styles.primaryActionText}>Send Message</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.primaryActionBtn, { backgroundColor: Colors.dark.surface, opacity: 0.6 }]}>
+              <Ionicons name="lock-closed-outline" size={20} color={Colors.dark.muted} />
+              <Text style={[styles.primaryActionText, { color: Colors.dark.muted }]}>Messages Locked</Text>
+            </View>
+          )}
 
           {isFriend ? (
             <TouchableOpacity style={styles.secondaryActionBtn} onPress={handleRemoveFriend} activeOpacity={0.8}>
@@ -217,7 +244,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: StatusBar.currentHeight ? StatusBar.currentHeight + 10 : 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: Colors.dark.border,

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Image, Alert, Switch, StatusBar, Platform, Modal,
@@ -12,6 +13,9 @@ import api, { uploadApi } from '../../services/api';
 import useAuthStore from '../../store/useAuthStore';
 import useChatStore from '../../store/useChatStore';
 import DisappearingMsgSheet, { secondsToLabel } from '../../components/DisappearingMsgSheet';
+import ThemeSelectSheet from '../../components/ThemeSelectSheet';
+import { getSocket } from '../../services/socketService';
+import { useAlert } from '../../components/CustomAlert';
 
 // Member grid item
 const MemberGridItem = ({ member, role, isMe, canManage, onAction, onTap }) => (
@@ -35,10 +39,12 @@ const MemberGridItem = ({ member, role, isMe, canManage, onAction, onTap }) => (
       {/* Dynamic role icon badge at bottom-right */}
       <View style={[
         styles.roleIconBadge,
-        role === 'owner' ? styles.badgeOwner : role === 'admin' ? styles.badgeAdmin : styles.badgeUser
+        role === 'system_bot' ? { backgroundColor: '#3B82F6' } :
+        role === 'owner' ? styles.badgeOwner : 
+        role === 'admin' ? styles.badgeAdmin : styles.badgeUser
       ]}>
         <Ionicons
-          name={role === 'owner' ? 'star' : role === 'admin' ? 'shield-checkmark' : 'person'}
+          name={role === 'system_bot' ? 'hardware-chip' : role === 'owner' ? 'star' : role === 'admin' ? 'shield-checkmark' : 'person'}
           size={9}
           color="#FFF"
         />
@@ -53,15 +59,20 @@ const MemberGridItem = ({ member, role, isMe, canManage, onAction, onTap }) => (
 );
 
 export default function GroupInfoScreen({ route, navigation }) {
+  const { showAlert } = useAlert();
+  const insets = useSafeAreaInsets();
   const { chat: initialChat } = route.params;
   const { user } = useAuthStore();
   const [chat, setChat] = useState(initialChat);
-  const [dmAllowed, setDmAllowed] = useState(chat.allowDirectMessages !== false);
   const [showDisappear, setShowDisappear] = useState(false);
+  const [showTheme, setShowTheme] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState(chat.chatName || '');
   const [editDesc, setEditDesc] = useState(chat.groupDescription || '');
+  const [editPrivacy, setEditPrivacy] = useState(chat.joinPrivacy || 'anyone');
+  const [editIsPublic, setEditIsPublic] = useState(chat.isPublic !== false);
   const [editAvatar, setEditAvatar] = useState(null);
+  const [showFullAvatar, setShowFullAvatar] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
@@ -69,6 +80,9 @@ export default function GroupInfoScreen({ route, navigation }) {
   const [addSearchResults, setAddSearchResults] = useState([]);
   const [isSearchingAdd, setIsSearchingAdd] = useState(false);
   const [isAddingUser, setIsAddingUser] = useState(null);
+  const [showBulkRemoveModal, setShowBulkRemoveModal] = useState(false);
+  const [selectedForRemoval, setSelectedForRemoval] = useState([]);
+  const [isBulkRemoving, setIsBulkRemoving] = useState(false);
 
   const myId = user?._id;
   const isOwner = chat.groupAdmin?._id === myId || chat.groupAdmin === myId;
@@ -76,31 +90,35 @@ export default function GroupInfoScreen({ route, navigation }) {
 
   const getRole = (memberId) => {
     const id = memberId?._id || memberId;
+    
+    // Check if user object has system_bot role
+    const fullUser = chat.users?.find(u => (u._id || u).toString() === id?.toString());
+    if (fullUser?.role === 'system_bot' || fullUser?.username === 'mica_bot') return 'system_bot';
+
     const ownerId = chat.groupAdmin?._id || chat.groupAdmin;
     if (id === ownerId || id?.toString() === ownerId?.toString()) return 'owner';
     if (chat.admins?.some(a => (a._id || a)?.toString() === id?.toString())) return 'admin';
     return null;
   };
 
-  // Toggle DMs from group (only admins can)
-  const toggleDM = async (val) => {
-    if (!isAdmin) {
-      Alert.alert('Permission denied', 'Only admins can change this setting.');
-      return;
-    }
-    try {
-      setDmAllowed(val);
-      // Update via group update endpoint
-      await api.put(`/chats/group/${chat._id}`, { allowDirectMessages: val });
-    } catch (e) {
-      setDmAllowed(!val);
-      Alert.alert('Error', e.message);
-    }
-  };
+  // Auto-refresh when the group is updated by anyone (theme, DM settings, name, picture, etc.)
+  useEffect(() => {
+    const socket = getSocket();
+    const handleChatUpdated = (updatedChat) => {
+      if (updatedChat._id === chat._id || updatedChat._id?.toString() === chat._id?.toString()) {
+        setChat(prev => ({ ...prev, ...updatedChat }));
+        useChatStore.getState().updateChat(chat._id, updatedChat);
+      }
+    };
+    if (socket) socket.on('chat_updated', handleChatUpdated);
+    return () => {
+      if (socket) socket.off('chat_updated', handleChatUpdated);
+    };
+  }, [chat._id]);
 
   // Leave group
   const handleLeave = () => {
-    Alert.alert(
+    showAlert(
       isOwner ? 'Transfer & Leave' : 'Leave Group',
       isOwner
         ? 'You are the owner. Leaving will transfer ownership to the next admin.'
@@ -114,7 +132,7 @@ export default function GroupInfoScreen({ route, navigation }) {
               await api.put(`/chats/group/${chat._id}/leave`);
               navigation.popToTop();
             } catch (e) {
-              Alert.alert('Error', e.message);
+              showAlert('Error', e.message);
             }
           },
         },
@@ -124,7 +142,7 @@ export default function GroupInfoScreen({ route, navigation }) {
 
   const handleAddSearch = async () => {
     if (addSearchQuery.trim().length < 3) {
-      Alert.alert('Search', 'Type at least 3 characters to search users.');
+      showAlert('Search', 'Type at least 3 characters to search users.');
       return;
     }
     setIsSearchingAdd(true);
@@ -132,10 +150,10 @@ export default function GroupInfoScreen({ route, navigation }) {
       const { data } = await api.get(`/users/search?q=${addSearchQuery.trim()}`);
       // Filter out users already in the group
       const existingIds = (chat.users || []).map(u => (u._id || u).toString());
-      const filtered = (data.users || []).filter(u => !existingIds.includes(u._id.toString()));
+      const filtered = (data.users || []).filter(u => !existingIds.includes(u._id.toString()) && u.username !== 'relay_bot' && u.username !== 'relay');
       setAddSearchResults(filtered);
     } catch (e) {
-      Alert.alert('Error', e.message || 'Search failed');
+      showAlert('Error', e.message || 'Search failed');
     } finally {
       setIsSearchingAdd(false);
     }
@@ -144,16 +162,26 @@ export default function GroupInfoScreen({ route, navigation }) {
   const handleAddUserToGroup = async (userId) => {
     setIsAddingUser(userId);
     try {
-      const { data } = await api.put(`/chats/group/${chat._id}/add`, { userId });
-      // Update local state and chat store
-      setChat(data.chat);
-      useChatStore.getState().addChat(data.chat);
-      Alert.alert('Success', 'User added to group successfully!');
+      // Add user to invited list on backend
+      await api.put(`/chats/group/${chat._id}/invite`, { userId });
+      
+      // Get/create DM chat to send the invite message
+      const { data: chatData } = await api.post('/chats', { userId });
+      const dmChatId = chatData.chat._id;
+      
+      // Send the invite message
+      await api.post('/messages', {
+        chatId: dmChatId,
+        content: JSON.stringify({ groupId: chat._id, groupName: chat.chatName || 'Group' }),
+        messageType: 'group_invite',
+      });
+
+      showAlert('Invite Sent', 'An invitation has been sent to the user in their direct messages.');
       setShowAddMemberModal(false);
       setAddSearchQuery('');
       setAddSearchResults([]);
     } catch (e) {
-      Alert.alert('Error', e.message || 'Failed to add user');
+      showAlert('Error', e.response?.data?.message || e.message || 'Failed to send invite');
     } finally {
       setIsAddingUser(null);
     }
@@ -163,6 +191,12 @@ export default function GroupInfoScreen({ route, navigation }) {
   const handleMemberAction = (member) => {
     const memberId = member._id;
     const memberRole = getRole(memberId);
+    
+    if (memberRole === 'system_bot') {
+      showAlert('System Assistant', 'Mica cannot be modified or removed.');
+      return;
+    }
+
     const actions = [];
 
     if (isOwner && memberRole !== 'owner') {
@@ -170,38 +204,88 @@ export default function GroupInfoScreen({ route, navigation }) {
         actions.push({
           text: 'Promote to Admin',
           onPress: async () => {
+            const previousAdmins = chat.admins;
+            const updatedChat = { ...chat, admins: [...chat.admins, memberId] };
+            setChat(updatedChat);
+            useChatStore.getState().updateChat(chat._id, updatedChat);
             try {
               await api.put(`/chats/group/${chat._id}/promote`, { userId: memberId });
-              setChat(prev => ({ ...prev, admins: [...prev.admins, memberId] }));
-              Alert.alert('Done', `${member.displayName || member.username} is now an admin.`);
-            } catch (e) { Alert.alert('Error', e.message); }
+              showAlert('Done', `${member.displayName || member.username} is now an admin.`);
+            } catch (e) {
+              const revertedChat = { ...chat, admins: previousAdmins };
+              setChat(revertedChat);
+              useChatStore.getState().updateChat(chat._id, revertedChat);
+              showAlert('Error', e.message); 
+            }
           },
         });
       } else {
         actions.push({
           text: 'Demote to Member',
           onPress: async () => {
+            const previousAdmins = chat.admins;
+            const updatedChat = { ...chat, admins: chat.admins.filter(a => (a._id || a) !== memberId) };
+            setChat(updatedChat);
+            useChatStore.getState().updateChat(chat._id, updatedChat);
             try {
               await api.put(`/chats/group/${chat._id}/demote`, { userId: memberId });
-              setChat(prev => ({ ...prev, admins: prev.admins.filter(a => (a._id || a) !== memberId) }));
-              Alert.alert('Done', `${member.displayName || member.username} is now a member.`);
-            } catch (e) { Alert.alert('Error', e.message); }
+              showAlert('Done', `${member.displayName || member.username} is now a member.`);
+            } catch (e) { 
+              const revertedChat = { ...chat, admins: previousAdmins };
+              setChat(revertedChat);
+              useChatStore.getState().updateChat(chat._id, revertedChat);
+              showAlert('Error', e.message); 
+            }
           },
         });
       }
+      
+      actions.push({
+        text: 'Transfer Ownership',
+        onPress: () => {
+          showAlert(
+            'Transfer Ownership',
+            `Are you sure you want to transfer ownership of this group to ${member.displayName || member.username}? You will become a regular admin.`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Transfer',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await api.put(`/chats/group/${chat._id}/transfer-ownership`, { userId: memberId });
+                    showAlert('Success', `Ownership transferred to ${member.displayName || member.username}.`);
+                  } catch (e) {
+                    showAlert('Error', e.message);
+                  }
+                }
+              }
+            ]
+          );
+        }
+      });
 
       actions.push({
         text: 'Remove from Group',
         style: 'destructive',
         onPress: async () => {
+          const previousUsers = chat.users;
+          const previousAdmins = chat.admins;
+          const updatedChat = { 
+            ...chat, 
+            users: chat.users.filter(u => (u._id || u) !== memberId),
+            admins: chat.admins.filter(a => (a._id || a) !== memberId) 
+          };
+          setChat(updatedChat);
+          useChatStore.getState().updateChat(chat._id, updatedChat);
           try {
             await api.put(`/chats/group/${chat._id}/remove`, { userId: memberId });
-            setChat(prev => ({ 
-              ...prev, 
-              users: prev.users.filter(u => (u._id || u) !== memberId),
-              admins: prev.admins.filter(a => (a._id || a) !== memberId) 
-            }));
-          } catch (e) { Alert.alert('Error', e.message); }
+          } catch (e) { 
+            const revertedChat = { ...chat, users: previousUsers, admins: previousAdmins };
+            setChat(revertedChat);
+            useChatStore.getState().updateChat(chat._id, revertedChat);
+            showAlert('Error', e.message); 
+          }
         },
       });
     } else if (isAdmin && !isOwner && memberRole === null) {
@@ -210,19 +294,67 @@ export default function GroupInfoScreen({ route, navigation }) {
         text: 'Remove from Group',
         style: 'destructive',
         onPress: async () => {
+          const previousUsers = chat.users;
+          const updatedChat = { ...chat, users: chat.users.filter(u => (u._id || u) !== memberId) };
+          setChat(updatedChat);
+          useChatStore.getState().updateChat(chat._id, updatedChat);
           try {
             await api.put(`/chats/group/${chat._id}/remove`, { userId: memberId });
-            setChat(prev => ({ ...prev, users: prev.users.filter(u => (u._id || u) !== memberId) }));
-          } catch (e) { Alert.alert('Error', e.message); }
+          } catch (e) { 
+            const revertedChat = { ...chat, users: previousUsers };
+            setChat(revertedChat);
+            useChatStore.getState().updateChat(chat._id, revertedChat);
+            showAlert('Error', e.message); 
+          }
         },
       });
     }
 
     if (actions.length === 0) return;
-    Alert.alert(
+    showAlert(
       member.displayName || member.username,
       'Choose an action:',
       [...actions, { text: 'Cancel', style: 'cancel' }]
+    );
+  };
+
+  const handleBulkRemoveSubmit = async () => {
+    if (selectedForRemoval.length === 0) return;
+    showAlert(
+      'Remove Members',
+      `Are you sure you want to remove ${selectedForRemoval.length} member(s)?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setIsBulkRemoving(true);
+            try {
+              // Optimistically update UI
+              const previousUsers = chat.users;
+              const previousAdmins = chat.admins;
+              const updatedChat = { 
+                ...chat, 
+                users: chat.users.filter(u => !selectedForRemoval.includes((u._id || u).toString())),
+                admins: chat.admins.filter(a => !selectedForRemoval.includes((a._id || a).toString())) 
+              };
+              setChat(updatedChat);
+              useChatStore.getState().updateChat(chat._id, updatedChat);
+
+              // API call
+              await api.put(`/chats/group/${chat._id}/remove`, { userIds: selectedForRemoval });
+              setShowBulkRemoveModal(false);
+              setSelectedForRemoval([]);
+            } catch (e) {
+              showAlert('Error', e.message);
+              // Revert
+            } finally {
+              setIsBulkRemoving(false);
+            }
+          }
+        }
+      ]
     );
   };
 
@@ -241,9 +373,9 @@ export default function GroupInfoScreen({ route, navigation }) {
       <StatusBar barStyle="light-content" />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: (insets.top || StatusBar.currentHeight || 0) + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
-          <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
+          <Ionicons name="close" size={24} color={Colors.dark.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Group Info</Text>
         {isAdmin && (
@@ -252,6 +384,8 @@ export default function GroupInfoScreen({ route, navigation }) {
             onPress={() => {
               setEditName(chat.chatName || '');
               setEditDesc(chat.groupDescription || '');
+              setEditPrivacy(chat.joinPrivacy || 'anyone');
+              setEditIsPublic(chat.isPublic !== false);
               setEditAvatar(null);
               setShowEditModal(true);
             }}
@@ -264,14 +398,24 @@ export default function GroupInfoScreen({ route, navigation }) {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* ── Group Profile ─────────────────────────────────────────────── */}
         <View style={styles.profileSection}>
-          {chat.groupPicture ? (
-            <Image source={{ uri: chat.groupPicture }} style={styles.groupAvatar} />
-          ) : (
-            <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.groupAvatar}>
-              <Text style={styles.groupInitial}>{chat.chatName?.charAt(0).toUpperCase()}</Text>
-            </LinearGradient>
-          )}
+          <TouchableOpacity 
+            activeOpacity={0.8}
+            onPress={() => { if (chat.groupPicture) setShowFullAvatar(true); }}
+          >
+            {chat.groupPicture ? (
+              <Image source={{ uri: chat.groupPicture }} style={styles.groupAvatar} />
+            ) : (
+              <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.groupAvatar}>
+                <Text style={styles.groupInitial}>{chat.chatName?.charAt(0).toUpperCase()}</Text>
+              </LinearGradient>
+            )}
+          </TouchableOpacity>
           <Text style={styles.groupName}>{chat.chatName}</Text>
+          {chat.groupUsername ? (
+            <Text style={{ color: Colors.primary, fontSize: 15, fontWeight: '600', marginTop: 4 }}>
+              @{chat.groupUsername}
+            </Text>
+          ) : null}
           {chat.groupDescription ? (
             <Text style={styles.groupDesc}>{chat.groupDescription}</Text>
           ) : null}
@@ -284,32 +428,12 @@ export default function GroupInfoScreen({ route, navigation }) {
         {/* ── Settings ─────────────────────────────────────────────────── */}
         <Text style={styles.sectionTitle}>Settings</Text>
         <View style={styles.card}>
-          {/* DM Toggle */}
-          <View style={styles.settingRow}>
-            <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
-              <Ionicons name="chatbubble-ellipses-outline" size={20} color={Colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.settingLabel}>Allow Direct Messages</Text>
-              <Text style={styles.settingSubtitle}>Members can DM each other</Text>
-            </View>
-            <Switch
-              value={dmAllowed}
-              onValueChange={toggleDM}
-              trackColor={{ false: Colors.dark.border, true: Colors.primary }}
-              thumbColor="#FFF"
-              disabled={!isAdmin}
-            />
-          </View>
 
-          <View style={styles.divider} />
-
-          {/* Disappearing messages */}
           <TouchableOpacity
             style={styles.settingRow}
             onPress={() => {
               if (!isAdmin) {
-                Alert.alert('Permission Denied', 'Only group admins and the owner can change disappearing messages settings.');
+                showAlert('Permission Denied', 'Only group admins and the owner can change disappearing messages settings.');
                 return;
               }
               setShowDisappear(true);
@@ -321,19 +445,145 @@ export default function GroupInfoScreen({ route, navigation }) {
             <Text style={styles.settingLabel}>Disappearing Messages</Text>
             <Text style={styles.settingValue}>{secondsToLabel(chat.disappearAfter || 0)}</Text>
           </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          {isAdmin && (
+            <TouchableOpacity
+              style={styles.settingRow}
+              onPress={() => setShowTheme(true)}
+            >
+              <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
+                <Ionicons name="color-palette-outline" size={20} color={Colors.primary} />
+              </View>
+              <Text style={styles.settingLabel}>Change Group Theme</Text>
+            </TouchableOpacity>
+          )}
+
+          {isAdmin && (
+            <>
+              <View style={styles.divider} />
+              <Text style={{ color: Colors.dark.muted, fontSize: 13, fontWeight: '700', marginLeft: 16, marginTop: 8, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Security</Text>
+              
+              <View style={styles.settingRow}>
+                <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
+                  <Ionicons name="camera-outline" size={20} color={Colors.primary} />
+                </View>
+                <Text style={styles.settingLabel}>Allow Screenshots</Text>
+                <Switch
+                  value={chat.allowScreenshots !== false}
+                  onValueChange={async (val) => {
+                    const prev = chat.allowScreenshots;
+                    setChat(c => ({ ...c, allowScreenshots: val }));
+                    useChatStore.getState().updateChat(chat._id, { allowScreenshots: val });
+                    try {
+                      await api.put(`/chats/${chat._id}/security`, { allowScreenshots: val });
+                    } catch (e) {
+                      setChat(c => ({ ...c, allowScreenshots: prev }));
+                      useChatStore.getState().updateChat(chat._id, { allowScreenshots: prev });
+                      showAlert('Error', e.message); 
+                    }
+                  }}
+                  trackColor={{ false: '#3A3A3A', true: Colors.primary }}
+                  thumbColor="#FFF"
+                />
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.settingRow}>
+                <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
+                  <Ionicons name="arrow-redo-outline" size={20} color={Colors.primary} />
+                </View>
+                <Text style={styles.settingLabel}>Allow Forwarding</Text>
+                <Switch
+                  value={chat.allowForwarding !== false}
+                  onValueChange={async (val) => {
+                    const prev = chat.allowForwarding;
+                    setChat(c => ({ ...c, allowForwarding: val }));
+                    useChatStore.getState().updateChat(chat._id, { allowForwarding: val });
+                    try {
+                      await api.put(`/chats/${chat._id}/security`, { allowForwarding: val });
+                    } catch (e) {
+                      setChat(c => ({ ...c, allowForwarding: prev }));
+                      useChatStore.getState().updateChat(chat._id, { allowForwarding: prev });
+                      showAlert('Error', e.message); 
+                    }
+                  }}
+                  trackColor={{ false: '#3A3A3A', true: Colors.primary }}
+                  thumbColor="#FFF"
+                />
+              </View>
+            </>
+          )}
         </View>
+
+        {/* ── Pending Requests ──────────────────────────────────────────────── */}
+        {isAdmin && chat.joinRequests?.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Pending Requests ({chat.joinRequests.length})</Text>
+            <View style={[styles.card, { paddingVertical: 4 }]}>
+              {chat.joinRequests.map(reqUser => (
+                <View key={reqUser._id} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: Colors.dark.border }}>
+                  {reqUser.profilePicture ? (
+                    <Image source={{ uri: reqUser.profilePicture }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                  ) : (
+                    <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: '#FFF', fontWeight: 'bold' }}>{(reqUser.displayName || reqUser.username || '?').charAt(0).toUpperCase()}</Text>
+                    </LinearGradient>
+                  )}
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={{ color: Colors.dark.text, fontSize: 15, fontWeight: '600' }}>{reqUser.displayName || reqUser.username}</Text>
+                    <Text style={{ color: Colors.dark.muted, fontSize: 13 }}>@{reqUser.username}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}
+                    onPress={async () => {
+                      try {
+                        const { data } = await api.put(`/chats/group/${chat._id}/accept-request`, { userId: reqUser._id });
+                        setChat(data.chat);
+                        useChatStore.getState().updateChat(chat._id, data.chat);
+                      } catch (e) { showAlert('Error', e.response?.data?.message || e.message); }
+                    }}
+                  >
+                    <Ionicons name="checkmark" size={18} color="#FFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.dark.muted + '40', alignItems: 'center', justifyContent: 'center' }}
+                    onPress={async () => {
+                      try {
+                        const { data } = await api.put(`/chats/group/${chat._id}/decline-request`, { userId: reqUser._id });
+                        setChat(data.chat);
+                        useChatStore.getState().updateChat(chat._id, data.chat);
+                      } catch (e) { showAlert('Error', e.response?.data?.message || e.message); }
+                    }}
+                  >
+                    <Ionicons name="close" size={18} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
 
         {/* ── Members ───────────────────────────────────────────────────── */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 16, marginTop: 16, marginBottom: 8 }}>
           <Text style={[styles.sectionTitle, { marginTop: 0, marginBottom: 0 }]}>Members — {memberCount} / 50</Text>
           {isAdmin && (
-            <TouchableOpacity 
-              onPress={() => setShowAddMemberModal(true)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }}
-            >
-              <Ionicons name="person-add-outline" size={14} color={Colors.primary} />
-              <Text style={{ color: Colors.primary, fontSize: 13, fontWeight: '700' }}>Add Member</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity 
+                onPress={() => setShowBulkRemoveModal(true)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.dark.card, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: Colors.dark.border }}
+              >
+                <Ionicons name="trash-bin-outline" size={14} color="#EF4444" />
+                <Text style={{ color: '#EF4444', fontSize: 13, fontWeight: '700' }}>Manage</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => setShowAddMemberModal(true)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.primary + '15', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 }}
+              >
+                <Ionicons name="person-add-outline" size={14} color={Colors.primary} />
+                <Text style={{ color: Colors.primary, fontSize: 13, fontWeight: '700' }}>Add</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
         <View style={styles.membersGridContainer}>
@@ -378,20 +628,43 @@ export default function GroupInfoScreen({ route, navigation }) {
         currentSeconds={chat.disappearAfter || 0}
         onSelect={async (seconds) => {
           try {
-            await api.put(`/chats/${chat._id}/disappear`, { seconds });
+            const res = await api.put(`/chats/${chat._id}/disappear`, { seconds });
             setChat(prev => ({ ...prev, disappearAfter: seconds }));
             useChatStore.getState().updateChat(chat._id, { disappearAfter: seconds });
-          } catch (e) { Alert.alert('Error', e.message); }
+            if (res.data && res.data.message) {
+              useChatStore.getState().addMessage(chat._id, res.data.message);
+            }
+          } catch (e) { showAlert('Error', e.message); }
         }}
         onClose={() => setShowDisappear(false)}
+      />
+
+      {/* Theme Select Sheet */}
+      <ThemeSelectSheet
+        visible={showTheme}
+        currentThemeId={chat?.theme || 'default'}
+        isGroup={true}
+        onSelect={async (themeId) => {
+          try {
+            await api.put(`/chats/${chat._id}/theme`, { theme: themeId });
+            setChat(prev => ({ ...prev, theme: themeId }));
+            useChatStore.getState().updateChat(chat._id, { theme: themeId });
+          } catch (e) { showAlert('Error', e.message); }
+        }}
+        onClose={() => setShowTheme(false)}
       />
 
       {/* ── Edit Group Modal ────────────────────────────────────────── */}
       <Modal visible={showEditModal} transparent animationType="slide" onRequestClose={() => setShowEditModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowEditModal(false)}>
           <View style={styles.editSheet} onStartShouldSetResponder={() => true}>
-            <View style={styles.editHandle} />
-            <Text style={styles.editTitle}>Edit Group</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 }}>
+              <View style={{ width: 24 }} />
+              <Text style={[styles.editTitle, { marginBottom: 0 }]}>Edit Group</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color={Colors.dark.text} />
+              </TouchableOpacity>
+            </View>
 
             {/* Group Avatar Picker */}
             <TouchableOpacity
@@ -441,17 +714,49 @@ export default function GroupInfoScreen({ route, navigation }) {
               maxLength={300}
             />
 
+            {/* Public/Private Toggle */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 24, marginTop: 16, marginBottom: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: Colors.dark.text, fontSize: 15, fontWeight: '600' }}>Public Group</Text>
+                <Text style={{ color: Colors.dark.muted, fontSize: 13, marginTop: 2 }}>{editIsPublic ? 'Group can be found in search' : 'Hidden from public search'}</Text>
+              </View>
+              <Switch
+                value={editIsPublic}
+                onValueChange={setEditIsPublic}
+                trackColor={{ false: Colors.dark.border, true: Colors.primary }}
+                thumbColor="#FFF"
+              />
+            </View>
+
+            {/* Join Privacy */}
+            <Text style={[styles.editLabel, { marginTop: 16 }]}>Who can join?</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24, marginHorizontal: 24 }}>
+              {['anyone', 'invite_only', 'closed'].map(option => (
+                <TouchableOpacity
+                  key={option}
+                  onPress={() => setEditPrivacy(option)}
+                  style={[{ flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: Colors.dark.border, alignItems: 'center' }, editPrivacy === option && { backgroundColor: Colors.primary + '20', borderColor: Colors.primary }]}
+                >
+                  <Text style={[{ fontSize: 13, color: Colors.dark.muted, fontWeight: '500' }, editPrivacy === option && { color: Colors.primary, fontWeight: '700' }]}>
+                    {option === 'anyone' ? 'Anyone' : option === 'invite_only' ? 'Request' : 'Closed'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
             {/* Save Button */}
             <TouchableOpacity
               style={styles.editSaveBtn}
               disabled={isSaving}
               onPress={async () => {
-                if (!editName.trim()) { Alert.alert('Error', 'Group name is required.'); return; }
+                if (!editName.trim()) { showAlert('Error', 'Group name is required.'); return; }
                 setIsSaving(true);
                 try {
                   const formData = new FormData();
                   formData.append('name', editName.trim());
                   formData.append('description', editDesc.trim());
+                  formData.append('joinPrivacy', editPrivacy);
+                  formData.append('isPublic', editIsPublic);
                   if (editAvatar) {
                     formData.append('groupPicture', {
                       uri: editAvatar.uri, name: 'groupPic.jpg', type: 'image/jpeg',
@@ -464,17 +769,21 @@ export default function GroupInfoScreen({ route, navigation }) {
                     ...prev,
                     chatName: data.chat?.chatName || editName.trim(),
                     groupDescription: data.chat?.groupDescription || editDesc.trim(),
+                    joinPrivacy: data.chat?.joinPrivacy || editPrivacy,
+                    isPublic: data.chat?.isPublic ?? editIsPublic,
                     groupPicture: data.chat?.groupPicture || prev.groupPicture,
                   }));
                   useChatStore.getState().updateChat(chat._id, {
                     chatName: editName.trim(),
                     groupDescription: editDesc.trim(),
+                    joinPrivacy: data.chat?.joinPrivacy || editPrivacy,
+                    isPublic: data.chat?.isPublic ?? editIsPublic,
                     groupPicture: data.chat?.groupPicture || chat.groupPicture,
                   });
                   setShowEditModal(false);
-                  Alert.alert('✨', 'Group updated!');
+                  showAlert('✨', 'Group updated!');
                 } catch (e) {
-                  Alert.alert('Error', e.response?.data?.message || e.message);
+                  showAlert('Error', e.response?.data?.message || e.message);
                 } finally { setIsSaving(false); }
               }}
             >
@@ -508,47 +817,82 @@ export default function GroupInfoScreen({ route, navigation }) {
                 </LinearGradient>
               )}
               <Text style={styles.memberSheetName}>{selectedMember?.displayName || selectedMember?.username}</Text>
-              <Text style={styles.memberSheetUsername}>@{selectedMember?.username}</Text>
+              {(() => {
+                let areFriends = false;
+                if (selectedMember && selectedMember._id !== myId) {
+                   areFriends = user?.friends?.some(f => (f._id || f).toString() === selectedMember._id.toString());
+                }
+                if (selectedMember?._id === myId || areFriends || selectedMember?.username === 'mica_bot') {
+                  return <Text style={styles.memberSheetUsername}>@{selectedMember?.username}</Text>;
+                }
+                return <Text style={[styles.memberSheetUsername, { fontStyle: 'italic' }]}>@Hidden (Add friend to view)</Text>;
+              })()}
             </View>
 
             {/* Actions */}
-            <View style={styles.memberSheetActions}>
-              {/* Message / DM */}
-              <TouchableOpacity
-                style={[styles.memberSheetItem, !dmAllowed && styles.memberSheetItemDisabled]}
-                disabled={!dmAllowed}
-                onPress={async () => {
-                  const memberId = selectedMember._id;
-                  setSelectedMember(null);
-                  try {
-                    const { data } = await api.post('/chats', { userId: memberId });
-                    navigation.push('ChatRoom', { chat: data.chat });
-                  } catch (e) { Alert.alert('Error', e.message); }
-                }}
-              >
-                <Ionicons name="chatbubble-outline" size={20} color={dmAllowed ? Colors.dark.text : Colors.dark.muted} />
-                <Text style={[styles.memberSheetLabel, !dmAllowed && { color: Colors.dark.muted }]}>Message</Text>
-                {!dmAllowed && <Text style={styles.memberSheetSub}>DMs disabled</Text>}
-              </TouchableOpacity>
+            {selectedMember?.role !== 'system_bot' && selectedMember?.username !== 'mica_bot' && (
+              <View style={styles.memberSheetActions}>
+                {/* Message / DM */}
+                {(() => {
+                  let isMsgAllowed = true;
+                  if (selectedMember && selectedMember._id !== myId) {
+                    const areFriends = user?.friends?.some(f => (f._id || f).toString() === selectedMember._id.toString());
+                    if (!areFriends) {
+                      isMsgAllowed = false; // Strictly disabled for non-friends
+                    }
+                  }
+
+                return (
+                  <TouchableOpacity
+                    style={[styles.memberSheetItem, !isMsgAllowed && styles.memberSheetItemDisabled]}
+                    disabled={!isMsgAllowed}
+                    onPress={async () => {
+                      const memberId = selectedMember._id;
+                      setSelectedMember(null);
+                      try {
+                        const { data } = await api.post('/chats', { userId: memberId });
+                        navigation.push('ChatRoom', { chat: data.chat });
+                      } catch (e) { showAlert('Error', e.message); }
+                    }}
+                  >
+                    <Ionicons name="chatbubble-outline" size={20} color={isMsgAllowed ? Colors.dark.text : Colors.dark.muted} />
+                    <Text style={[styles.memberSheetLabel, !isMsgAllowed && { color: Colors.dark.muted }]}>Message</Text>
+                    {!isMsgAllowed && <Text style={styles.memberSheetSub}>DMs disabled</Text>}
+                  </TouchableOpacity>
+                );
+              })()}
 
               <View style={styles.divider} />
 
               {/* Add Friend */}
-              <TouchableOpacity
-                style={styles.memberSheetItem}
-                onPress={async () => {
-                  const memberId = selectedMember._id;
-                  try {
-                    await api.post(`/users/${memberId}/friend-request`);
-                    Alert.alert('✅', 'Friend request sent!');
-                  } catch (e) {
-                    Alert.alert('Info', e.response?.data?.message || e.message);
-                  }
-                }}
-              >
-                <Ionicons name="person-add-outline" size={20} color={Colors.dark.text} />
-                <Text style={styles.memberSheetLabel}>Add Friend</Text>
-              </TouchableOpacity>
+              {(() => {
+                const areFriends = selectedMember && user?.friends?.some(f => (f._id || f).toString() === selectedMember._id.toString());
+                if (areFriends) {
+                  return (
+                    <View style={styles.memberSheetItem}>
+                      <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
+                      <Text style={[styles.memberSheetLabel, { color: Colors.primary }]}>Friends</Text>
+                    </View>
+                  );
+                }
+                return (
+                  <TouchableOpacity
+                    style={styles.memberSheetItem}
+                    onPress={async () => {
+                      const memberId = selectedMember._id;
+                      try {
+                        await api.post(`/users/${memberId}/friend-request`);
+                        showAlert('✅', 'Friend request sent!');
+                      } catch (e) {
+                        showAlert('Info', e.response?.data?.message || e.message);
+                      }
+                    }}
+                  >
+                    <Ionicons name="person-add-outline" size={20} color={Colors.dark.text} />
+                    <Text style={styles.memberSheetLabel}>Add Friend</Text>
+                  </TouchableOpacity>
+                );
+              })()}
 
               <View style={styles.divider} />
 
@@ -561,9 +905,10 @@ export default function GroupInfoScreen({ route, navigation }) {
                 }}
               >
                 <Ionicons name="person-outline" size={20} color={Colors.dark.text} />
-                <Text style={styles.memberSheetLabel}>View Profile</Text>
-              </TouchableOpacity>
-            </View>
+                  <Text style={styles.memberSheetLabel}>View Profile</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Cancel */}
             <TouchableOpacity style={styles.memberSheetCancel} onPress={() => setSelectedMember(null)}>
@@ -667,6 +1012,100 @@ export default function GroupInfoScreen({ route, navigation }) {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* ── Bulk Remove Modal ─────────────────────────────────────────── */}
+      <Modal visible={showBulkRemoveModal} transparent animationType="slide" onRequestClose={() => { setShowBulkRemoveModal(false); setSelectedForRemoval([]); }}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { setShowBulkRemoveModal(false); setSelectedForRemoval([]); }}>
+          <View style={[styles.memberSheet, { height: '70%' }]} onStartShouldSetResponder={() => true}>
+            <View style={styles.editHandle} />
+            <Text style={[styles.memberSheetName, { color: '#EF4444', fontSize: 18, marginBottom: 8 }]}>Remove Members</Text>
+            <Text style={{ color: Colors.dark.muted, fontSize: 13, textAlign: 'center', marginBottom: 16 }}>Select members to remove from the group.</Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginBottom: 16 }}>
+              {sortedMembers.map((member) => {
+                const id = member._id || member;
+                const mRole = getRole(id);
+                // Admins cannot remove the owner, themselves, or Mica. 
+                // Owners cannot remove themselves or Mica.
+                if (id?.toString() === myId?.toString() || mRole === 'system_bot' || mRole === 'owner') return null;
+                if (!isOwner && mRole === 'admin') return null;
+
+                const isSelected = selectedForRemoval.includes(id?.toString());
+                
+                return (
+                  <TouchableOpacity
+                    key={id}
+                    onPress={() => {
+                      if (isSelected) {
+                        setSelectedForRemoval(prev => prev.filter(pId => pId !== id?.toString()));
+                      } else {
+                        setSelectedForRemoval(prev => [...prev, id?.toString()]);
+                      }
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: Colors.dark.border }}
+                  >
+                    <View style={[{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: isSelected ? '#EF4444' : Colors.dark.muted, alignItems: 'center', justifyContent: 'center', marginRight: 12 }, isSelected && { backgroundColor: '#EF4444' }]}>
+                      {isSelected && <Ionicons name="checkmark" size={16} color="#FFF" />}
+                    </View>
+                    
+                    {member.profilePicture ? (
+                      <Image source={{ uri: member.profilePicture }} style={styles.addAvatar} />
+                    ) : (
+                      <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.addAvatar}>
+                        <Text style={styles.addAvatarInitial}>
+                          {(member.displayName || member.username || '?').charAt(0).toUpperCase()}
+                        </Text>
+                      </LinearGradient>
+                    )}
+                    
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={{ color: Colors.dark.text, fontSize: 15, fontWeight: '600' }}>{member.displayName || member.username}</Text>
+                      <Text style={{ color: Colors.dark.muted, fontSize: 13 }}>@{member.username}</Text>
+                    </View>
+                    
+                    {mRole === 'admin' && (
+                      <View style={{ backgroundColor: Colors.primary + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                        <Text style={{ color: Colors.primary, fontSize: 11, fontWeight: '600' }}>Admin</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity style={[styles.memberSheetCancel, { flex: 1 }]} onPress={() => { setShowBulkRemoveModal(false); setSelectedForRemoval([]); }}>
+                <Text style={[styles.memberSheetCancelText, { color: Colors.dark.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[{ flex: 1, backgroundColor: '#EF4444', borderRadius: 14, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' }, selectedForRemoval.length === 0 && { opacity: 0.5 }]} 
+                disabled={selectedForRemoval.length === 0 || isBulkRemoving}
+                onPress={handleBulkRemoveSubmit}
+              >
+                {isBulkRemoving ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#FFF' }}>Remove ({selectedForRemoval.length})</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Fullscreen Avatar Modal ─────────────────────────────────────── */}
+      <Modal visible={showFullAvatar} transparent animationType="fade" onRequestClose={() => setShowFullAvatar(false)}>
+        <TouchableOpacity style={styles.fullAvatarOverlay} activeOpacity={1} onPress={() => setShowFullAvatar(false)}>
+          <TouchableOpacity style={styles.fullAvatarClose} onPress={() => setShowFullAvatar(false)}>
+            <Ionicons name="close" size={30} color="#FFF" />
+          </TouchableOpacity>
+          {chat?.groupPicture && (
+            <Image source={{ uri: chat.groupPicture }} style={styles.fullAvatarImage} resizeMode="contain" />
+          )}
+        </TouchableOpacity>
+      </Modal>
+
     </View>
   );
 }
@@ -676,7 +1115,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 8 : 54,
     paddingBottom: 12,
     backgroundColor: Colors.dark.card,
     borderBottomWidth: 1, borderBottomColor: Colors.dark.border,
@@ -891,4 +1329,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary, borderRadius: 10,
     paddingHorizontal: 12, paddingVertical: 8,
   },
+  fullAvatarOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center', alignItems: 'center'
+  },
+  fullAvatarClose: {
+    position: 'absolute', top: 50, right: 20, padding: 10, zIndex: 10
+  },
+  fullAvatarImage: {
+    width: '100%', height: '80%'
+  }
 });
