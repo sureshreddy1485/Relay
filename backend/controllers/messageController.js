@@ -196,7 +196,6 @@ const sendMessage = asyncHandler(async (req, res) => {
             pushMessages.push({
               to: targetUser.pushToken,
               sound: 'kin_notification_sound.wav',
-              channelId: 'messages-v6',
               color: '#2DD4BF',
               title,
               body: pushBody,
