@@ -27,6 +27,15 @@ const connectSocket = (userId) => {
   socket.on('connect', () => {
     console.log('🔌 Socket connected:', socket.id);
     socket.emit('setup', userId);
+    
+    // Automatically fetch latest data in case internet was dropped and reconnected
+    const state = useChatStore.getState();
+    if (state.chats.length > 0) {
+      state.fetchChats(true);
+      if (state.selectedChat?._id) {
+        state.fetchMessages(state.selectedChat._id);
+      }
+    }
   });
 
   socket.on('disconnect', () => {

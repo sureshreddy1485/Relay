@@ -101,10 +101,20 @@ export default function App() {
       checkUpdates();
     }, 5000);
     
-    // Also check for updates when app comes to foreground
+    // Also check for updates and refresh data when app comes to foreground
     const subscription = AppState.addEventListener('change', nextAppState => {
-      if (nextAppState === 'active' && isMounted) {
-        checkUpdates();
+      if (nextAppState === 'active') {
+        if (isMounted) checkUpdates();
+        
+        // Refresh chats if they were already loaded
+        const useChatStore = require('./src/store/useChatStore').default;
+        const state = useChatStore.getState();
+        if (state.chats.length > 0) {
+          state.fetchChats(true);
+          if (state.selectedChat?._id) {
+            state.fetchMessages(state.selectedChat._id);
+          }
+        }
       }
     });
 
