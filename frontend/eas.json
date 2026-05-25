@@ -21,6 +21,9 @@
       "channel": "preview"
     },
     "production": {
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://relay-api-jlpx.onrender.com/api",
         "EXPO_PUBLIC_SOCKET_URL": "https://relay-api-jlpx.onrender.com",

@@ -60,6 +60,7 @@ const userSchema = new mongoose.Schema(
     lastSeen: { type: Date, default: Date.now },
     isCameraActive: { type: Boolean, default: false },
     pushToken: { type: String, default: '' },
+    fcmToken: { type: String, default: '' },
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     friendRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     sentRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

@@ -165,6 +165,7 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   // Emit via socket to all participants' personal rooms
   let pushMessages = [];
+  let fcmMessages = [];
   
   if (io) {
     chat.users.forEach((userId) => {
@@ -183,17 +184,59 @@ const sendMessage = asyncHandler(async (req, res) => {
       // Prepare Push Notifications for recipients
       if (userId.toString() !== req.user._id.toString()) {
         const targetUser = userSpecificMessage.chat?.users?.find(u => (u._id || u).toString() === userId.toString());
-        if (targetUser && targetUser.pushToken && Expo.isExpoPushToken(targetUser.pushToken)) {
+        if (targetUser) {
           let pushBody = content || `Sent a ${messageType}`;
           if (isEncrypted) pushBody = '🔒 Encrypted Message';
-          pushMessages.push({
-            to: targetUser.pushToken,
-            sound: 'default',
-            channelId: 'messages',
-            title: chat.isGroupChat ? chat.groupName : (req.user.displayName || req.user.username),
-            body: pushBody,
-            data: { chatId: chat._id },
-          });
+          const title = chat.isGroupChat ? chat.groupName : (req.user.displayName || req.user.username);
+          
+          let pushSent = false;
+          
+          // Use FCM Token for Notifee Background Handling (Data-only)
+          if (targetUser.fcmToken) {
+            fcmMessages.push({
+              token: targetUser.fcmToken,
+              data: {
+                // Must be all strings
+                chatId: chat._id.toString(),
+                messageId: message._id.toString(),
+                title: title,
+                body: pushBody,
+                sender: JSON.stringify({
+                   _id: req.user._id.toString(),
+                   username: req.user.username,
+                   displayName: req.user.displayName,
+                   profilePicture: req.user.profilePicture,
+                }),
+                chat: JSON.stringify({
+                   _id: chat._id.toString(),
+                   isGroupChat: chat.isGroupChat || false,
+                   chatName: chat.chatName || '',
+                   groupPicture: chat.groupPicture || '',
+                }),
+              }
+            });
+            pushSent = true;
+          } 
+          // Fallback to Expo Push Token
+          else if (targetUser.pushToken && Expo.isExpoPushToken(targetUser.pushToken)) {
+            pushMessages.push({
+              to: targetUser.pushToken,
+              sound: 'kin_notification_sound.wav',
+              channelId: 'messages-v3',
+              title,
+              body: pushBody,
+              data: { chatId: chat._id },
+            });
+            pushSent = true;
+          }
+          
+          if (pushSent) {
+            // Mark as delivered to this user since we are sending a push notification!
+            if (!message.deliveredTo) message.deliveredTo = [];
+            if (!message.deliveredTo.includes(targetUser._id)) {
+              message.deliveredTo.push(targetUser._id);
+            }
+          }
         }
       }
     });
@@ -211,6 +254,29 @@ const sendMessage = asyncHandler(async (req, res) => {
         }
       }
     })();
+  }
+  
+  // Send FCM Data-only push notifications asynchronously
+  if (fcmMessages.length > 0) {
+    (async () => {
+      try {
+        const admin = require('firebase-admin');
+        if (admin.apps.length > 0) {
+          const sendPromises = fcmMessages.map(msg => admin.messaging().send(msg));
+          await Promise.allSettled(sendPromises);
+        }
+      } catch (e) {
+        console.error('Error sending FCM messages:', e);
+      }
+    })();
+  }
+  
+  // Save the deliveredTo modifications for offline push notification users
+  if (message.isModified && message.isModified('deliveredTo')) {
+    await message.save();
+  } else {
+    // If it's just a populated document, update DB directly
+    await Message.findByIdAndUpdate(message._id, { deliveredTo: message.deliveredTo });
   }
 
   const resMessage = message.toObject();

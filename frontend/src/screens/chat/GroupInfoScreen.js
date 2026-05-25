@@ -83,6 +83,11 @@ export default function GroupInfoScreen({ route, navigation }) {
   const [showBulkRemoveModal, setShowBulkRemoveModal] = useState(false);
   const [selectedForRemoval, setSelectedForRemoval] = useState([]);
   const [isBulkRemoving, setIsBulkRemoving] = useState(false);
+  const [expandedSection, setExpandedSection] = useState(null);
+
+  const toggleSection = (sectionName) => {
+    setExpandedSection(prev => prev === sectionName ? null : sectionName);
+  };
 
   const myId = user?._id;
   const isOwner = chat.groupAdmin?._id === myId || chat.groupAdmin === myId;
@@ -425,107 +430,121 @@ export default function GroupInfoScreen({ route, navigation }) {
           </View>
         </View>
 
-        <View style={[styles.card, { marginTop: 16 }]}>
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={() => navigation.navigate('SharedMedia', { chatId: chat._id })}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
-              <Ionicons name="images-outline" size={20} color={Colors.primary} />
-            </View>
-            <Text style={styles.settingLabel}>Shared Media</Text>
-            <Ionicons name="chevron-forward" size={20} color={Colors.dark.muted} />
-          </TouchableOpacity>
-        </View>
-
         {/* ── Settings ─────────────────────────────────────────────────── */}
         <Text style={styles.sectionTitle}>Settings</Text>
-        <View style={styles.card}>
 
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={() => {
-              if (!isAdmin) {
-                showAlert('Permission Denied', 'Only group admins and the owner can change disappearing messages settings.');
-                return;
-              }
-              setShowDisappear(true);
-            }}
-          >
+        {/* Category: Media & Appearance */}
+        <View style={[styles.card, { marginBottom: 12, overflow: 'hidden' }]}>
+          <TouchableOpacity style={styles.settingRow} onPress={() => toggleSection('media')}>
             <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
-              <Ionicons name="time-outline" size={20} color={Colors.primary} />
+              <Ionicons name="color-palette-outline" size={20} color={Colors.primary} />
             </View>
-            <Text style={styles.settingLabel}>Disappearing Messages</Text>
-            <Text style={styles.settingValue}>{secondsToLabel(chat.disappearAfter || 0)}</Text>
+            <Text style={[styles.settingLabel, { fontWeight: '700' }]}>Media & Appearance</Text>
+            <Ionicons name={expandedSection === 'media' ? "chevron-up" : "chevron-down"} size={20} color={Colors.dark.muted} />
           </TouchableOpacity>
-
-          <View style={styles.divider} />
-
-          {isAdmin && (
-            <TouchableOpacity
-              style={styles.settingRow}
-              onPress={() => setShowTheme(true)}
-            >
-              <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
-                <Ionicons name="color-palette-outline" size={20} color={Colors.primary} />
-              </View>
-              <Text style={styles.settingLabel}>Change Group Theme</Text>
-            </TouchableOpacity>
-          )}
-
-          {isAdmin && (
-            <>
-              <View style={styles.divider} />
-              <Text style={{ color: Colors.dark.muted, fontSize: 13, fontWeight: '700', marginLeft: 16, marginTop: 8, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Security</Text>
+          
+          {expandedSection === 'media' && (
+            <View style={{ backgroundColor: 'rgba(0,0,0,0.2)', paddingVertical: 4 }}>
+              <TouchableOpacity
+                style={[styles.settingRow, { paddingVertical: 12, paddingLeft: 56 }]}
+                onPress={() => navigation.navigate('SharedMedia', { chatId: chat._id })}
+              >
+                <Text style={styles.settingLabel}>Shared Media</Text>
+                <Ionicons name="images-outline" size={18} color={Colors.dark.muted} />
+              </TouchableOpacity>
               
-              <View style={styles.settingRow}>
-                <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
-                  <Ionicons name="camera-outline" size={20} color={Colors.primary} />
-                </View>
-                <Text style={styles.settingLabel}>Allow Screenshots</Text>
-                <Switch
-                  value={chat.allowScreenshots !== false}
-                  onValueChange={async (val) => {
-                    const prev = chat.allowScreenshots;
-                    setChat(c => ({ ...c, allowScreenshots: val }));
-                    useChatStore.getState().updateChat(chat._id, { allowScreenshots: val });
-                    try {
-                      await api.put(`/chats/${chat._id}/security`, { allowScreenshots: val });
-                    } catch (e) {
-                      setChat(c => ({ ...c, allowScreenshots: prev }));
-                      useChatStore.getState().updateChat(chat._id, { allowScreenshots: prev });
-                      showAlert('Error', e.message); 
-                    }
-                  }}
-                  trackColor={{ false: '#3A3A3A', true: Colors.primary }}
-                  thumbColor="#FFF"
-                />
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.settingRow}>
-                <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
-                  <Ionicons name="arrow-redo-outline" size={20} color={Colors.primary} />
-                </View>
-                <Text style={styles.settingLabel}>Allow Forwarding</Text>
-                <Switch
-                  value={chat.allowForwarding !== false}
-                  onValueChange={async (val) => {
-                    const prev = chat.allowForwarding;
-                    setChat(c => ({ ...c, allowForwarding: val }));
-                    useChatStore.getState().updateChat(chat._id, { allowForwarding: val });
-                    try {
-                      await api.put(`/chats/${chat._id}/security`, { allowForwarding: val });
-                    } catch (e) {
-                      setChat(c => ({ ...c, allowForwarding: prev }));
-                      useChatStore.getState().updateChat(chat._id, { allowForwarding: prev });
-                      showAlert('Error', e.message); 
-                    }
-                  }}
-                  trackColor={{ false: '#3A3A3A', true: Colors.primary }}
-                  thumbColor="#FFF"
-                />
-              </View>
-            </>
+              {isAdmin && (
+                <>
+                  <View style={[styles.divider, { marginLeft: 56 }]} />
+                  <TouchableOpacity
+                    style={[styles.settingRow, { paddingVertical: 12, paddingLeft: 56 }]}
+                    onPress={() => setShowTheme(true)}
+                  >
+                    <Text style={styles.settingLabel}>Change Chat Theme</Text>
+                    <Ionicons name="color-wand-outline" size={18} color={Colors.dark.muted} />
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Category: Privacy & Security */}
+        <View style={[styles.card, { marginBottom: 12, overflow: 'hidden' }]}>
+          <TouchableOpacity style={styles.settingRow} onPress={() => toggleSection('security')}>
+            <View style={[styles.settingIcon, { backgroundColor: '#10B98120' }]}>
+              <Ionicons name="shield-checkmark-outline" size={20} color="#10B981" />
+            </View>
+            <Text style={[styles.settingLabel, { fontWeight: '700' }]}>Privacy & Security</Text>
+            <Ionicons name={expandedSection === 'security' ? "chevron-up" : "chevron-down"} size={20} color={Colors.dark.muted} />
+          </TouchableOpacity>
+          
+          {expandedSection === 'security' && (
+            <View style={{ backgroundColor: 'rgba(0,0,0,0.2)', paddingVertical: 4 }}>
+              <TouchableOpacity
+                style={[styles.settingRow, { paddingVertical: 12, paddingLeft: 56 }]}
+                onPress={() => {
+                  if (!isAdmin) {
+                    showAlert('Permission Denied', 'Only group admins and the owner can change disappearing messages settings.');
+                    return;
+                  }
+                  setShowDisappear(true);
+                }}
+              >
+                <Text style={styles.settingLabel}>Disappearing Messages</Text>
+                <Text style={[styles.settingValue, { fontSize: 13 }]}>{secondsToLabel(chat.disappearAfter || 0)}</Text>
+              </TouchableOpacity>
+
+              {isAdmin && (
+                <>
+                  <View style={[styles.divider, { marginLeft: 56 }]} />
+                  <View style={[styles.settingRow, { paddingVertical: 12, paddingLeft: 56 }]}>
+                    <Text style={styles.settingLabel}>Allow Screenshots</Text>
+                    <Switch
+                      value={chat.allowScreenshots !== false}
+                      onValueChange={async (val) => {
+                        const prev = chat.allowScreenshots;
+                        setChat(c => ({ ...c, allowScreenshots: val }));
+                        useChatStore.getState().updateChat(chat._id, { allowScreenshots: val });
+                        try {
+                          await api.put(`/chats/${chat._id}/security`, { allowScreenshots: val });
+                        } catch (e) {
+                          setChat(c => ({ ...c, allowScreenshots: prev }));
+                          useChatStore.getState().updateChat(chat._id, { allowScreenshots: prev });
+                          showAlert('Error', e.message); 
+                        }
+                      }}
+                      trackColor={{ false: '#3A3A3A', true: Colors.primary }}
+                      thumbColor="#FFF"
+                      style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                    />
+                  </View>
+
+                  <View style={[styles.divider, { marginLeft: 56 }]} />
+                  <View style={[styles.settingRow, { paddingVertical: 12, paddingLeft: 56 }]}>
+                    <Text style={styles.settingLabel}>Allow Forwarding</Text>
+                    <Switch
+                      value={chat.allowForwarding !== false}
+                      onValueChange={async (val) => {
+                        const prev = chat.allowForwarding;
+                        setChat(c => ({ ...c, allowForwarding: val }));
+                        useChatStore.getState().updateChat(chat._id, { allowForwarding: val });
+                        try {
+                          await api.put(`/chats/${chat._id}/security`, { allowForwarding: val });
+                        } catch (e) {
+                          setChat(c => ({ ...c, allowForwarding: prev }));
+                          useChatStore.getState().updateChat(chat._id, { allowForwarding: prev });
+                          showAlert('Error', e.message); 
+                        }
+                      }}
+                      trackColor={{ false: '#3A3A3A', true: Colors.primary }}
+                      thumbColor="#FFF"
+                      style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                    />
+                  </View>
+                </>
+              )}
+            </View>
           )}
         </View>
 

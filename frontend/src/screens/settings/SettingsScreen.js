@@ -325,7 +325,11 @@ export default function SettingsScreen({ navigation }) {
         showAlert('Up to Date', 'You are on the latest version.');
       }
     } catch (e) {
-      showAlert('Error', 'Failed to check for updates: ' + e.message);
+      if (e.message?.includes('rejected')) {
+        showAlert('Checking...', 'The app is already checking for updates in the background. Please wait a moment and try restarting the app.');
+      } else {
+        showAlert('Notice', 'Unable to check for updates right now. Ensure you have installed the latest APK build.');
+      }
     }
   };
 

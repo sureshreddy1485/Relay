@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, Image, StatusBar, Alert,
-  ActivityIndicator, Pressable, Animated, ScrollView, Modal, LayoutAnimation,
+  ActivityIndicator, Pressable, Animated, ScrollView, Modal, LayoutAnimation, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1012,7 +1012,7 @@ export default function ChatRoomScreen({ route, navigation }) {
       {/* ── Messages + input ──────────────────────────────────────────────── */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
         <FlatList

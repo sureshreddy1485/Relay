@@ -891,7 +891,16 @@ export default function MessageBubble({
             <TouchableOpacity
               key={i}
               style={[styles.reactionChip, g.hasMe && styles.reactionChipMine]}
-              onPress={() => onReact?.(message._id, g.emoji)}
+              onPress={() => {
+                const totalReactions = message.reactions.length;
+                const onlyMe = totalReactions === 1 && g.hasMe;
+                if (onlyMe) {
+                  onReact?.(message._id, g.emoji);
+                } else {
+                  setTab('reactionsList');
+                  setShowActions(true);
+                }
+              }}
               activeOpacity={0.7}
             >
               <Text style={styles.reactionEmoji}>{g.emoji}</Text>
@@ -946,7 +955,7 @@ export default function MessageBubble({
                   <Text style={styles.sheetCancelText}>Cancel</Text>
                 </TouchableOpacity>
               </>
-            ) : (
+            ) : tab === 'readby' ? (
               /* Read by list */
               <>
                 <TouchableOpacity style={styles.backRow} onPress={() => setTab('actions')}>
@@ -980,6 +989,44 @@ export default function MessageBubble({
                 {/* Cancel Button */}
                 <TouchableOpacity style={styles.sheetCancelBtn} onPress={() => setShowActions(false)} activeOpacity={0.8}>
                   <Text style={styles.sheetCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              /* Reactions List */
+              <>
+                <View style={styles.backRow}>
+                  <TouchableOpacity onPress={() => setTab('actions')} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="arrow-back" size={18} color={Colors.primary} />
+                    <Text style={styles.backLabel}>Reactions</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.actionDivider} />
+                <ScrollView style={{ maxHeight: 240 }}>
+                  {message.reactions?.map((r, i) => {
+                    const rUserId = r.user?._id || r.user;
+                    const isMe = rUserId?.toString() === currentUser?._id?.toString();
+                    return (
+                      <View key={i} style={styles.readByRow}>
+                        <View style={styles.readByAvatar}>
+                          <Text style={styles.readByInitial}>
+                            {resolveUser(rUserId).charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.readByName}>{isMe ? 'You' : resolveUser(rUserId)}</Text>
+                        </View>
+                        <Text style={{ fontSize: 20, marginRight: isMe ? 16 : 0 }}>{r.emoji}</Text>
+                        {isMe && (
+                          <TouchableOpacity onPress={() => { onReact?.(message._id, r.emoji); setShowActions(false); }}>
+                            <Text style={{ color: Colors.camera, fontSize: 13, fontWeight: 'bold' }}>Remove</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+                <TouchableOpacity style={styles.sheetCancelBtn} onPress={() => setShowActions(false)} activeOpacity={0.8}>
+                  <Text style={styles.sheetCancelText}>Close</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -1057,7 +1104,7 @@ const styles = StyleSheet.create({
   replyContextName: { fontSize: 12, fontWeight: '700', color: Colors.accentGreen },
   replyContextContent: { fontSize: 12, color: Colors.dark.muted },
   reactionsRow: {
-    flexDirection: 'row', gap: 4, paddingHorizontal: 16, marginTop: -4, marginBottom: 4,
+    flexDirection: 'row', gap: 4, paddingHorizontal: 16, marginTop: 2, marginBottom: 4,
   },
   reactionsRowMine: { justifyContent: 'flex-end' },
   reactionsRowTheirs: { justifyContent: 'flex-start' },

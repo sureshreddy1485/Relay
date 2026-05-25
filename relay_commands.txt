@@ -88,8 +88,21 @@ Keep this file handy! It contains all the essential commands to build, fix, upda
 -----------------------------------------
 (Always run these inside the "backend" folder)
 
-* Broadcast a message to all users:
+* Broadcast a message to all users manually:
   node scripts/broadcast.js "🚀 **New Update!** Write your message here!"
+
+-----------------------------------------
+5.5. AUTOMATED ONE-CLICK UPDATE & BROADCAST
+-----------------------------------------
+(Run this from the MAIN project folder "nexchat", NOT frontend/backend)
+
+I built a custom script for you that will automatically:
+1. Ask you what the update is about.
+2. Build and push the OTA Update via Expo.
+3. Automatically broadcast the message to all users via relay_bot!
+
+Command to run:
+  node publishUpdate.js
 
 Rules:
 - Wrap your entire message in double quotes (" ").

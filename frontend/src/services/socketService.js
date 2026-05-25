@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
 import { AppState, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { Audio } from 'expo-av';
 import useChatStore from '../store/useChatStore';
 import useAuthStore from '../store/useAuthStore';
 import api from './api';
@@ -37,7 +38,7 @@ const connectSocket = (userId) => {
   });
 
   // ── Realtime events ─────────────────────────────────────────────
-  socket.on('new_message', (message) => {
+  socket.on('new_message', async (message) => {
     const storeState = useChatStore.getState();
     const { selectedChat, addMessage, incrementUnread, messages } = storeState;
     const chatId = message.chat?._id || message.chat;
@@ -78,8 +79,19 @@ const connectSocket = (userId) => {
             body = 'Group Invitation';
           }
         }
+        
         if (AppState.currentState === 'active') {
-          // Foreground: show custom banner
+          // Play sound manually via expo-av
+          try {
+            const { sound } = await Audio.Sound.createAsync(
+              require('../../assets/kin_notification_sound.wav')
+            );
+            await sound.playAsync();
+          } catch (e) {
+            console.log('Error playing custom sound manually:', e);
+          }
+          
+          // Show the custom banner UI
           useChatStore.getState().showNotification({
             messageId: message._id,
             chatId,
@@ -89,15 +101,15 @@ const connectSocket = (userId) => {
             chat: message.chat,
           });
         } else {
-          // Background/Terminated/Locked: show system notification panel push notification
+          // Always show system notification to get panel entry in background
           Notifications.scheduleNotificationAsync({
             content: {
               title,
               body,
               data: { chatId, chat: message.chat },
-              sound: true,
+              sound: 'kin_notification_sound.wav',
               priority: Notifications.AndroidNotificationPriority.MAX,
-              channelId: 'default',
+              channelId: 'messages-v3',
             },
             trigger: null,
           }).catch(err => console.log('Error scheduling local notification:', err));

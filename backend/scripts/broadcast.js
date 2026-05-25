@@ -1,13 +1,12 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const path = require('path');
 const User = require('../models/User');
 const Chat = require('../models/Chat');
 const Message = require('../models/Message');
 
-const path = require('path');
-
 // Load environment variables
-dotenv.config({ path: path.join(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const broadcastMessage = async (messageContent) => {
   if (!messageContent) {
@@ -80,8 +79,8 @@ const broadcastMessage = async (messageContent) => {
   }
 };
 
-// Get the message from the command line arguments
+// Get the message from the command line arguments or environment variables
 const args = process.argv.slice(2);
-const message = args.join(' ');
+const message = process.env.BROADCAST_MESSAGE || args.join(' ');
 
 broadcastMessage(message);

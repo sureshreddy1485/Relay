@@ -11,6 +11,22 @@ const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 require('./config/cloudinary'); // initialize cloudinary
 
+const admin = require('firebase-admin');
+let serviceAccount;
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } else {
+    serviceAccount = require('./firebase-adminsdk.json');
+  }
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+  console.log('🔥 Firebase Admin SDK initialized successfully');
+} catch (e) {
+  console.warn('⚠️ Firebase Admin SDK failed to initialize. Background notifications may fail:', e.message);
+}
+
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const chatRoutes = require('./routes/chatRoutes');

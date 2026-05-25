@@ -459,12 +459,13 @@ const getFriends = asyncHandler(async (req, res) => {
 // @route PUT /api/users/push-token
 // @access Private
 const updatePushToken = asyncHandler(async (req, res) => {
-  const { pushToken } = req.body;
+  const { pushToken, fcmToken } = req.body;
   const user = await User.findById(req.user._id);
   if (!user) { res.status(404); throw new Error('User not found'); }
-  user.pushToken = pushToken || '';
+  if (pushToken !== undefined) user.pushToken = pushToken || '';
+  if (fcmToken !== undefined) user.fcmToken = fcmToken || '';
   await user.save();
-  res.status(200).json({ success: true, message: 'Push token updated' });
+  res.status(200).json({ success: true, message: 'Push tokens updated' });
 });
 
 // @desc  Toggle DM permission for a specific group

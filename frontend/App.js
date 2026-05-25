@@ -1,8 +1,9 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useRef } from 'react';
-import { StatusBar, LogBox, View, Animated, StyleSheet, Image, Text } from 'react-native';
+import { StatusBar, LogBox, View, Animated, StyleSheet, Image, Text, Alert, AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
+import * as Updates from 'expo-updates';
 // RootNavigator dynamically imported later to allow Colors override
 // import RootNavigator from './src/navigation/RootNavigator';
 import useAuthStore from './src/store/useAuthStore';
@@ -70,6 +71,49 @@ export default function App() {
       connectSocket(user._id);
     }
   }, [isAuthenticated, user?._id]);
+
+  useEffect(() => {
+    if (__DEV__) return;
+
+    let isMounted = true;
+    
+    const checkUpdates = async () => {
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable && isMounted) {
+          await Updates.fetchUpdateAsync();
+          Alert.alert(
+            'Update Available',
+            'A new version of the app is available. Would you like to restart to apply it?',
+            [
+              { text: 'Later', style: 'cancel' },
+              { text: 'Restart Now', onPress: () => Updates.reloadAsync() }
+            ]
+          );
+        }
+      } catch (e) {
+        // Silently fail on boot if native fetch is currently running
+      }
+    };
+
+    // Delay the manual check slightly to allow native boot checks to finish
+    const timer = setTimeout(() => {
+      checkUpdates();
+    }, 5000);
+    
+    // Also check for updates when app comes to foreground
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active' && isMounted) {
+        checkUpdates();
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, []);
 
   const RootNavigator = themeLoaded ? require('./src/navigation/RootNavigator').default : null;
 

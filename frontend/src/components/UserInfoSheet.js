@@ -19,6 +19,14 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
   const { showAlert } = useAlert();
   const { user: authUser, updateUser } = useAuthStore();
   const [profile, setProfile]     = useState(initialUser || null);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [expandedSection, setExpandedSection] = useState(null);
+
+  const toggleSection = (sectionName) => {
+    setExpandedSection(prev => prev === sectionName ? null : sectionName);
+  };
+
+  const handleBlock = () => {};
   const [loading, setLoading]     = useState(false);
   const [notifOn, setNotifOn]     = useState(true);
   const [pinned, setPinned]       = useState(authUser?.pinnedChats?.includes(chat?._id) || false);
@@ -190,8 +198,6 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
                 <>
                   <ActionRow icon="chatbubble-outline" label="Open Chat" onPress={handleOpenChat} />
                   <View style={styles.divider} />
-                  <ActionRow icon="images-outline" label="Shared Media" onPress={() => { onClose(); navigation.navigate('SharedMedia', { chatId: chat?._id }); }} />
-                  <View style={styles.divider} />
                   <SwitchRow icon="notifications-outline" label="Notifications" value={notifOn} onChange={setNotifOn} />
                   <View style={styles.divider} />
                   <SwitchRow icon="pin-outline" label="Pin Chat" value={pinned} onChange={handlePinToggle} />
@@ -203,58 +209,94 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
                     iconColor={Colors.primary}
                     onPress={handleStartGroup}
                   />
-                  <View style={styles.divider} />
-                  <ActionRow
-                    icon="time-outline"
-                    label="Disappearing Messages"
-                    value={secondsToLabel(disappear)}
-                    valueStyle={{ color: Colors.primary }}
-                    onPress={() => setShowDisappear(true)}
-                  />
-                  <View style={styles.divider} />
-                  <ActionRow
-                    icon="color-palette-outline"
-                    label="Change Chat Theme"
-                    onPress={() => setShowTheme(true)}
-                  />
-                  <View style={styles.divider} />
-                  <View style={styles.divider} />
-                  
-                  <Text style={{ color: Colors.dark.muted, fontSize: 13, fontWeight: '700', marginLeft: 16, marginTop: 8, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Security</Text>
 
-                  <SwitchRow 
-                    icon="camera-outline" 
-                    label="Allow Screenshots" 
-                    value={chat?.allowScreenshots !== false} 
-                    onChange={async (val) => {
-                      const prev = chat?.allowScreenshots;
-                      useChatStore.getState().updateChat(chat._id, { allowScreenshots: val });
-                      try {
-                        await api.put(`/chats/${chat._id}/security`, { allowScreenshots: val });
-                      } catch (e) {
-                        useChatStore.getState().updateChat(chat._id, { allowScreenshots: prev });
-                        showAlert('Error', e.message); 
-                      }
-                    }} 
-                  />
-                  <View style={styles.divider} />
-                  
-                  <SwitchRow 
-                    icon="arrow-redo-outline" 
-                    label="Allow Forwarding" 
-                    value={chat?.allowForwarding !== false} 
-                    onChange={async (val) => {
-                      const prev = chat?.allowForwarding;
-                      useChatStore.getState().updateChat(chat._id, { allowForwarding: val });
-                      try {
-                        await api.put(`/chats/${chat._id}/security`, { allowForwarding: val });
-                      } catch (e) {
-                        useChatStore.getState().updateChat(chat._id, { allowForwarding: prev });
-                        showAlert('Error', e.message); 
-                      }
-                    }} 
-                  />
-                  <View style={styles.divider} />
+                  {/* Category: Media & Appearance */}
+                  <View style={[styles.card, { marginTop: 12, overflow: 'hidden' }]}>
+                    <TouchableOpacity style={styles.settingRowAccordion} onPress={() => toggleSection('media')}>
+                      <View style={[styles.settingIconAcc, { backgroundColor: Colors.primary + '20' }]}>
+                        <Ionicons name="color-palette-outline" size={20} color={Colors.primary} />
+                      </View>
+                      <Text style={[styles.settingLabelAcc, { fontWeight: '700' }]}>Media & Appearance</Text>
+                      <Ionicons name={expandedSection === 'media' ? "chevron-up" : "chevron-down"} size={20} color={Colors.dark.muted} />
+                    </TouchableOpacity>
+                    
+                    {expandedSection === 'media' && (
+                      <View style={{ backgroundColor: 'rgba(0,0,0,0.2)', paddingVertical: 4 }}>
+                        <ActionRow 
+                          icon="images-outline" 
+                          label="Shared Media" 
+                          onPress={() => { onClose(); navigation.navigate('SharedMedia', { chatId: chat?._id }); }} 
+                          containerStyle={{ paddingLeft: 16 }}
+                        />
+                        <View style={[styles.divider, { marginLeft: 56 }]} />
+                        <ActionRow
+                          icon="color-wand-outline"
+                          label="Change Chat Theme"
+                          onPress={() => setShowTheme(true)}
+                          containerStyle={{ paddingLeft: 16 }}
+                        />
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Category: Privacy & Security */}
+                  <View style={[styles.card, { marginTop: 12, overflow: 'hidden' }]}>
+                    <TouchableOpacity style={styles.settingRowAccordion} onPress={() => toggleSection('security')}>
+                      <View style={[styles.settingIconAcc, { backgroundColor: '#10B98120' }]}>
+                        <Ionicons name="shield-checkmark-outline" size={20} color="#10B981" />
+                      </View>
+                      <Text style={[styles.settingLabelAcc, { fontWeight: '700' }]}>Privacy & Security</Text>
+                      <Ionicons name={expandedSection === 'security' ? "chevron-up" : "chevron-down"} size={20} color={Colors.dark.muted} />
+                    </TouchableOpacity>
+                    
+                    {expandedSection === 'security' && (
+                      <View style={{ backgroundColor: 'rgba(0,0,0,0.2)', paddingVertical: 4 }}>
+                        <ActionRow
+                          icon="time-outline"
+                          label="Disappearing Messages"
+                          value={secondsToLabel(disappear)}
+                          valueStyle={{ color: Colors.primary, fontSize: 13 }}
+                          onPress={() => setShowDisappear(true)}
+                          containerStyle={{ paddingLeft: 16 }}
+                        />
+                        <View style={[styles.divider, { marginLeft: 56 }]} />
+                        <SwitchRow 
+                          icon="camera-outline" 
+                          label="Allow Screenshots" 
+                          value={chat?.allowScreenshots !== false} 
+                          containerStyle={{ paddingLeft: 16 }}
+                          onChange={async (val) => {
+                            const prev = chat?.allowScreenshots;
+                            useChatStore.getState().updateChat(chat._id, { allowScreenshots: val });
+                            try {
+                              await api.put(`/chats/${chat._id}/security`, { allowScreenshots: val });
+                            } catch (e) {
+                              useChatStore.getState().updateChat(chat._id, { allowScreenshots: prev });
+                              showAlert('Error', e.message); 
+                            }
+                          }} 
+                        />
+                        <View style={[styles.divider, { marginLeft: 56 }]} />
+                        <SwitchRow 
+                          icon="arrow-redo-outline" 
+                          label="Allow Forwarding" 
+                          value={chat?.allowForwarding !== false} 
+                          containerStyle={{ paddingLeft: 16 }}
+                          onChange={async (val) => {
+                            const prev = chat?.allowForwarding;
+                            useChatStore.getState().updateChat(chat._id, { allowForwarding: val });
+                            try {
+                              await api.put(`/chats/${chat._id}/security`, { allowForwarding: val });
+                            } catch (e) {
+                              useChatStore.getState().updateChat(chat._id, { allowForwarding: prev });
+                              showAlert('Error', e.message); 
+                            }
+                          }} 
+                        />
+                      </View>
+                    )}
+                  </View>
+                  <View style={{ height: 12 }} />
                   
                   {!isFriend ? (
                     <>
@@ -279,6 +321,23 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
                         label="Already Friends"
                         iconColor={Colors.primary}
                         labelStyle={{ color: Colors.primary }}
+                        onPress={() => {
+                          showAlert('Remove Friend', `Are you sure you want to remove ${profile.displayName || profile.username} from friends?`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Remove',
+                              style: 'destructive',
+                              onPress: async () => {
+                                try {
+                                  await api.post(`/users/${profile._id}/remove-friend`);
+                                  const updatedFriends = (authUser.friends || []).filter(id => (id._id || id).toString() !== profile._id.toString());
+                                  updateUser({ friends: updatedFriends });
+                                  showAlert('Removed', 'Friend removed silently');
+                                } catch (e) { showAlert('Error', e.message); }
+                              }
+                            }
+                          ]);
+                        }}
                       />
                       <View style={styles.divider} />
                     </>
@@ -332,36 +391,6 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
                   <ActionRow icon="information-circle-outline" label="System Assistant" onPress={() => {}} />
                   <View style={styles.divider} />
                   <ActionRow icon="shield-checkmark-outline" label="Managed by Relay" iconColor={Colors.primary} labelStyle={{ color: Colors.primary }} onPress={() => {}} />
-                </>
-              )}
-              {authUser.friends?.some(f => (f._id || f).toString() === profile._id.toString()) && profile.role !== 'system_bot' && (
-                <>
-                  <View style={styles.divider} />
-                  <ActionRow
-                    icon="person-remove-outline"
-                    label="Remove Friend"
-                    labelStyle={{ color: '#FF4444' }}
-                    iconColor="#FF4444"
-                    onPress={() => {
-                      showAlert('Remove Friend', `Are you sure you want to remove ${profile.displayName || profile.username} from friends?`, [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Remove',
-                          style: 'destructive',
-                          onPress: async () => {
-                            try {
-                              await api.post(`/users/${profile._id}/remove-friend`);
-                              const updatedFriends = (authUser.friends || []).filter(id => (id._id || id).toString() !== profile._id.toString());
-                              updateUser({ friends: updatedFriends });
-                              showAlert('Removed', 'Friend removed silently');
-                              onClose();
-                              if (navigation && navigation.goBack) navigation.goBack();
-                            } catch (e) { showAlert('Error', e.message); }
-                          }
-                        }
-                      ]);
-                    }}
-                  />
                 </>
               )}
             </View>
@@ -453,6 +482,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.card, marginHorizontal: 16, borderRadius: 18,
     borderWidth: 1, borderColor: Colors.dark.border, overflow: 'hidden',
   },
+  card: { backgroundColor: Colors.dark.card, marginHorizontal: 0, borderRadius: 18, borderWidth: 1, borderColor: Colors.dark.border },
+  settingRowAccordion: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
+  settingIconAcc: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  settingLabelAcc: { flex: 1, fontSize: 15, color: Colors.dark.text, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, gap: 16 },
   rowLabel: { flex: 1, fontSize: 15, color: Colors.dark.text, fontWeight: '500' },
   rowValue: { fontSize: 14, color: Colors.dark.muted },
