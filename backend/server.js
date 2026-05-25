@@ -67,6 +67,7 @@ const io = new Server(server, {
 
 // Make io accessible in controllers via req.app.get('io')
 app.set('io', io);
+app.set('trust proxy', 1); // IMPORTANT: Required for rate limiter on Render
 socketHandler(io);
 
 // ─── Middleware ────────────────────────────────────────────────────────────
