@@ -97,60 +97,6 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth', authLimiter);
 
-// --- TEMPORARY BROADCAST ROUTE ---
-app.get('/api/broadcast-update', async (req, res) => {
-  try {
-    const User = require('./models/User');
-    const Chat = require('./models/Chat');
-    const Message = require('./models/Message');
-
-    const botUser = await User.findOne({ username: 'relay_bot' });
-    if (!botUser) return res.send('relay_bot not found');
-
-    const users = await User.find({ role: 'user', username: { $nin: ['relay_bot', 'relay', 'mica_bot'] } });
-    let sentCount = 0;
-    const messageContent = "🚀 **New Update Available!**\n\nThe friend request (+) and keyboard overlap issues have been fixed!\n\n*(Your app will ask you to restart automatically to apply this update!)*";
-
-    for (const u of users) {
-      let chat = await Chat.findOne({
-        isGroupChat: false,
-        $and: [
-          { users: { $elemMatch: { $eq: botUser._id } } },
-          { users: { $elemMatch: { $eq: u._id } } }
-        ]
-      });
-
-      if (!chat) {
-        chat = await Chat.create({
-          chatName: 'sender',
-          isGroupChat: false,
-          users: [botUser._id, u._id],
-          theme: 'default'
-        });
-      }
-
-      const newMessage = await Message.create({
-        sender: botUser._id,
-        content: messageContent,
-        chat: chat._id,
-        messageType: 'text'
-      });
-
-      await Chat.findByIdAndUpdate(chat._id, { latestMessage: newMessage._id });
-
-      const fullChat = await Chat.findById(chat._id).populate({ path: 'latestMessage', populate: { path: 'sender', select: 'username displayName profilePicture' }});
-      const leanMsg = newMessage.toObject();
-      io.to(u._id.toString()).emit('new_message', leanMsg);
-
-      sentCount++;
-    }
-
-    res.send(`🎉 Broadcast sent to ${sentCount} users!`);
-  } catch (err) {
-    res.status(500).send(`Error: ${err.message}`);
-  }
-});
-// ---------------------------------
 
 // ─── Routes ────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
