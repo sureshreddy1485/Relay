@@ -18,6 +18,15 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     const chatId = data.chatId;
 
     if (chatId && sender) {
+      // Guarantee channel exists
+      await notifee.createChannel({
+        id: 'messages-v5',
+        name: 'Relay Messages',
+        importance: 4, // AndroidImportance.HIGH
+        sound: 'kin_notification_sound',
+        vibration: true,
+      });
+
       // Fetch existing notifications to see if we already have one for this chat
       const displayed = await notifee.getDisplayedNotifications();
       const existingNotification = displayed.find(n => n.id === chatId);
@@ -43,6 +52,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         body: body,
         android: {
           channelId: 'messages-v5',
+          smallIcon: 'ic_launcher',
           color: '#2DD4BF',
           pressAction: {
             id: 'default',
@@ -61,6 +71,11 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     }
   } catch (e) {
     console.error('Error handling background data message:', e);
+    await notifee.displayNotification({
+      title: 'Crash Report',
+      body: String(e.message || e),
+      android: { channelId: 'messages-v5' }
+    });
   }
 });
 
