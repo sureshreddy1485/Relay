@@ -11,6 +11,7 @@ import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { Colors } from '../theme/colors';
 import { CHAT_THEMES, GROUP_THEMES } from './ThemeSelectSheet';
 import { useAlert } from './CustomAlert';
+import EmojiPicker from 'rn-emoji-keyboard';
 
 import { Audio } from 'expo-av';
 import { useNavigation } from '@react-navigation/native';
@@ -89,7 +90,7 @@ const AudioPlayer = ({ url, isMine }) => {
   );
 };
 
-const REACTIONS = ['❤️', '😂', '👍', '😮', '😢', '🔥'];
+const REACTIONS = ['❤️', '😂', '👍', '😮', '😢'];
 
 const formatTime = (d) =>
   new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -104,6 +105,7 @@ export default function MessageBubble({
   selectionMode, isSelected, onSelectToggle
 }) {
   const [showActions, setShowActions] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [tab, setTab] = useState('actions'); // 'actions' | 'readby'
   const swipeableRef = useRef(null);
   const navigation = useNavigation();
@@ -918,6 +920,12 @@ export default function MessageBubble({
                       <Text style={styles.emoji}>{emoji}</Text>
                     </TouchableOpacity>
                   ))}
+                  <TouchableOpacity
+                    onPress={() => { setShowActions(false); setShowEmojiPicker(true); }}
+                    style={[styles.emojiBtn, { backgroundColor: Colors.dark.card, borderRadius: 20, alignItems: 'center', justifyContent: 'center', width: 40, height: 40 }]}
+                  >
+                    <Ionicons name="add" size={24} color={Colors.dark.text} />
+                  </TouchableOpacity>
                 </View>
                 <View style={styles.actionDivider} />
 
@@ -978,6 +986,28 @@ export default function MessageBubble({
           </View>
         </Pressable>
       </Modal>
+
+      <EmojiPicker 
+        open={showEmojiPicker} 
+        onClose={() => setShowEmojiPicker(false)} 
+        onEmojiSelected={(emojiObject) => { 
+          onReact?.(message._id, emojiObject.emoji); 
+          setShowEmojiPicker(false); 
+        }} 
+        theme={{
+          backdrop: '#16161888',
+          knob: Colors.dark.border,
+          container: Colors.dark.bg,
+          header: Colors.dark.text,
+          skinTonesContainer: Colors.dark.card,
+          category: {
+            icon: Colors.dark.muted,
+            iconActive: Colors.primary,
+            container: Colors.dark.card,
+            containerActive: Colors.primary + '20',
+          },
+        }}
+      />
     </>
   );
 }

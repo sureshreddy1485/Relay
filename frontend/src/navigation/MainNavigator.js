@@ -8,6 +8,7 @@ import NewChatScreen from '../screens/chat/NewChatScreen';
 import CreateGroupScreen from '../screens/chat/CreateGroupScreen';
 import MediaViewerScreen from '../screens/chat/MediaViewerScreen';
 import MessageInfoScreen from '../screens/chat/MessageInfoScreen';
+import SharedMediaScreen from '../screens/chat/SharedMediaScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import ChangePasswordScreen from '../screens/settings/ChangePasswordScreen';
@@ -38,6 +39,7 @@ export default function MainNavigator() {
       <Stack.Screen name="NewChat" component={NewChatScreen} options={{ title: 'New Chat' }} />
       <Stack.Screen name="CreateGroup" component={CreateGroupScreen} options={{ headerShown: false }} />
       <Stack.Screen name="MediaViewer" component={MediaViewerScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="SharedMedia" component={SharedMediaScreen} options={{ headerShown: false }} />
       <Stack.Screen name="MessageInfo" component={MessageInfoScreen} options={{ title: 'Message Info' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />

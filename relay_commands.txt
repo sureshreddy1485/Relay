@@ -1,0 +1,113 @@
+=========================================
+      RELAY APP - MASTER COMMAND CHEAT SHEET
+=========================================
+Keep this file handy! It contains all the essential commands to build, fix, update, and manage your NexChat/Relay app.
+
+-----------------------------------------
+1. EAS & EXPO COMMANDS (FRONTEND)
+-----------------------------------------
+(Always run these inside the "frontend" folder)
+
+* Start the development server (Expo Go):
+  npx expo start
+  npx expo start -c     (Clears the cache, fixes a LOT of weird bugs)
+
+* Build an Android APK (Live backend):
+  eas build -p android --profile preview
+
+* Send an Over-The-Air (OTA) Update (Instant updates without APK rebuilds):
+  eas update --branch preview --message "Your update description"
+
+* Expo/EAS Account Commands:
+  eas login             (Log into your Expo account on this computer)
+  eas logout            (Log out of your Expo account)
+  eas whoami            (Check which account is currently logged in)
+
+* Troubleshooting Expo:
+  npx expo-doctor       (Checks your project for dependency issues or errors)
+  npx expo install --fix (Attempts to automatically fix misaligned package versions)
+
+
+-----------------------------------------
+2. GIT & GITHUB (VERSION CONTROL)
+-----------------------------------------
+(Run these in the main project folder "nexchat")
+
+* Saving and Uploading Code:
+  git status            (Check which files have been modified)
+  git add .             (Stage all changes to be saved)
+  git commit -m "Desc"  (Save the changes with a description)
+  git push origin main  (Upload code to GitHub, triggers backend Render deployment)
+
+* Getting the Latest Code (If you made changes on GitHub directly):
+  git pull origin main
+
+* Branching (Safe way to test new features):
+  git checkout -b feature-name  (Create and switch to a new branch)
+  git checkout main             (Switch back to the main code)
+  git merge feature-name        (Combine your feature into the main code)
+
+* Undoing Mistakes:
+  git reset --hard      (DANGER: Destroys ALL unsaved changes and reverts to last commit)
+  git restore <file>    (Discards changes in a specific file)
+
+
+-----------------------------------------
+3. NPM & DEPENDENCIES
+-----------------------------------------
+(Run these inside either "frontend" or "backend" depending on where you need it)
+
+* Installing Packages:
+  npm install           (Installs everything listed in package.json)
+  npm install <pkg>     (Installs a specific package, e.g., npm install axios)
+  npm uninstall <pkg>   (Removes a package)
+
+* Fixing Broken Modules (The "Nuclear" Option):
+  If your app is completely broken and nothing works, run these in order:
+  1. rm -rf node_modules
+  2. rm package-lock.json
+  3. npm install
+  (On Windows, you can manually delete the node_modules folder and package-lock.json file, then run npm install)
+
+
+-----------------------------------------
+4. BACKEND COMMANDS (NODE.JS)
+-----------------------------------------
+(Always run these inside the "backend" folder)
+
+* Start the backend normally:
+  npm start
+
+* Start the backend for development (auto-restarts when you save files):
+  npm run dev
+  (Requires nodemon to be installed: npm install -g nodemon)
+
+
+-----------------------------------------
+5. RELAY BOT BROADCASTING (BACKEND)
+-----------------------------------------
+(Always run these inside the "backend" folder)
+
+* Broadcast a message to all users:
+  node scripts/broadcast.js "🚀 **New Update!** Write your message here!"
+
+Rules:
+- Wrap your entire message in double quotes (" ").
+- Press Shift+Enter to create new lines inside the quotes before hitting Enter to send.
+- You can use emojis and Markdown (**bold**, *italics*).
+
+
+-----------------------------------------
+6. COMMON TROUBLESHOOTING FIXES
+-----------------------------------------
+* "Port is already in use" error (Backend):
+  This means a previous server didn't close properly. Close the terminal, or open Task Manager and end any "Node.js" tasks.
+
+* Environment Variables (Keys) aren't working:
+  If you add something to `.env`, you MUST restart your server (`npm run dev` or `npx expo start -c`) for it to take effect.
+
+* Build fails on EAS:
+  Run `npx expo-doctor`. If it complains about versions, run `npx expo install --fix`.
+
+* App crashes immediately on opening (in APK):
+  This usually means a native package was added but not compiled, OR an environment variable (`EXPO_PUBLIC_...`) is missing in `eas.json`. Check `eas.json`!

@@ -107,7 +107,7 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
     res.status(400); throw new Error('Request already sent');
   }
 
-  if (targetUser.username === 'mica_bot') {
+  if (targetUser.username === 'mica_bot' || targetUser.privacy?.autoAcceptFriendRequests) {
     if (!targetUser.friends.includes(req.user._id)) targetUser.friends.push(req.user._id);
     await targetUser.save();
     
@@ -115,7 +115,42 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
     if (!sender.friends.includes(targetUser._id)) sender.friends.push(targetUser._id);
     await sender.save();
     
-    return res.status(200).json({ success: true, message: 'Friend request auto-accepted by Mica!' });
+    // Create the chat
+    let chat = await Chat.findOne({
+      isGroupChat: false,
+      isChannel: false,
+      $and: [
+        { users: { $elemMatch: { $eq: targetUser._id } } },
+        { users: { $elemMatch: { $eq: sender._id } } },
+      ],
+    });
+
+    if (!chat) {
+      chat = await Chat.create({ users: [targetUser._id, sender._id], isGroupChat: false });
+    }
+
+    // Notify the sender
+    const io = req.app.get('io');
+    if (io) {
+      const fullChat = await Chat.findById(chat._id)
+        .populate('users', '-password -securityKey')
+        .populate({
+          path: 'latestMessage',
+          populate: { path: 'sender', select: 'username displayName profilePicture' },
+        });
+
+      io.to(sender._id.toString()).emit('friend_request_accepted', {
+        acceptedBy: {
+          _id: targetUser._id,
+          username: targetUser.username,
+          displayName: targetUser.displayName,
+          profilePicture: targetUser.profilePicture,
+        },
+        chat: fullChat,
+      });
+    }
+
+    return res.status(200).json({ success: true, message: 'Friend request auto-accepted!' });
   }
 
   targetUser.friendRequests.push(req.user._id);

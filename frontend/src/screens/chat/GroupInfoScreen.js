@@ -425,6 +425,19 @@ export default function GroupInfoScreen({ route, navigation }) {
           </View>
         </View>
 
+        <View style={[styles.card, { marginTop: 16 }]}>
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => navigation.navigate('SharedMedia', { chatId: chat._id })}
+          >
+            <View style={[styles.settingIcon, { backgroundColor: Colors.primary + '20' }]}>
+              <Ionicons name="images-outline" size={20} color={Colors.primary} />
+            </View>
+            <Text style={styles.settingLabel}>Shared Media</Text>
+            <Ionicons name="chevron-forward" size={20} color={Colors.dark.muted} />
+          </TouchableOpacity>
+        </View>
+
         {/* ── Settings ─────────────────────────────────────────────────── */}
         <Text style={styles.sectionTitle}>Settings</Text>
         <View style={styles.card}>

@@ -77,6 +77,7 @@ export default function SettingsScreen({ navigation }) {
     profilePictureVisibility: user?.privacy?.profilePictureVisibility || 'everyone',
     storiesVisibility:        user?.privacy?.storiesVisibility || 'everyone',
     readReceipts:             user?.privacy?.readReceipts || 'automatic',
+    autoAcceptFriendRequests: user?.privacy?.autoAcceptFriendRequests || false,
   });
 
   const [profileSheetVisible, setProfileSheetVisible] = useState(false);
@@ -494,6 +495,29 @@ export default function SettingsScreen({ navigation }) {
             onPress={() => {
               setShowBlockedModal(true);
               fetchBlockedUsers();
+            }}
+          />
+          <SwitchRow
+            icon="people-outline"
+            label="Auto-Accept Requests"
+            iconBg="#10B98120"
+            iconColor="#10B981"
+            value={privacy.autoAcceptFriendRequests}
+            onChange={(val) => {
+              if (val) {
+                showAlert('Warning', 'If you enable this, anyone who sends you a friend request will automatically become your friend. Are you sure?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Enable', onPress: () => {
+                      const updated = { ...privacy, autoAcceptFriendRequests: true };
+                      setPrivacy(updated);
+                      savePrivacy(updated);
+                  }}
+                ]);
+              } else {
+                const updated = { ...privacy, autoAcceptFriendRequests: false };
+                setPrivacy(updated);
+                savePrivacy(updated);
+              }
             }}
           />
         </View>

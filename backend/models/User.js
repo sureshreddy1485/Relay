@@ -99,6 +99,7 @@ const userSchema = new mongoose.Schema(
         default: 'automatic',
       },
       allowDMFromGroups: { type: Boolean, default: true },
+      autoAcceptFriendRequests: { type: Boolean, default: false },
       allowedDMGroups: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
       disallowedDMGroups: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
     },

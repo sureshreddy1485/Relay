@@ -190,6 +190,8 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
                 <>
                   <ActionRow icon="chatbubble-outline" label="Open Chat" onPress={handleOpenChat} />
                   <View style={styles.divider} />
+                  <ActionRow icon="images-outline" label="Shared Media" onPress={() => { onClose(); navigation.navigate('SharedMedia', { chatId: chat?._id }); }} />
+                  <View style={styles.divider} />
                   <SwitchRow icon="notifications-outline" label="Notifications" value={notifOn} onChange={setNotifOn} />
                   <View style={styles.divider} />
                   <SwitchRow icon="pin-outline" label="Pin Chat" value={pinned} onChange={handlePinToggle} />

@@ -1,0 +1,35 @@
+{
+  "cli": {
+    "version": ">= 7.6.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://relay-api-jlpx.onrender.com/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://relay-api-jlpx.onrender.com",
+        "EXPO_PUBLIC_GIPHY_API_KEY": "KwfNr95SXbDkYlmD2QPZFPm890JiYPW8"
+      },
+      "channel": "preview"
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://relay-api-jlpx.onrender.com/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://relay-api-jlpx.onrender.com",
+        "EXPO_PUBLIC_GIPHY_API_KEY": "KwfNr95SXbDkYlmD2QPZFPm890JiYPW8"
+      },
+      "channel": "production"
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
