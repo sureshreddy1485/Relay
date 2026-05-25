@@ -80,6 +80,8 @@ export default function SettingsScreen({ navigation }) {
     autoAcceptFriendRequests: user?.privacy?.autoAcceptFriendRequests || false,
   });
 
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
   const [profileSheetVisible, setProfileSheetVisible] = useState(false);
   const [profilePicViewerVisible, setProfilePicViewerVisible] = useState(false);
 
@@ -310,25 +312,52 @@ export default function SettingsScreen({ navigation }) {
 
   const handleCheckUpdate = async () => {
     if (__DEV__) {
-      showAlert('Development Mode', 'Over-the-air updates are perfectly configured, but they cannot be tested inside Expo Go. They will work flawlessly in your built app!');
+      showAlert('Development Mode', 'OTA updates work in your built APK, not in Expo Go.');
       return;
     }
+    setCheckingUpdate(true);
     try {
-      const update = await Updates.checkForUpdateAsync();
+      // Race between the check and a 5-second timeout
+      const update = await Promise.race([
+        Updates.checkForUpdateAsync(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 5000)
+        ),
+      ]);
+      setCheckingUpdate(false);
       if (update.isAvailable) {
-        showAlert('Update Available', 'Downloading update...');
-        await Updates.fetchUpdateAsync();
-        showAlert('Update Ready', 'App will restart to apply the update.', [
-          { text: 'OK', onPress: () => Updates.reloadAsync() }
-        ]);
+        showAlert(
+          '🚀 Update Available!',
+          'A new version of Relay is ready. Tap Restart to apply it now!',
+          [
+            { text: 'Later', style: 'cancel' },
+            {
+              text: 'Restart Now',
+              onPress: async () => {
+                await Updates.fetchUpdateAsync();
+                await Updates.reloadAsync();
+              },
+            },
+          ]
+        );
       } else {
-        showAlert('Up to Date', 'You are on the latest version.');
+        showAlert('✅ Up to Date', 'You are already on the latest version of Relay!');
       }
     } catch (e) {
-      if (e.message?.includes('rejected')) {
-        showAlert('Checking...', 'The app is already checking for updates in the background. Please wait a moment and try restarting the app.');
+      setCheckingUpdate(false);
+      if (e.message === 'timeout') {
+        showAlert('⏱ Slow Connection', 'Update check timed out. Please check your internet and try again.');
+      } else if (e.message?.includes('rejected') || e.message?.includes('already')) {
+        showAlert(
+          '🔄 Update in Progress',
+          'An update is already being downloaded. Restart the app to apply it!',
+          [
+            { text: 'Restart Now', onPress: () => { try { Updates.reloadAsync(); } catch (_) {} } },
+            { text: 'Later', style: 'cancel' },
+          ]
+        );
       } else {
-        showAlert('Notice', 'Unable to check for updates right now. Ensure you have installed the latest APK build.');
+        showAlert('⚠️ Notice', 'Unable to check for updates. Make sure you have internet access.');
       }
     }
   };
@@ -386,6 +415,17 @@ export default function SettingsScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.dark.card} />
+
+      {/* ── Checking Update Loading Overlay ─── */}
+      <Modal visible={checkingUpdate} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ backgroundColor: Colors.dark.card, borderRadius: 20, padding: 32, alignItems: 'center', gap: 16, width: 240, borderWidth: 1, borderColor: Colors.dark.border }}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>Checking for Updates</Text>
+            <Text style={{ color: Colors.dark.muted, fontSize: 13, textAlign: 'center' }}>This may take a few seconds...</Text>
+          </View>
+        </View>
+      </Modal>
 
       {/* Header */}
       <TabHeader title="Settings" />

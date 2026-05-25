@@ -83,8 +83,8 @@ export default function App() {
         if (update.isAvailable && isMounted) {
           await Updates.fetchUpdateAsync();
           Alert.alert(
-            'Update Available',
-            'A new version of the app is available. Would you like to restart to apply it?',
+            '🚀 Update Available!',
+            'A new version of Relay is ready. Restart now to apply the latest improvements!',
             [
               { text: 'Later', style: 'cancel' },
               { text: 'Restart Now', onPress: () => Updates.reloadAsync() }
