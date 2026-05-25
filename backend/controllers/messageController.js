@@ -165,7 +165,7 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   // Emit via socket to all participants' personal rooms
   let pushMessages = [];
-  let fcmMessages = [];
+
   
   if (io) {
     chat.users.forEach((userId) => {
@@ -191,34 +191,8 @@ const sendMessage = asyncHandler(async (req, res) => {
           
           let pushSent = false;
           
-          // Use FCM Token for Notifee Background Handling (Data-only)
-          if (targetUser.fcmToken) {
-            fcmMessages.push({
-              token: targetUser.fcmToken,
-              data: {
-                // Must be all strings
-                chatId: chat._id.toString(),
-                messageId: message._id.toString(),
-              },
-              notification: {
-                title: title,
-                body: pushBody,
-              },
-              android: { 
-                collapseKey: chat._id.toString(),
-                priority: 'high',
-                notification: {
-                  tag: chat._id.toString(),
-                  channelId: 'messages-v5',
-                  color: '#2DD4BF',
-                  sound: 'kin_notification_sound' // Use custom sound natively
-                }
-              }
-            });
-            pushSent = true;
-          } 
-          // Fallback to Expo Push Token
-          else if (targetUser.pushToken && Expo.isExpoPushToken(targetUser.pushToken)) {
+          // Exclusively use Expo Push Notifications for maximum reliability
+          if (targetUser.pushToken && Expo.isExpoPushToken(targetUser.pushToken)) {
             pushMessages.push({
               to: targetUser.pushToken,
               sound: 'kin_notification_sound.wav',
@@ -257,20 +231,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     })();
   }
   
-  // Send FCM Data-only push notifications asynchronously
-  if (fcmMessages.length > 0) {
-    (async () => {
-      try {
-        const admin = require('firebase-admin');
-        if (admin.apps.length > 0) {
-          const sendPromises = fcmMessages.map(msg => admin.messaging().send(msg));
-          await Promise.allSettled(sendPromises);
-        }
-      } catch (e) {
-        console.error('Error sending FCM messages:', e);
-      }
-    })();
-  }
+
   
   // Save the deliveredTo modifications for offline push notification users
   if (message.isModified && message.isModified('deliveredTo')) {
