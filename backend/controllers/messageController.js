@@ -199,22 +199,20 @@ const sendMessage = asyncHandler(async (req, res) => {
                 // Must be all strings
                 chatId: chat._id.toString(),
                 messageId: message._id.toString(),
+              },
+              notification: {
                 title: title,
                 body: pushBody,
-                sender: JSON.stringify({
-                   _id: req.user._id.toString(),
-                   username: req.user.username,
-                   displayName: req.user.displayName,
-                   profilePicture: req.user.profilePicture,
-                }),
-                chat: JSON.stringify({
-                   _id: chat._id.toString(),
-                   isGroupChat: chat.isGroupChat || false,
-                   chatName: chat.chatName || '',
-                   groupPicture: chat.groupPicture || '',
-                }),
               },
-              android: { priority: 'high' }
+              android: { 
+                priority: 'high',
+                notification: {
+                  tag: chat._id.toString(),
+                  channelId: 'messages-v5',
+                  color: '#2DD4BF',
+                  sound: 'kin_notification_sound' // Use custom sound natively
+                }
+              }
             });
             pushSent = true;
           } 
