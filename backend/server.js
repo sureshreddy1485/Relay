@@ -89,11 +89,12 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// Stricter limit for auth routes
+// Stricter limit for auth routes (login/signup only)
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { success: false, message: 'Too many auth attempts, please try again later.' },
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 50, // 50 attempts per 5 minutes per IP
+  message: { success: false, message: 'Too many auth attempts, please try again in a few minutes.' },
+  skip: (req) => req.path === '/me' || req.path === '/logout' || req.path === '/devices', // Don't limit non-login routes
 });
 app.use('/api/auth', authLimiter);
 
