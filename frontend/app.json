@@ -25,7 +25,7 @@
         "backgroundColor": "#0A0A0F"
       },
       "package": "com.relay.app",
-      "softwareKeyboardLayoutMode": "pan",
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -64,7 +64,6 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#2DD4BF",
           "sounds": [
             "./assets/kin_notification_sound.wav"
           ]
@@ -84,8 +83,7 @@
           }
         }
       ],
-      "@react-native-firebase/app",
-      "@notifee/react-native"
+      "@react-native-firebase/app"
     ],
     "extra": {
       "eas": {

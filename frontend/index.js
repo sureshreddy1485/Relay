@@ -18,13 +18,33 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     const chatId = data.chatId;
 
     if (chatId && sender) {
+      // Fetch existing notifications to see if we already have one for this chat
+      const displayed = await notifee.getDisplayedNotifications();
+      const existingNotification = displayed.find(n => n.id === chatId);
+      
+      let existingMessages = [];
+      if (existingNotification?.notification?.android?.style?.messages) {
+        existingMessages = existingNotification.notification.android.style.messages;
+      }
+
+      // Build the new message object
+      const newMessage = {
+        text: body,
+        timestamp: Date.now(),
+        person: {
+          name: sender.displayName || sender.username,
+          icon: sender.profilePicture || undefined,
+        },
+      };
+
       // Build the Notifee notification using MessagingStyle
       await notifee.displayNotification({
-        id: chatId, // Using chatId as the notification ID groups them visually, but MessagingStyle handles actual grouping
+        id: chatId, 
         title: title,
         body: body,
         android: {
-          channelId: 'messages-v3',
+          channelId: 'messages-v4',
+          color: '#2DD4BF',
           pressAction: {
             id: 'default',
           },
@@ -33,21 +53,11 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
             person: {
               name: 'Me',
             },
-            messages: [
-              {
-                text: body,
-                timestamp: Date.now(),
-                person: {
-                  name: sender.displayName || sender.username,
-                  icon: sender.profilePicture || undefined,
-                },
-              },
-            ],
-            // For group chats, we could set title to the group name, and use conversationTitle
+            messages: [...existingMessages, newMessage],
             title: chat?.isGroupChat ? chat.chatName : undefined,
           },
         },
-        data: { chatId }, // To handle pressing it
+        data: { chatId }, 
       });
     }
   } catch (e) {
