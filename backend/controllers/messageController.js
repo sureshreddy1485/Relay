@@ -213,7 +213,8 @@ const sendMessage = asyncHandler(async (req, res) => {
                    chatName: chat.chatName || '',
                    groupPicture: chat.groupPicture || '',
                 }),
-              }
+              },
+              android: { priority: 'high' }
             });
             pushSent = true;
           } 
