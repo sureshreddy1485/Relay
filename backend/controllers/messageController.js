@@ -205,6 +205,7 @@ const sendMessage = asyncHandler(async (req, res) => {
                 body: pushBody,
               },
               android: { 
+                collapseKey: chat._id.toString(),
                 priority: 'high',
                 notification: {
                   tag: chat._id.toString(),
