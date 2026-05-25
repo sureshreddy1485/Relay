@@ -141,7 +141,7 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
     ? Math.max(1, Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000))
     : null;
 
-  const isFriend = profile && authUser?.friends?.some(f => (f._id || f).toString() === profile._id.toString());
+  const isFriend = profile?.isFriend ?? (profile && authUser?.friends?.some(f => (f._id || f).toString() === profile._id.toString()));
 
   if (!profile) return null;
 

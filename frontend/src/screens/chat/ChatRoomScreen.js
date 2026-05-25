@@ -953,7 +953,7 @@ export default function ChatRoomScreen({ route, navigation }) {
               
               {(!chat.isGroupChat && otherUser && otherUser.username !== 'mica_bot' && otherUser.username !== 'relay_bot' && otherUser.username !== 'relay') && (
                 (() => {
-                  const isAlreadyFriend = user?.friends?.some(f => (f._id || f).toString() === otherUser._id.toString());
+                  const isAlreadyFriend = otherUser?.isFriend ?? user?.friends?.some(f => (f._id || f).toString() === otherUser._id.toString());
                   return (
                     <TouchableOpacity
                       style={styles.iconBtn}
@@ -1012,8 +1012,8 @@ export default function ChatRoomScreen({ route, navigation }) {
       {/* ── Messages + input ──────────────────────────────────────────────── */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
       >
         <FlatList
           ref={flatRef}
