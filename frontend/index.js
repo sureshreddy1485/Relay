@@ -43,7 +43,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         title: title,
         body: body,
         android: {
-          channelId: 'messages-v4',
+          channelId: 'messages-v5',
           color: '#2DD4BF',
           pressAction: {
             id: 'default',

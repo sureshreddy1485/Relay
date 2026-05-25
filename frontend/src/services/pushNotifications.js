@@ -13,7 +13,7 @@ export async function registerForPushNotificationsAsync() {
 
   if (Platform.OS === 'android') {
     // Expo legacy channel
-    Notifications.setNotificationChannelAsync('messages-v4', {
+    Notifications.setNotificationChannelAsync('messages-v5', {
       name: 'Relay Messages',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
@@ -25,7 +25,7 @@ export async function registerForPushNotificationsAsync() {
     // Notifee channel (for Firebase background messages)
     try {
       await notifee.createChannel({
-        id: 'messages-v4',
+        id: 'messages-v5',
         name: 'Relay Messages',
         importance: AndroidImportance.HIGH,
         sound: 'kin_notification_sound', // No extension for notifee
