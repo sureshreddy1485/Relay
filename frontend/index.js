@@ -33,7 +33,6 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         timestamp: Date.now(),
         person: {
           name: sender.displayName || sender.username,
-          icon: sender.profilePicture || undefined,
         },
       };
 
