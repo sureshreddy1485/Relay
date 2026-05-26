@@ -58,7 +58,7 @@ export default function LoginScreen({ navigation }) {
     clearError();
     if (!identifier.trim() || !password.trim() || !securityKey.trim()) return shake();
     
-    if (securityKey.trim() !== 'RELAY2026') {
+    if (securityKey.trim().toUpperCase() !== 'RELAY2026') {
       useAuthStore.setState({ error: 'Invalid Security Key. Access Denied.' });
       return shake();
     }
