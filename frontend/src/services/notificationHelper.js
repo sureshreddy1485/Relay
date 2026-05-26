@@ -34,8 +34,6 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
       body: body,
       android: {
         channelId: 'messages-v6',
-        smallIcon: 'ic_launcher',
-        color: '#2DD4BF',
         pressAction: { id: 'default' },
         style: {
           type: AndroidStyle.MESSAGING,
