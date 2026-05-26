@@ -57,12 +57,40 @@ const socketHandler = (io) => {
     });
 
     // ─── Typing indicators ───────────────────────────────────────────
-    socket.on('typing', ({ chatId, userId, username }) => {
+    socket.on('typing', async ({ chatId, userId, username }) => {
+      // Emit to active viewers in the chat room
       socket.to(chatId).emit('typing', { chatId, userId, username });
+      
+      // Also emit to all participants personal rooms for ChatList updates
+      try {
+        const chat = await User.db.model('Chat').findById(chatId).select('users');
+        if (chat) {
+          chat.users.forEach(uId => {
+            if (uId.toString() !== userId.toString()) {
+              io.to(uId.toString()).emit('typing', { chatId, userId, username });
+            }
+          });
+        }
+      } catch (e) {
+        console.error('Error broadcasting typing to personal rooms', e);
+      }
     });
 
-    socket.on('stop_typing', ({ chatId, userId }) => {
+    socket.on('stop_typing', async ({ chatId, userId }) => {
       socket.to(chatId).emit('stop_typing', { chatId, userId });
+      
+      try {
+        const chat = await User.db.model('Chat').findById(chatId).select('users');
+        if (chat) {
+          chat.users.forEach(uId => {
+            if (uId.toString() !== userId.toString()) {
+              io.to(uId.toString()).emit('stop_typing', { chatId, userId });
+            }
+          });
+        }
+      } catch (e) {
+        console.error('Error broadcasting stop_typing to personal rooms', e);
+      }
     });
 
     // ─── Message sent from client ────────────────────────────────────

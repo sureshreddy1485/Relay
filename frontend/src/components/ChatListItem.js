@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import useChatStore from '../store/useChatStore';
@@ -39,6 +39,35 @@ const disappearIcon = (seconds) => {
   return null;
 };
 
+// ── Typing Animation Component ────────────────────────────────────────────────
+const TypingAnimation = () => {
+  const anim1 = React.useRef(new Animated.Value(0)).current;
+  const anim2 = React.useRef(new Animated.Value(0)).current;
+  const anim3 = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    const bounce = (val) =>
+      Animated.sequence([
+        Animated.timing(val, { toValue: -3, duration: 250, useNativeDriver: true }),
+        Animated.timing(val, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]);
+    Animated.loop(
+      Animated.stagger(150, [bounce(anim1), bounce(anim2), bounce(anim3)])
+    ).start();
+  }, []);
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 6 }}>
+      <Text style={{ fontSize: 13, color: Colors.primary, fontWeight: '600', fontStyle: 'italic', marginRight: 4 }}>typing</Text>
+      <View style={{ flexDirection: 'row', gap: 2, paddingBottom: 2 }}>
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: anim1 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: anim2 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: anim3 }] }]} />
+      </View>
+    </View>
+  );
+};
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ChatListItem({ chat, currentUser, onPress, onLongPress }) {
@@ -52,6 +81,9 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
   const isMuted       = currentUser?.mutedChats?.includes(chat._id);
   const disappear     = disappearIcon(chat.disappearAfter);
   const unreadCount   = useChatStore(s => s.unreadCounts[chat._id?.toString()] || 0);
+  
+  const typingUsers   = useChatStore(s => s.typingUsers[chat._id?.toString()] || []);
+  const isTyping      = typingUsers.some(id => id.toString() !== currentUser?._id?.toString());
 
   const lastMsg = chat.latestMessage;
   let lastMsgText = 'No messages yet';
@@ -124,7 +156,7 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
 
         {/* Bottom row: last message + badge icons */}
         <View style={styles.bottomRow}>
-          <Text style={styles.lastMsg} numberOfLines={1}>{lastMsgText}</Text>
+          {isTyping ? <TypingAnimation /> : <Text style={styles.lastMsg} numberOfLines={1}>{lastMsgText}</Text>}
           <View style={styles.badgeRow}>
             {/* Mute icon shown under the time */}
             {isMuted && (
@@ -209,5 +241,11 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 10,
     fontWeight: '700',
+  },
+  typingDot: {
+    width: 3.5,
+    height: 3.5,
+    borderRadius: 2,
+    backgroundColor: Colors.primary,
   },
 });
