@@ -18,14 +18,18 @@ export async function registerForPushNotificationsAsync() {
 
   if (Platform.OS === 'android') {
     // Expo legacy channel
-    Notifications.setNotificationChannelAsync('messages-v6', {
-      name: 'Relay Messages',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#06B6D4',
-      sound: 'kin_notification_sound.wav',
-      enableVibrate: true,
-    });
+    try {
+      await Notifications.setNotificationChannelAsync('messages-v6', {
+        name: 'Relay Messages',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#06B6D4',
+        sound: 'kin_notification_sound.wav',
+        enableVibrate: true,
+      });
+    } catch (e) {
+      console.log('Failed to set notification channel:', e);
+    }
   }
 
   if (Device.isDevice) {
