@@ -4,6 +4,7 @@ import { StatusBar, LogBox, View, Animated, StyleSheet, Image, Text, Alert, AppS
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
+import notifee, { EventType } from '@notifee/react-native';
 // RootNavigator dynamically imported later to allow Colors override
 // import RootNavigator from './src/navigation/RootNavigator';
 import useAuthStore from './src/store/useAuthStore';
@@ -126,6 +127,36 @@ export default function App() {
       clearTimeout(timer);
       subscription.remove();
     };
+  }, []);
+
+  // Handle Notifee Notification Navigation (App Background & Closed states)
+  useEffect(() => {
+    // 1. App in Background: Handle Notification Press
+    const unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
+      if (type === EventType.PRESS && detail.notification?.data?.chatId) {
+        const { navigationRef } = require('./src/navigation/RootNavigator');
+        if (navigationRef && navigationRef.isReady()) {
+          navigationRef.navigate('ChatRoom', { chatId: detail.notification.data.chatId });
+        }
+      }
+    });
+
+    // 2. App completely Closed: Handle Initial Notification Press
+    async function checkInitialNotification() {
+      const initialNotification = await notifee.getInitialNotification();
+      if (initialNotification?.notification?.data?.chatId) {
+        // Give navigation a brief moment to mount
+        setTimeout(() => {
+          const { navigationRef } = require('./src/navigation/RootNavigator');
+          if (navigationRef && navigationRef.isReady()) {
+            navigationRef.navigate('ChatRoom', { chatId: initialNotification.notification.data.chatId });
+          }
+        }, 1000);
+      }
+    }
+    checkInitialNotification();
+
+    return unsubscribe;
   }, []);
 
   const RootNavigator = themeLoaded ? require('./src/navigation/RootNavigator').default : null;

@@ -34,7 +34,10 @@ function processUpdate() {
 
   console.log('\n📦 1. Sending OTA Update to all users...');
   try {
+    console.log('Pushing to production branch...');
     execSync(`cd frontend && npx eas update --branch production --message "${message.replace(/"/g, '\\"')}" --clear-cache`, { stdio: 'inherit' });
+    console.log('Pushing to preview branch...');
+    execSync(`cd frontend && npx eas update --branch preview --message "${message.replace(/"/g, '\\"')}" --clear-cache`, { stdio: 'inherit' });
     console.log('✅ OTA Update published successfully!');
   } catch (e) {
     console.log('❌ Failed to publish OTA update.');

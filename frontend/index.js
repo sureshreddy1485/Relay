@@ -3,6 +3,64 @@ import messaging from '@react-native-firebase/messaging';
 import notifee, { AndroidStyle } from '@notifee/react-native';
 
 import App from './App';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+
+const getBaseUrl = () => process.env.EXPO_PUBLIC_API_URL || 'https://relay-api-jlpx.onrender.com/api';
+
+notifee.onBackgroundEvent(async ({ type, detail }) => {
+  const { notification, pressAction, input } = detail;
+  const chatId = notification?.data?.chatId;
+
+  if (type === notifee.EventType.ACTION_PRESS && chatId) {
+    try {
+      const token = await AsyncStorage.getItem('relay_token');
+      if (!token) return;
+
+      if (pressAction.id === 'reply' && input) {
+        // Handle inline reply
+        await axios.post(`${getBaseUrl()}/messages`, {
+          chatId: chatId,
+          content: input,
+          messageType: 'text',
+        }, { headers: { Authorization: `Bearer ${token}` } });
+        
+        // Update notification thread immediately
+        const displayed = await notifee.getDisplayedNotifications();
+        const existingNotification = displayed.find(n => n.id === chatId);
+        let existingMessages = [];
+        if (existingNotification?.notification?.android?.style?.messages) {
+          existingMessages = existingNotification.notification.android.style.messages;
+        }
+        
+        await notifee.displayNotification({
+          id: chatId,
+          title: notification.title,
+          android: {
+            ...notification.android,
+            style: {
+              ...notification.android.style,
+              messages: [
+                ...existingMessages,
+                { text: input, timestamp: Date.now(), person: { name: 'Me' } }
+              ]
+            }
+          },
+          data: notification.data
+        });
+
+      } else if (pressAction.id === 'mark_as_read') {
+        // Handle Mark as Read
+        await axios.put(`${getBaseUrl()}/messages/${chatId}/read`, {}, { 
+          headers: { Authorization: `Bearer ${token}` } 
+        });
+        await notifee.cancelNotification(notification.id);
+      }
+    } catch (e) {
+      console.error('Background action failed:', e);
+    }
+  }
+});
 
 // Background Data Message Handler
 messaging().setBackgroundMessageHandler(async remoteMessage => {
@@ -65,6 +123,18 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
             messages: [...existingMessages, newMessage],
             title: chat?.isGroupChat ? chat.chatName : undefined,
           },
+          actions: [
+            {
+              title: 'Reply',
+              icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png', // Fallback icon
+              pressAction: { id: 'reply' },
+              input: { allowFreeFormInput: true, placeholder: 'Reply to message...' }
+            },
+            {
+              title: 'Mark as Read',
+              pressAction: { id: 'mark_as_read' }
+            }
+          ]
         },
         data: { chatId }, 
       });

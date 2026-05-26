@@ -191,16 +191,31 @@ const sendMessage = asyncHandler(async (req, res) => {
           
           let pushSent = false;
           
-          // Exclusively use Expo Push Notifications for maximum reliability
-          if (targetUser.pushToken && Expo.isExpoPushToken(targetUser.pushToken)) {
+          if (targetUser.fcmToken) {
+            // Android: Send data-only message via FCM to trigger Notifee MessagingStyle
             pushMessages.push({
+              type: 'fcm',
+              token: targetUser.fcmToken,
+              data: {
+                chatId: chat._id.toString(),
+                sender: JSON.stringify({ _id: req.user._id, username: req.user.username, displayName: req.user.displayName }),
+                chat: JSON.stringify({ isGroupChat: chat.isGroupChat, chatName: chat.groupName }),
+                title: title,
+                body: pushBody,
+              }
+            });
+            pushSent = true;
+          } else if (targetUser.pushToken && Expo.isExpoPushToken(targetUser.pushToken)) {
+            // iOS / Fallback uses Expo Push
+            pushMessages.push({
+              type: 'expo',
               to: targetUser.pushToken,
               channelId: 'messages-v6',
               sound: 'kin_notification_sound.wav',
               color: '#2DD4BF',
               title,
               body: pushBody,
-              data: { chatId: chat._id },
+              data: { chatId: chat._id.toString() },
             });
             pushSent = true;
           }
@@ -219,16 +234,42 @@ const sendMessage = asyncHandler(async (req, res) => {
 
   // Send push notifications asynchronously
   if (pushMessages.length > 0) {
-    let chunks = expo.chunkPushNotifications(pushMessages);
-    (async () => {
-      for (let chunk of chunks) {
-        try {
-          await expo.sendPushNotificationsAsync(chunk);
-        } catch (error) {
-          console.error('Error sending push notification:', error);
+    const expoMessages = pushMessages.filter(m => m.type === 'expo');
+    const fcmMessages = pushMessages.filter(m => m.type === 'fcm');
+
+    if (expoMessages.length > 0) {
+      let chunks = expo.chunkPushNotifications(expoMessages);
+      (async () => {
+        for (let chunk of chunks) {
+          try {
+            await expo.sendPushNotificationsAsync(chunk);
+          } catch (error) {
+            console.error('Error sending Expo push notification:', error);
+          }
         }
-      }
-    })();
+      })();
+    }
+
+    if (fcmMessages.length > 0) {
+      (async () => {
+        const admin = require('firebase-admin');
+        if (admin.apps.length > 0) {
+          for (let msg of fcmMessages) {
+            try {
+              await admin.messaging().send({
+                token: msg.token,
+                data: msg.data,
+                android: {
+                  priority: 'high'
+                }
+              });
+            } catch (error) {
+              console.error('Error sending FCM push notification:', error);
+            }
+          }
+        }
+      })();
+    }
   }
   
 
