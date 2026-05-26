@@ -44,8 +44,8 @@ function CamDot() {
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.4, duration: 600, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1,   duration: 600, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1.4, duration: 600, useNativeDriver: false }),
+        Animated.timing(pulse, { toValue: 1,   duration: 600, useNativeDriver: false }),
       ])
     ).start();
     return () => pulse.stopAnimation();
@@ -69,25 +69,25 @@ function TypingBubble({ username }) {
       if (!active) return;
       Animated.sequence([
         Animated.parallel([
-          Animated.timing(dot1, { toValue: -5, duration: 250, useNativeDriver: true }),
+          Animated.timing(dot1, { toValue: -5, duration: 250, useNativeDriver: false }),
           Animated.sequence([
             Animated.delay(120),
-            Animated.timing(dot2, { toValue: -5, duration: 250, useNativeDriver: true }),
+            Animated.timing(dot2, { toValue: -5, duration: 250, useNativeDriver: false }),
           ]),
           Animated.sequence([
             Animated.delay(240),
-            Animated.timing(dot3, { toValue: -5, duration: 250, useNativeDriver: true }),
+            Animated.timing(dot3, { toValue: -5, duration: 250, useNativeDriver: false }),
           ]),
         ]),
         Animated.parallel([
-          Animated.timing(dot1, { toValue: 0, duration: 250, useNativeDriver: true }),
+          Animated.timing(dot1, { toValue: 0, duration: 250, useNativeDriver: false }),
           Animated.sequence([
             Animated.delay(120),
-            Animated.timing(dot2, { toValue: 0, duration: 250, useNativeDriver: true }),
+            Animated.timing(dot2, { toValue: 0, duration: 250, useNativeDriver: false }),
           ]),
           Animated.sequence([
             Animated.delay(240),
-            Animated.timing(dot3, { toValue: 0, duration: 250, useNativeDriver: true }),
+            Animated.timing(dot3, { toValue: 0, duration: 250, useNativeDriver: false }),
           ]),
         ]),
         Animated.delay(150),

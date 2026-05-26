@@ -46,20 +46,27 @@ const TypingAnimation = () => {
   const anim3 = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
+    let anims = [];
     const animateDot = (val, delay) => {
-      Animated.loop(
+      const anim = Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(val, { toValue: -3, duration: 250, useNativeDriver: true }),
-          Animated.timing(val, { toValue: 0, duration: 250, useNativeDriver: true }),
+          Animated.timing(val, { toValue: -3, duration: 250, useNativeDriver: false }),
+          Animated.timing(val, { toValue: 0, duration: 250, useNativeDriver: false }),
           Animated.delay(400 - delay)
         ])
-      ).start();
+      );
+      anim.start();
+      anims.push(anim);
     };
 
     animateDot(anim1, 0);
     animateDot(anim2, 150);
     animateDot(anim3, 300);
+
+    return () => {
+      anims.forEach(a => a.stop());
+    };
   }, []);
 
   return (
