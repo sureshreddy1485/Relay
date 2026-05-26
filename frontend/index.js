@@ -67,25 +67,29 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
 
 // Background Data Message Handler
 if (messaging) {
-  messaging().setBackgroundMessageHandler(async remoteMessage => {
-  const data = remoteMessage.data;
-  if (!data) return;
-
   try {
-    const sender = data.sender ? JSON.parse(data.sender) : null;
-    const chat = data.chat ? JSON.parse(data.chat) : null;
-    const title = data.title || 'New Message';
-    const body = data.body || '';
-    const chatId = data.chatId;
+    messaging().setBackgroundMessageHandler(async remoteMessage => {
+      const data = remoteMessage.data;
+      if (!data) return;
 
-    if (chatId && sender) {
-      const { displayMessagingNotification } = require('./src/services/notificationHelper');
-      await displayMessagingNotification({ chatId, sender, chat, title, body });
-    }
+      try {
+        const sender = data.sender ? JSON.parse(data.sender) : null;
+        const chat = data.chat ? JSON.parse(data.chat) : null;
+        const title = data.title || 'New Message';
+        const body = data.body || '';
+        const chatId = data.chatId;
+
+        if (chatId && sender) {
+          const { displayMessagingNotification } = require('./src/services/notificationHelper');
+          await displayMessagingNotification({ chatId, sender, chat, title, body });
+        }
+      } catch (e) {
+        console.error('Error handling background data message:', e);
+      }
+    });
   } catch (e) {
-    console.error('Error handling background data message:', e);
+    console.log('Firebase background handler failed to initialize:', e);
   }
-  });
 }
 
 registerRootComponent(App);

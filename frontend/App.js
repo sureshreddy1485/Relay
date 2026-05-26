@@ -158,29 +158,33 @@ export default function App() {
     // 3. App in Foreground: Handle Incoming Data Messages
     let unsubscribeFCM;
     if (messaging) {
-      unsubscribeFCM = messaging().onMessage(async remoteMessage => {
-        const data = remoteMessage.data;
-        if (!data) return;
+      try {
+        unsubscribeFCM = messaging().onMessage(async remoteMessage => {
+          const data = remoteMessage.data;
+          if (!data) return;
 
-        try {
-        const sender = data.sender ? JSON.parse(data.sender) : null;
-        const chat = data.chat ? JSON.parse(data.chat) : null;
-        const title = data.title || 'New Message';
-        const body = data.body || '';
-        const chatId = data.chatId;
+          try {
+            const sender = data.sender ? JSON.parse(data.sender) : null;
+            const chat = data.chat ? JSON.parse(data.chat) : null;
+            const title = data.title || 'New Message';
+            const body = data.body || '';
+            const chatId = data.chatId;
 
-        // Check if user is actively viewing this chat room
-        const useChatStore = require('./src/store/useChatStore').default;
-        const { selectedChat } = useChatStore.getState();
-        
-        if (chatId && sender && selectedChat?._id?.toString() !== chatId?.toString()) {
-          const { displayMessagingNotification } = require('./src/services/notificationHelper');
-          await displayMessagingNotification({ chatId, sender, chat, title, body });
-        }
+            // Check if user is actively viewing this chat room
+            const useChatStore = require('./src/store/useChatStore').default;
+            const { selectedChat } = useChatStore.getState();
+            
+            if (chatId && sender && selectedChat?._id?.toString() !== chatId?.toString()) {
+              const { displayMessagingNotification } = require('./src/services/notificationHelper');
+              await displayMessagingNotification({ chatId, sender, chat, title, body });
+            }
+          } catch (e) {
+            console.error('Error handling foreground data message:', e);
+          }
+        });
       } catch (e) {
-        console.error('Error handling foreground data message:', e);
+        console.log('Firebase messaging() failed to initialize natively:', e);
       }
-    });
     } // Close if (messaging)
 
     return () => {
