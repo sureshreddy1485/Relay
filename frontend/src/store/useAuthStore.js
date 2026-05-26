@@ -73,7 +73,7 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  login: async (identifier, password) => {
+  login: async (identifier, password, securityKey) => {
     set({ isLoading: true, error: null });
     try {
       const deviceName = Device.isDevice ? `${Device.osName} ${Device.modelName}` : `${Platform.OS} Simulator`;
@@ -82,7 +82,7 @@ const useAuthStore = create((set, get) => ({
         deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2);
         await AsyncStorage.setItem('relay_device_id', deviceId);
       }
-      const { data } = await api.post('/auth/login', { identifier, password, deviceName, deviceId });
+      const { data } = await api.post('/auth/login', { identifier, password, securityKey, deviceName, deviceId });
       await AsyncStorage.setItem('relay_token', data.token);
       await AsyncStorage.setItem('relay_user', JSON.stringify(data.user));
       setAuthHeader(data.token);

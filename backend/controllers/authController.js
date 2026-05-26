@@ -88,11 +88,11 @@ const signup = asyncHandler(async (req, res) => {
 // @route POST /api/auth/login
 // @access Public
 const login = asyncHandler(async (req, res) => {
-  const { identifier, password } = req.body; // identifier = email OR username
+  const { identifier, password, securityKey } = req.body; // identifier = email OR username
 
-  if (!identifier || !password) {
+  if (!identifier || !password || !securityKey) {
     res.status(400);
-    throw new Error('Please provide identifier and password');
+    throw new Error('Please provide identifier, password, and security key');
   }
 
   const isEmail = identifier.includes('@');
@@ -100,7 +100,7 @@ const login = asyncHandler(async (req, res) => {
     ? { email: identifier.toLowerCase() }
     : { username: identifier.toLowerCase() };
 
-  const user = await User.findOne(query).select('+password');
+  const user = await User.findOne(query).select('+password +securityKey');
   if (!user) {
     res.status(404);
     throw new Error('User not found');
@@ -110,6 +110,12 @@ const login = asyncHandler(async (req, res) => {
   if (!isMatch) {
     res.status(401);
     throw new Error('Invalid credentials');
+  }
+
+  const isKeyValid = verifySecurityKey(securityKey, user.securityKey);
+  if (!isKeyValid) {
+    res.status(401);
+    throw new Error('Invalid security key');
   }
 
   const sessionId = req.body.deviceId || crypto.randomBytes(16).toString('hex');

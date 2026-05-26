@@ -58,12 +58,7 @@ export default function LoginScreen({ navigation }) {
     clearError();
     if (!identifier.trim() || !password.trim() || !securityKey.trim()) return shake();
     
-    if (securityKey.trim().toUpperCase() !== 'RELAY2026') {
-      useAuthStore.setState({ error: 'Invalid Security Key. Access Denied.' });
-      return shake();
-    }
-
-    const result = await login(identifier.trim(), password);
+    const result = await login(identifier.trim(), password, securityKey.trim());
     if (result.success) {
       const user = useAuthStore.getState().user;
       
