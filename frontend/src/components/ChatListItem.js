@@ -46,14 +46,20 @@ const TypingAnimation = () => {
   const anim3 = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
-    const bounce = (val) =>
-      Animated.sequence([
-        Animated.timing(val, { toValue: -3, duration: 250, useNativeDriver: true }),
-        Animated.timing(val, { toValue: 0, duration: 250, useNativeDriver: true }),
-      ]);
-    Animated.loop(
-      Animated.stagger(150, [bounce(anim1), bounce(anim2), bounce(anim3)])
-    ).start();
+    const animateDot = (val, delay) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, { toValue: -3, duration: 250, useNativeDriver: true }),
+          Animated.timing(val, { toValue: 0, duration: 250, useNativeDriver: true }),
+          Animated.delay(400 - delay)
+        ])
+      ).start();
+    };
+
+    animateDot(anim1, 0);
+    animateDot(anim2, 150);
+    animateDot(anim3, 300);
   }, []);
 
   return (
@@ -72,7 +78,7 @@ const TypingAnimation = () => {
 
 export default function ChatListItem({ chat, currentUser, onPress, onLongPress }) {
   const otherUser     = chat.isGroupChat ? null : chat.users?.find(u => u._id !== currentUser?._id);
-  const name          = chat.isGroupChat ? chat.chatName : (otherUser?.displayName || otherUser?.username || 'Unknown');
+  const name          = chat.isGroupChat ? (chat.chatName || 'Group') : (otherUser?.displayName || otherUser?.username || 'Unknown');
   const avatar        = chat.isGroupChat ? chat.groupPicture : otherUser?.profilePicture;
   const isRelay       = !chat.isGroupChat && (otherUser?.username === 'relay_bot' || otherUser?.username === 'relay');
   const isOnline      = !chat.isGroupChat && (otherUser?.isOnline || otherUser?.username === 'mica_bot') && !isRelay;
@@ -83,7 +89,7 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
   const unreadCount   = useChatStore(s => s.unreadCounts[chat._id?.toString()] || 0);
   
   const typingUsers   = useChatStore(s => s.typingUsers[chat._id?.toString()] || []);
-  const isTyping      = typingUsers.some(id => id.toString() !== currentUser?._id?.toString());
+  const isTyping      = typingUsers.some(id => id && id.toString() !== currentUser?._id?.toString());
 
   const lastMsg = chat.latestMessage;
   let lastMsgText = 'No messages yet';
