@@ -7,7 +7,24 @@ try {
 } catch (e) {}
 
 export const displayMessagingNotification = async ({ chatId, sender, chat, title, body }) => {
-  if (!chatId || !sender || !notifee) return;
+  if (!chatId || !sender) return;
+
+  if (!notifee) {
+    // Fallback to expo-notifications if Notifee isn't natively available (e.g. old APK build)
+    try {
+      const Notifications = require('expo-notifications');
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: title,
+          body: body,
+          sound: true,
+          data: { chatId },
+        },
+        trigger: null,
+      });
+    } catch(e) {}
+    return;
+  }
 
   try {
     await notifee.createChannel({
