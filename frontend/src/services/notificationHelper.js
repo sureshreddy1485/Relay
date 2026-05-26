@@ -28,12 +28,14 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
   }
 
   try {
+    // Channel ID MUST match android.notification.channelId in the FCM backend payload
     await notifee.createChannel({
-      id: 'messages-v6',
+      id: 'relay-messages',
       name: 'Relay Messages',
-      importance: 4, // HIGH
-      sound: 'kin_notification_sound',
+      importance: 5, // IMPORTANCE_HIGH = heads-up popups + sound + vibration
+      sound: 'kin_notification_sound', // Must match filename in android res/raw/ (no extension)
       vibration: true,
+      vibrationPattern: [0, 250, 250, 250],
     });
 
     const displayed = await notifee.getDisplayedNotifications();
@@ -58,7 +60,7 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
       title: title,
       body: body,
       android: {
-        channelId: 'messages-v6',
+        channelId: 'relay-messages', // Must match channel created above
         pressAction: { id: 'default' },
         style: {
           type: AndroidStyle.MESSAGING,

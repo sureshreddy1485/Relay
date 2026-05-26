@@ -83,7 +83,8 @@
           }
         }
       ],
-      "@react-native-firebase/app"
+      "@react-native-firebase/app",
+      "@notifee/react-native"
     ],
     "extra": {
       "eas": {

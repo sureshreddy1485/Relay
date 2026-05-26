@@ -210,7 +210,7 @@ const sendMessage = asyncHandler(async (req, res) => {
             pushMessages.push({
               type: 'expo',
               to: targetUser.pushToken,
-              channelId: 'messages-v6',
+              channelId: 'relay-messages',
               sound: 'kin_notification_sound.wav',
               color: '#2DD4BF',
               title,
@@ -258,10 +258,28 @@ const sendMessage = asyncHandler(async (req, res) => {
             try {
               await admin.messaging().send({
                 token: msg.token,
+                // notification block = required for killed-app state on Android
+                // Without this, FCM data-only messages are SILENTLY dropped when app is killed
+                notification: {
+                  title: msg.data.title,
+                  body: msg.data.body,
+                },
                 data: msg.data,
                 android: {
-                  priority: 'high'
-                }
+                  priority: 'high',
+                  ttl: 86400000, // 24 hours
+                  collapseKey: msg.data.chatId, // Group messages by chat
+                  notification: {
+                    channelId: 'relay-messages', // Must match Notifee channel
+                    sound: 'kin_notification_sound', // Android raw resource (no extension)
+                    priority: 'PRIORITY_HIGH',
+                    defaultSound: false,
+                    defaultVibrateTimings: false,
+                    vibrateTimingsMillis: [0, 250, 250, 250],
+                    clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+                    tag: msg.data.chatId, // Groups notifications by chat
+                  },
+                },
               });
             } catch (error) {
               console.error('Error sending FCM push notification:', error);
