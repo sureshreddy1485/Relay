@@ -17,7 +17,7 @@ const broadcastMessage = async (messageContent) => {
 
   try {
     // 1. Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(process.env.MONGO_URI, { family: 4 });
     console.log('✅ Connected to MongoDB');
 
     // 2. Find the relay_bot user

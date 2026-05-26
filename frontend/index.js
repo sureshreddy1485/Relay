@@ -3,7 +3,17 @@ let messaging;
 try {
   messaging = require('@react-native-firebase/messaging').default;
 } catch (e) {}
-import notifee, { AndroidStyle } from '@notifee/react-native';
+let notifee = null;
+let AndroidStyle = null;
+let EventType = null;
+try {
+  const notifeeModule = require('@notifee/react-native');
+  notifee = notifeeModule.default;
+  AndroidStyle = notifeeModule.AndroidStyle;
+  EventType = notifeeModule.EventType;
+} catch (e) {
+  console.log('Notifee native module not found, skipping background events...');
+}
 
 import App from './App';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,59 +21,63 @@ import axios from 'axios';
 
 const getBaseUrl = () => process.env.EXPO_PUBLIC_API_URL || 'https://relay-api-jlpx.onrender.com/api';
 
-notifee.onBackgroundEvent(async ({ type, detail }) => {
-  const { notification, pressAction, input } = detail;
-  const chatId = notification?.data?.chatId;
+if (notifee) {
+  try {
+    notifee.onBackgroundEvent(async ({ type, detail }) => {
+      const { notification, pressAction, input } = detail;
+      const chatId = notification?.data?.chatId;
 
-  if (type === notifee.EventType.ACTION_PRESS && chatId) {
-    try {
-      const token = await AsyncStorage.getItem('relay_token');
-      if (!token) return;
+      if (type === EventType?.ACTION_PRESS && chatId) {
+        try {
+          const token = await AsyncStorage.getItem('relay_token');
+          if (!token) return;
 
-      if (pressAction.id === 'reply' && input) {
-        // Handle inline reply
-        await axios.post(`${getBaseUrl()}/messages`, {
-          chatId: chatId,
-          content: input,
-          messageType: 'text',
-        }, { headers: { Authorization: `Bearer ${token}` } });
-        
-        // Update notification thread immediately
-        const displayed = await notifee.getDisplayedNotifications();
-        const existingNotification = displayed.find(n => n.id === chatId);
-        let existingMessages = [];
-        if (existingNotification?.notification?.android?.style?.messages) {
-          existingMessages = existingNotification.notification.android.style.messages;
-        }
-        
-        await notifee.displayNotification({
-          id: chatId,
-          title: notification.title,
-          android: {
-            ...notification.android,
-            style: {
-              ...notification.android.style,
-              messages: [
-                ...existingMessages,
-                { text: input, timestamp: Date.now(), person: { name: 'Me' } }
-              ]
+          if (pressAction.id === 'reply' && input) {
+            // Handle inline reply
+            await axios.post(`${getBaseUrl()}/messages`, {
+              chatId: chatId,
+              content: input,
+              messageType: 'text',
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            
+            // Update notification thread immediately
+            const displayed = await notifee.getDisplayedNotifications();
+            const existingNotification = displayed.find(n => n.id === chatId);
+            let existingMessages = [];
+            if (existingNotification?.notification?.android?.style?.messages) {
+              existingMessages = existingNotification.notification.android.style.messages;
             }
-          },
-          data: notification.data
-        });
+            
+            await notifee.displayNotification({
+              id: chatId,
+              title: notification.title,
+              android: {
+                ...notification.android,
+                style: {
+                  ...notification.android.style,
+                  messages: [
+                    ...existingMessages,
+                    { text: input, timestamp: Date.now(), person: { name: 'Me' } }
+                  ]
+                }
+              },
+              data: notification.data
+            });
 
-      } else if (pressAction.id === 'mark_as_read') {
-        // Handle Mark as Read
-        await axios.put(`${getBaseUrl()}/messages/${chatId}/read`, {}, { 
-          headers: { Authorization: `Bearer ${token}` } 
-        });
-        await notifee.cancelNotification(notification.id);
+          } else if (pressAction.id === 'mark_as_read') {
+            // Handle Mark as Read
+            await axios.put(`${getBaseUrl()}/messages/${chatId}/read`, {}, { 
+              headers: { Authorization: `Bearer ${token}` } 
+            });
+            await notifee.cancelNotification(notification.id);
+          }
+        } catch (e) {
+          console.error('Background action failed:', e);
+        }
       }
-    } catch (e) {
-      console.error('Background action failed:', e);
-    }
-  }
-});
+    });
+  } catch (e) {}
+}
 
 // Background Data Message Handler
 if (messaging) {

@@ -9,10 +9,11 @@ try {
 } catch (e) {
   console.log('Firebase messaging not available in pushNotifications');
 }
-import notifee, { AndroidImportance } from '@notifee/react-native';
-
-
-
+let notifee = null;
+try {
+  const notifeeModule = require('@notifee/react-native');
+  notifee = notifeeModule.default;
+} catch (e) {}
 export async function registerForPushNotificationsAsync() {
   let token;
 

@@ -1,7 +1,13 @@
-import notifee, { AndroidStyle } from '@notifee/react-native';
+let notifee = null;
+let AndroidStyle = null;
+try {
+  const notifeeModule = require('@notifee/react-native');
+  notifee = notifeeModule.default;
+  AndroidStyle = notifeeModule.AndroidStyle;
+} catch (e) {}
 
 export const displayMessagingNotification = async ({ chatId, sender, chat, title, body }) => {
-  if (!chatId || !sender) return;
+  if (!chatId || !sender || !notifee) return;
 
   try {
     await notifee.createChannel({

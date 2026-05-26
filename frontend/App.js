@@ -4,7 +4,15 @@ import { StatusBar, LogBox, View, Animated, StyleSheet, Image, Text, Alert, AppS
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
-import notifee, { EventType } from '@notifee/react-native';
+let notifee = null;
+let EventType = null;
+try {
+  const notifeeModule = require('@notifee/react-native');
+  notifee = notifeeModule.default;
+  EventType = notifeeModule.EventType;
+} catch (e) {
+  console.log('Notifee not available (Expo Go), skipping...');
+}
 let messaging;
 try {
   messaging = require('@react-native-firebase/messaging').default;
@@ -130,30 +138,41 @@ export default function App() {
 
   // Handle Notifee Notification Navigation (App Background & Closed states)
   useEffect(() => {
+    let unsubscribe;
+
     // 1. App in Background: Handle Notification Press
-    const unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
-      if (type === EventType.PRESS && detail.notification?.data?.chatId) {
-        const { navigationRef } = require('./src/navigation/RootNavigator');
-        if (navigationRef && navigationRef.isReady()) {
-          navigationRef.navigate('ChatRoom', { chatId: detail.notification.data.chatId });
+    if (notifee) {
+      try {
+        unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
+          if (type === EventType?.PRESS && detail.notification?.data?.chatId) {
+            const { navigationRef } = require('./src/navigation/RootNavigator');
+            if (navigationRef && navigationRef.isReady()) {
+              navigationRef.navigate('ChatRoom', { chatId: detail.notification.data.chatId });
+            }
+          }
+        });
+      } catch (e) {
+        console.log('Notifee onForegroundEvent failed:', e);
+      }
+
+      // 2. App completely Closed: Handle Initial Notification Press
+      async function checkInitialNotification() {
+        try {
+          const initialNotification = await notifee.getInitialNotification();
+          if (initialNotification?.notification?.data?.chatId) {
+            setTimeout(() => {
+              const { navigationRef } = require('./src/navigation/RootNavigator');
+              if (navigationRef && navigationRef.isReady()) {
+                navigationRef.navigate('ChatRoom', { chatId: initialNotification.notification.data.chatId });
+              }
+            }, 1000);
+          }
+        } catch (e) {
+          console.log('Notifee getInitialNotification failed:', e);
         }
       }
-    });
-
-    // 2. App completely Closed: Handle Initial Notification Press
-    async function checkInitialNotification() {
-      const initialNotification = await notifee.getInitialNotification();
-      if (initialNotification?.notification?.data?.chatId) {
-        // Give navigation a brief moment to mount
-        setTimeout(() => {
-          const { navigationRef } = require('./src/navigation/RootNavigator');
-          if (navigationRef && navigationRef.isReady()) {
-            navigationRef.navigate('ChatRoom', { chatId: initialNotification.notification.data.chatId });
-          }
-        }, 1000);
-      }
+      checkInitialNotification();
     }
-    checkInitialNotification();
 
     // 3. App in Foreground: Handle Incoming Data Messages
     let unsubscribeFCM;
