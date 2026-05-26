@@ -14,6 +14,7 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
     try {
       const Notifications = require('expo-notifications');
       await Notifications.scheduleNotificationAsync({
+        identifier: chatId, // This ensures messages from the same chat overwrite/group together!
         content: {
           title: title,
           body: body,

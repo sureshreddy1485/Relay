@@ -87,6 +87,7 @@ const connectSocket = (userId) => {
           else if (message.mediaType === 'document') body = '📎 Document';
 
           await Notifications.scheduleNotificationAsync({
+            identifier: chatId, // Ensure messages overwrite/group in the same chat
             content: {
               title: chatName,
               body: body,
