@@ -52,9 +52,7 @@ export async function registerForPushNotificationsAsync() {
       
       let fcmToken = null;
       try {
-        if (messaging && Platform.OS === 'android') {
-          // Register Firebase explicitly on Android if needed
-          await messaging().registerDeviceForRemoteMessages();
+        if (messaging) {
           fcmToken = await messaging().getToken();
         }
       } catch (fcmErr) {
