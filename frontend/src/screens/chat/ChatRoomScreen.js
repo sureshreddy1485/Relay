@@ -14,7 +14,7 @@ import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import { Audio } from 'expo-av';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import EmojiPicker from 'rn-emoji-keyboard';
+import { EmojiKeyboard } from 'rn-emoji-keyboard';
 
 import useChatStore from '../../store/useChatStore';
 import useAuthStore from '../../store/useAuthStore';
@@ -1209,35 +1209,7 @@ export default function ChatRoomScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Emoji picker modal */}
-        {!isRelayBotChat && (
-          <EmojiPicker 
-            open={showEmoji} 
-            onClose={() => setShowEmoji(false)} 
-            onEmojiSelected={(emoji) => {
-              setText(prev => prev + emoji.emoji);
-            }}
-            theme={{
-              backdrop: '#11111588',
-              knob: '#333333',
-              container: '#1A1A24',
-              header: '#FFFFFF',
-              skinTonesContainer: '#2A2A35',
-              category: {
-                icon: '#666666',
-                iconActive: '#2DD4BF',
-                container: '#2A2A35',
-                containerActive: '#2A2A35',
-              },
-              search: {
-                background: '#2A2A35',
-                text: '#FFFFFF',
-                placeholder: '#666666',
-                icon: '#666666',
-              }
-            }}
-          />
-        )}
+
 
         {/* Input bar — paddingBottom includes gesture nav inset */}
         {!isRelayBotChat && (
@@ -1284,6 +1256,35 @@ export default function ChatRoomScreen({ route, navigation }) {
             </TouchableOpacity>
           ) : null}
         </View>
+        )}
+
+        {/* Inline Emoji Keyboard (replaces system keyboard without covering input) */}
+        {!isRelayBotChat && showEmoji && (
+          <View style={{ height: 320, backgroundColor: '#1A1A24' }}>
+            <EmojiKeyboard 
+              onEmojiSelected={(emoji) => {
+                setText(prev => prev + emoji.emoji);
+              }}
+              allowMultipleSelections={true}
+              theme={{
+                container: '#1A1A24',
+                header: '#FFFFFF',
+                skinTonesContainer: '#2A2A35',
+                category: {
+                  icon: '#666666',
+                  iconActive: '#2DD4BF',
+                  container: '#2A2A35',
+                  containerActive: '#2A2A35',
+                },
+                search: {
+                  background: '#2A2A35',
+                  text: '#FFFFFF',
+                  placeholder: '#666666',
+                  icon: '#666666',
+                }
+              }}
+            />
+          </View>
         )}
       </KeyboardAvoidingView>
 

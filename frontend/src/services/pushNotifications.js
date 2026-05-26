@@ -13,7 +13,7 @@ export async function registerForPushNotificationsAsync() {
 
   if (Platform.OS === 'android') {
     // Expo legacy channel
-    Notifications.setNotificationChannelAsync('messages-v5', {
+    Notifications.setNotificationChannelAsync('messages-v6', {
       name: 'Relay Messages',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
@@ -21,20 +21,6 @@ export async function registerForPushNotificationsAsync() {
       sound: 'kin_notification_sound.wav',
       enableVibrate: true,
     });
-    
-    // Notifee channel (for Firebase background messages)
-    try {
-      await notifee.createChannel({
-        id: 'messages-v5',
-        name: 'Relay Messages',
-        importance: AndroidImportance.HIGH,
-        sound: 'kin_notification_sound', // No extension for notifee
-        vibration: true,
-        vibrationPattern: [300, 500],
-      });
-    } catch (e) {
-      console.log('Failed to create Notifee channel:', e);
-    }
   }
 
   if (Device.isDevice) {

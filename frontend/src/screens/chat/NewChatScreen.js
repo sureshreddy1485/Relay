@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, Alert, ActivityIndicator, Image,
@@ -23,21 +23,29 @@ export default function NewChatScreen({ navigation }) {
 
   const { user: currentUser, updateUser } = useAuthStore();
 
-  const handleSearch = async () => {
-    if (search.trim().length < 3) {
-      showAlert('Enter username', 'Type the full username to search.');
+  const handleSearch = async (searchTerm) => {
+    if (!searchTerm || searchTerm.trim().length < 3) {
+      setResults([]);
+      setSearched(false);
       return;
     }
     setIsSearching(true);
     setSearched(true);
-    setResults([]);
     try {
-      const { data } = await api.get(`/users/search?q=${search.trim()}`);
+      const { data } = await api.get(`/users/search?q=${searchTerm.trim()}`);
       setResults(data.users.filter(u => u.username !== 'relay' && u.username !== 'relay_bot'));
     } catch (_) {} finally {
       setIsSearching(false);
     }
   };
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      handleSearch(search);
+    }, 400); // 400ms debounce
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [search]);
 
   const startChat = async (userId) => {
     setIsCreating(userId);
@@ -96,14 +104,13 @@ export default function NewChatScreen({ navigation }) {
         <Ionicons name="search-outline" size={20} color={Colors.dark.muted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Enter exact username..."
+          placeholder="Enter username..."
           placeholderTextColor={Colors.dark.muted}
           value={search}
-          onChangeText={(v) => { setSearch(v); setSearched(false); setResults([]); }}
+          onChangeText={setSearch}
           autoFocus
           autoCapitalize="none"
           returnKeyType="search"
-          onSubmitEditing={handleSearch}
         />
         {search.length > 0 && (
           <TouchableOpacity onPress={() => { setSearch(''); setResults([]); setSearched(false); }}>
@@ -112,16 +119,7 @@ export default function NewChatScreen({ navigation }) {
         )}
       </View>
 
-      <TouchableOpacity
-        style={styles.searchBtn}
-        onPress={handleSearch}
-        disabled={isSearching}
-      >
-        {isSearching
-          ? <ActivityIndicator size="small" color="#FFF" />
-          : <Text style={styles.searchBtnText}>Search</Text>
-        }
-      </TouchableOpacity>
+      {/* Search button removed for auto-search behavior */}
 
       <ScrollView>
         {results.map(user => {
@@ -201,7 +199,7 @@ export default function NewChatScreen({ navigation }) {
           <View style={styles.empty}>
             <Ionicons name="person-outline" size={48} color={Colors.dark.muted} />
             <Text style={styles.emptyText}>No user found for "@{search}"</Text>
-            <Text style={styles.emptyHint}>Make sure you type the full username exactly</Text>
+            <Text style={styles.emptyHint}>Make sure you type the username correctly</Text>
           </View>
         )}
       </ScrollView>

@@ -3,6 +3,9 @@ const User = require('../models/User');
 const Chat = require('../models/Chat');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/cloudinaryUpload');
 const { sanitizeUser } = require('../utils/privacyHelper');
+const { Expo } = require('expo-server-sdk');
+
+let expo = new Expo();
 
 // @desc  Search users by username
 // @route GET /api/users/search?q=username
@@ -169,6 +172,22 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
       displayName: sender.displayName,
       profilePicture: sender.profilePicture,
     });
+  }
+
+  // Send push notification for friend request
+  if (targetUser.pushToken && Expo.isExpoPushToken(targetUser.pushToken)) {
+    try {
+      await expo.sendPushNotificationsAsync([{
+        to: targetUser.pushToken,
+        channelId: 'messages-v6',
+        sound: 'kin_notification_sound.wav',
+        title: 'New Friend Request',
+        body: `${sender.displayName || sender.username} sent you a friend request`,
+        data: { type: 'friend_request' }
+      }]);
+    } catch (err) {
+      console.error('Push error:', err);
+    }
   }
 
   res.status(200).json({ success: true, message: 'Friend request sent' });

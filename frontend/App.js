@@ -12,11 +12,14 @@ import { connectSocket } from './src/services/socketService';
 LogBox.ignoreLogs(['Warning: ...', 'Animated: `useNativeDriver`']);
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async () => {
+    const isActive = AppState.currentState === 'active';
+    return {
+      shouldShowAlert: !isActive, // Don't show system banner if app is open
+      shouldPlaySound: true, // System sound respects silent mode!
+      shouldSetBadge: true,
+    };
+  },
 });
 
 import { AlertProvider } from './src/components/CustomAlert';

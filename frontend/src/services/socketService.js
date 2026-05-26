@@ -90,15 +90,7 @@ const connectSocket = (userId) => {
         }
         
         if (AppState.currentState === 'active') {
-          // Play sound manually via expo-av
-          try {
-            const { sound } = await Audio.Sound.createAsync(
-              require('../../assets/kin_notification_sound.wav')
-            );
-            await sound.playAsync();
-          } catch (e) {
-            console.log('Error playing custom sound manually:', e);
-          }
+
           
           // Show the custom banner UI
           useChatStore.getState().showNotification({
@@ -109,19 +101,6 @@ const connectSocket = (userId) => {
             avatar: message.chat?.isGroupChat ? message.chat?.groupPicture : message.sender?.profilePicture,
             chat: message.chat,
           });
-        } else {
-          // Always show system notification to get panel entry in background
-          Notifications.scheduleNotificationAsync({
-            content: {
-              title,
-              body,
-              data: { chatId, chat: message.chat },
-              sound: 'kin_notification_sound.wav',
-              priority: Notifications.AndroidNotificationPriority.MAX,
-              channelId: 'messages-v3',
-            },
-            trigger: null,
-          }).catch(err => console.log('Error scheduling local notification:', err));
         }
       }
       // Emit delivered status if app is active but not in chat

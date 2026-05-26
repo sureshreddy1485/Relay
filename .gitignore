@@ -8,3 +8,4 @@ dist/
 build/
 *.pem
 *.key
+*firebase-adminsdk.json

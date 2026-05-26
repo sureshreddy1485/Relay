@@ -20,7 +20,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     if (chatId && sender) {
       // Guarantee channel exists
       await notifee.createChannel({
-        id: 'messages-v5',
+        id: 'messages-v6',
         name: 'Relay Messages',
         importance: 4, // AndroidImportance.HIGH
         sound: 'kin_notification_sound',
@@ -51,7 +51,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         title: title,
         body: body,
         android: {
-          channelId: 'messages-v5',
+          channelId: 'messages-v6',
           smallIcon: 'ic_launcher',
           color: '#2DD4BF',
           pressAction: {

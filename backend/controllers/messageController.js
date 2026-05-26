@@ -195,6 +195,7 @@ const sendMessage = asyncHandler(async (req, res) => {
           if (targetUser.pushToken && Expo.isExpoPushToken(targetUser.pushToken)) {
             pushMessages.push({
               to: targetUser.pushToken,
+              channelId: 'messages-v6',
               sound: 'kin_notification_sound.wav',
               color: '#2DD4BF',
               title,
