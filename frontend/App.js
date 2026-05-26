@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useRef } from 'react';
-import { StatusBar, LogBox, View, Animated, StyleSheet, Image, Text, Alert, AppState } from 'react-native';
+import { StatusBar, LogBox, View, Animated, StyleSheet, Image, Text, Alert, AppState, Modal, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
@@ -33,6 +33,7 @@ export default function App() {
   const { hydrate, user, isAuthenticated } = useAuthStore();
   const [themeLoaded, setThemeLoaded] = useState(false);
   const [splashVisible, setSplashVisible] = useState(true);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
   const splashAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
@@ -87,14 +88,7 @@ export default function App() {
         const update = await Updates.checkForUpdateAsync();
         if (update.isAvailable && isMounted) {
           await Updates.fetchUpdateAsync();
-          Alert.alert(
-            '🚀 Update Available!',
-            'A new version of Relay is ready. Restart now to apply the latest improvements!',
-            [
-              { text: 'Later', style: 'cancel' },
-              { text: 'Restart Now', onPress: () => Updates.reloadAsync() }
-            ]
-          );
+          setUpdateAvailable(true);
         }
       } catch (e) {
         // Silently fail on boot if native fetch is currently running
@@ -207,6 +201,42 @@ export default function App() {
           </Animated.View>
         </Animated.View>
       )}
+
+      {/* Custom Update Available Modal */}
+      <Modal visible={updateAvailable} transparent animationType="fade" statusBarTranslucent>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: '#111827', width: '100%', borderRadius: 24, padding: 32, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(6,182,212,0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: 'rgba(6,182,212,0.3)' }}>
+              <Text style={{ fontSize: 40 }}>🚀</Text>
+            </View>
+            <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' }}>Update Available!</Text>
+            <Text style={{ color: '#9CA3AF', fontSize: 16, textAlign: 'center', marginBottom: 32, lineHeight: 24 }}>
+              A new version of Relay is ready. Restart now to apply the latest improvements and bug fixes!
+            </Text>
+            
+            <View style={{ width: '100%', gap: 12 }}>
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => {
+                  setUpdateAvailable(false);
+                  setTimeout(() => Updates.reloadAsync(), 100);
+                }}
+                style={{ backgroundColor: Colors.primary || '#06B6D4', paddingVertical: 16, borderRadius: 16, alignItems: 'center', shadowColor: Colors.primary || '#06B6D4', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
+              >
+                <Text style={{ color: '#000', fontSize: 16, fontWeight: 'bold' }}>Restart Now</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => setUpdateAvailable(false)}
+                style={{ paddingVertical: 16, borderRadius: 16, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)' }}
+              >
+                <Text style={{ color: '#9CA3AF', fontSize: 16, fontWeight: '600' }}>Maybe Later</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </GestureHandlerRootView>
   );
 }
