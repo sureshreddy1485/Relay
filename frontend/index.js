@@ -27,49 +27,48 @@ if (notifee) {
       const { notification, pressAction, input } = detail;
       const chatId = notification?.data?.chatId;
 
+      // DISMISSED — user swiped away the notification, clear stored messages
+      if (type === EventType?.DISMISSED && chatId) {
+        try {
+          const { clearStoredMessages } = require('./src/services/notificationHelper');
+          await clearStoredMessages(chatId);
+        } catch (e) {}
+        return;
+      }
+
       if (type === EventType?.ACTION_PRESS && chatId) {
         try {
           const token = await AsyncStorage.getItem('relay_token');
           if (!token) return;
 
           if (pressAction.id === 'reply' && input) {
-            // Handle inline reply
+            // Send inline reply to backend
             await axios.post(`${getBaseUrl()}/messages`, {
               chatId: chatId,
               content: input,
               messageType: 'text',
             }, { headers: { Authorization: `Bearer ${token}` } });
-            
-            // Update notification thread immediately
-            const displayed = await notifee.getDisplayedNotifications();
-            const existingNotification = displayed.find(n => n.id === chatId);
-            let existingMessages = [];
-            if (existingNotification?.notification?.android?.style?.messages) {
-              existingMessages = existingNotification.notification.android.style.messages;
-            }
-            
-            await notifee.displayNotification({
-              id: chatId,
+
+            // Add the reply to the stored message list and update the notification
+            const { displayMessagingNotification } = require('./src/services/notificationHelper');
+            await displayMessagingNotification({
+              chatId,
+              sender: { _id: 'me', displayName: 'You', username: 'You' },
+              chat: null,
               title: notification.title,
-              android: {
-                ...notification.android,
-                style: {
-                  ...notification.android.style,
-                  messages: [
-                    ...existingMessages,
-                    { text: input, timestamp: Date.now(), person: { name: 'Me' } }
-                  ]
-                }
-              },
-              data: notification.data
+              body: input,
             });
 
           } else if (pressAction.id === 'mark_as_read') {
-            // Handle Mark as Read
-            await axios.put(`${getBaseUrl()}/messages/${chatId}/read`, {}, { 
-              headers: { Authorization: `Bearer ${token}` } 
+            // Mark as read on server
+            await axios.put(`${getBaseUrl()}/messages/${chatId}/read`, {}, {
+              headers: { Authorization: `Bearer ${token}` }
             });
-            await notifee.cancelNotification(notification.id);
+            // Clear stored messages so next message starts fresh
+            const { clearStoredMessages } = require('./src/services/notificationHelper');
+            await clearStoredMessages(chatId);
+            // Cancel the notification
+            await notifee.cancelNotification(notification.id || chatId);
           }
         } catch (e) {
           console.error('Background action failed:', e);

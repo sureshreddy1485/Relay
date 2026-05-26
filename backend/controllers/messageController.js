@@ -256,29 +256,21 @@ const sendMessage = asyncHandler(async (req, res) => {
         if (admin.apps.length > 0) {
           for (let msg of fcmMessages) {
             try {
+              // DATA-ONLY message — critical for background/killed-app notifications
+              // When notification+data is sent, Android shows it directly and SKIPS
+              // setBackgroundMessageHandler. Data-only ensures our Notifee MessagingStyle
+              // handler runs in ALL states: foreground, background, AND killed.
               await admin.messaging().send({
                 token: msg.token,
-                // notification block = required for killed-app state on Android
-                // Without this, FCM data-only messages are SILENTLY dropped when app is killed
-                notification: {
-                  title: msg.data.title,
-                  body: msg.data.body,
-                },
-                data: msg.data,
+                data: msg.data,  // data-only, no notification block
                 android: {
-                  priority: 'high',
-                  ttl: 86400000, // 24 hours
-                  collapseKey: msg.data.chatId, // Group messages by chat
-                  notification: {
-                    channelId: 'relay-messages', // Must match Notifee channel
-                    sound: 'kin_notification_sound', // Android raw resource (no extension)
-                    priority: 'PRIORITY_HIGH',
-                    defaultSound: false,
-                    defaultVibrateTimings: false,
-                    vibrateTimingsMillis: [0, 250, 250, 250],
-                    clickAction: 'FLUTTER_NOTIFICATION_CLICK',
-                    tag: msg.data.chatId, // Groups notifications by chat
-                  },
+                  priority: 'high',          // Wake device from Doze mode
+                  ttl: 86400 * 1000,         // 24h delivery window
+                  collapseKey: msg.data.chatId, // One slot per chat in FCM queue
+                },
+                apns: {
+                  headers: { 'apns-priority': '10' },
+                  payload: { aps: { contentAvailable: true } },
                 },
               });
             } catch (error) {

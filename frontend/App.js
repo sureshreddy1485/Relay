@@ -144,10 +144,17 @@ export default function App() {
     if (notifee) {
       try {
         unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
-          if (type === EventType?.PRESS && detail.notification?.data?.chatId) {
+          const chatId = detail.notification?.data?.chatId;
+          if (type === EventType?.PRESS && chatId) {
+            // Clear stored messages — user is reading the chat now
+            try {
+              const { clearStoredMessages } = require('./src/services/notificationHelper');
+              clearStoredMessages(chatId);
+              notifee.cancelNotification(chatId);
+            } catch (e) {}
             const { navigationRef } = require('./src/navigation/RootNavigator');
             if (navigationRef && navigationRef.isReady()) {
-              navigationRef.navigate('ChatRoom', { chatId: detail.notification.data.chatId });
+              navigationRef.navigate('ChatRoom', { chatId });
             }
           }
         });
@@ -159,11 +166,18 @@ export default function App() {
       async function checkInitialNotification() {
         try {
           const initialNotification = await notifee.getInitialNotification();
-          if (initialNotification?.notification?.data?.chatId) {
+          const chatId = initialNotification?.notification?.data?.chatId;
+          if (chatId) {
+            // Clear stored messages — user tapped notification to open app
+            try {
+              const { clearStoredMessages } = require('./src/services/notificationHelper');
+              await clearStoredMessages(chatId);
+              await notifee.cancelNotification(chatId);
+            } catch (e) {}
             setTimeout(() => {
               const { navigationRef } = require('./src/navigation/RootNavigator');
               if (navigationRef && navigationRef.isReady()) {
-                navigationRef.navigate('ChatRoom', { chatId: initialNotification.notification.data.chatId });
+                navigationRef.navigate('ChatRoom', { chatId });
               }
             }, 1000);
           }
