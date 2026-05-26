@@ -192,20 +192,10 @@ const sendMessage = asyncHandler(async (req, res) => {
           let pushSent = false;
           
           if (targetUser.fcmToken) {
-            // Android: Send FCM message with notification block to guarantee OS-level display
-            // even if the headless JS task fails (e.g., Notifee missing, expo-notifications crashes).
+            // Android: Send data-only message via FCM to trigger Notifee/Expo local notification
             pushMessages.push({
               type: 'fcm',
               token: targetUser.fcmToken,
-              notification: {
-                title: title,
-                body: pushBody,
-              },
-              android: {
-                notification: {
-                  tag: chat._id.toString()
-                }
-              },
               data: {
                 chatId: chat._id.toString(),
                 sender: JSON.stringify({ _id: req.user._id, username: req.user.username, displayName: req.user.displayName }),
