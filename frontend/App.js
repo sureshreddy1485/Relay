@@ -5,7 +5,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import notifee, { EventType } from '@notifee/react-native';
-import messaging from '@react-native-firebase/messaging';
+let messaging;
+try {
+  messaging = require('@react-native-firebase/messaging').default;
+} catch (e) {
+  console.log('Firebase messaging native module missing, skipping...');
+}
 // RootNavigator dynamically imported later to allow Colors override
 // import RootNavigator from './src/navigation/RootNavigator';
 import useAuthStore from './src/store/useAuthStore';
@@ -152,11 +157,13 @@ export default function App() {
     checkInitialNotification();
 
     // 3. App in Foreground: Handle Incoming Data Messages
-    const unsubscribeFCM = messaging().onMessage(async remoteMessage => {
-      const data = remoteMessage.data;
-      if (!data) return;
+    let unsubscribeFCM;
+    if (messaging) {
+      unsubscribeFCM = messaging().onMessage(async remoteMessage => {
+        const data = remoteMessage.data;
+        if (!data) return;
 
-      try {
+        try {
         const sender = data.sender ? JSON.parse(data.sender) : null;
         const chat = data.chat ? JSON.parse(data.chat) : null;
         const title = data.title || 'New Message';
@@ -177,8 +184,8 @@ export default function App() {
     });
 
     return () => {
-      unsubscribe();
-      unsubscribeFCM();
+      if (unsubscribe) unsubscribe();
+      if (unsubscribeFCM) unsubscribeFCM();
     };
   }, []);
 

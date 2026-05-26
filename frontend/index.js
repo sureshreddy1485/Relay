@@ -1,5 +1,8 @@
 import { registerRootComponent } from 'expo';
-import messaging from '@react-native-firebase/messaging';
+let messaging;
+try {
+  messaging = require('@react-native-firebase/messaging').default;
+} catch (e) {}
 import notifee, { AndroidStyle } from '@notifee/react-native';
 
 import App from './App';
@@ -63,7 +66,8 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
 });
 
 // Background Data Message Handler
-messaging().setBackgroundMessageHandler(async remoteMessage => {
+if (messaging) {
+  messaging().setBackgroundMessageHandler(async remoteMessage => {
   const data = remoteMessage.data;
   if (!data) return;
 
@@ -81,6 +85,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
   } catch (e) {
     console.error('Error handling background data message:', e);
   }
-});
+  });
+}
 
 registerRootComponent(App);
