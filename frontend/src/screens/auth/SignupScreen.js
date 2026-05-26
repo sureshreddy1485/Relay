@@ -69,8 +69,8 @@ export default function SignupScreen({ navigation }) {
     if (!username || !email || !password || !securityKey) {
       Alert.alert('Error', 'All fields are required'); return;
     }
-    if (username.length < 8 || username.length > 16) {
-      Alert.alert('Error', 'Username must be between 8 and 16 characters'); return;
+    if (username.length < 6 || username.length > 16) {
+      Alert.alert('Error', 'Username must be between 6 and 16 characters'); return;
     }
     const usernameRegex = /^[a-zA-Z_][a-zA-Z0-9_.]*$/;
     if (!usernameRegex.test(username)) {

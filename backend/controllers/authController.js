@@ -31,9 +31,9 @@ const signup = asyncHandler(async (req, res) => {
     throw new Error('Username must start with a letter or underscore and contain only letters, numbers, underscores, and dots (no spaces)');
   }
   
-  if (username.length < 8) {
+  if (username.length < 6) {
     res.status(400);
-    throw new Error('Username must be at least 8 characters long');
+    throw new Error('Username must be at least 6 characters long');
   }
 
   const usernameExists = await User.findOne({ username: username.toLowerCase() });
