@@ -18,6 +18,7 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [securityKey, setSecurityKey] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [showKey, setShowKey] = useState(false);
   const [saveLogin, setSaveLogin] = useState(false);
   const [savedAccounts, setSavedAccounts] = useState([]);
   const { login, isLoading, error, clearError } = useAuthStore();
@@ -198,8 +199,11 @@ export default function LoginScreen({ navigation }) {
                   placeholderTextColor={Colors.dark.muted}
                   value={securityKey}
                   onChangeText={setSecurityKey}
-                  secureTextEntry={true}
+                  secureTextEntry={!showKey}
                 />
+                <TouchableOpacity onPress={() => setShowKey(!showKey)} style={styles.eyeBtn}>
+                  <Ionicons name={showKey ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.dark.muted} />
+                </TouchableOpacity>
               </View>
             </View>
 
