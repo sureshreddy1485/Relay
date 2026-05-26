@@ -9,10 +9,12 @@ const { width } = Dimensions.get('window');
 const COLUMN_COUNT = 3;
 const ITEM_SIZE = (width - 4) / COLUMN_COUNT;
 
+const EMPTY_MESSAGES = [];
+
 export default function SharedMediaScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { chatId } = route.params;
-  const messages = useChatStore(state => state.messages[chatId] || []);
+  const messages = useChatStore(state => state.messages[chatId] || EMPTY_MESSAGES);
 
   const mediaMessages = useMemo(() => {
     return messages.filter(m => m.mediaUrl).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));

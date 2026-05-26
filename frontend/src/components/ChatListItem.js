@@ -48,6 +48,9 @@ const TypingAnimation = () => {
   );
 };
 
+// Stable empty array to avoid infinite re-render loop with React 19 + Zustand
+const EMPTY_ARRAY = [];
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ChatListItem({ chat, currentUser, onPress, onLongPress }) {
@@ -62,7 +65,7 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
   const disappear     = disappearIcon(chat.disappearAfter);
   const unreadCount   = useChatStore(s => s.unreadCounts[chat._id?.toString()] || 0);
   
-  const typingUsers   = useChatStore(s => s.typingUsers[chat._id?.toString()] || []);
+  const typingUsers   = useChatStore(s => s.typingUsers[chat._id?.toString()] || EMPTY_ARRAY);
   const isTyping      = typingUsers.some(id => id && id.toString() !== currentUser?._id?.toString());
 
   const lastMsg = chat.latestMessage;

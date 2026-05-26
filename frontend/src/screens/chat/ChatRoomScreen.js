@@ -118,7 +118,11 @@ export default function ChatRoomScreen({ route, navigation }) {
   const storeChat = useChatStore(s => s.chats.find(c => c._id === initialChat._id));
   const chat = storeChat || initialChat;
   const { user } = useAuthStore();
-  const { chats, messages, fetchMessages, addMessage, typingUsers, clearUnread } = useChatStore();
+  const messages = useChatStore(s => s.messages);
+  const typingUsers = useChatStore(s => s.typingUsers);
+  const fetchMessages = useChatStore(s => s.fetchMessages);
+  const addMessage = useChatStore(s => s.addMessage);
+  const clearUnread = useChatStore(s => s.clearUnread);
   const insets = useSafeAreaInsets();
 
   const [text, setText]               = useState('');
