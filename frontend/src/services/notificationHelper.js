@@ -30,6 +30,7 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
       text: body,
       timestamp: Date.now(),
       person: {
+        id: sender._id ? sender._id.toString() : sender.username,
         name: sender.displayName || sender.username,
       },
     };
@@ -43,7 +44,7 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
         pressAction: { id: 'default' },
         style: {
           type: AndroidStyle.MESSAGING,
-          person: { name: 'Me' },
+          person: { name: 'Me', id: 'me' },
           messages: [...existingMessages, newMessage],
           title: chat?.isGroupChat ? chat.chatName : undefined,
         },

@@ -45,37 +45,40 @@ export async function registerForPushNotificationsAsync() {
       return;
     }
     
+    let expoPushToken = null;
+    let fcmToken = null;
+
+    // 1. Try to get Expo Push Token
     try {
       const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-      
       let tokenOpts = {};
       if (projectId) {
         tokenOpts.projectId = projectId;
       }
+      expoPushToken = await Notifications.getExpoPushTokenAsync(tokenOpts);
+    } catch (e) {
+      console.log('Error getting expo push token:', e.message || e);
+    }
 
-      token = await Notifications.getExpoPushTokenAsync(tokenOpts);
-      
-      let fcmToken = null;
-      try {
-        if (messaging) {
-          fcmToken = await messaging().getToken();
-        }
-      } catch (fcmErr) {
-        console.log('Failed to get FCM token:', fcmErr.message);
+    // 2. Try to get FCM Token
+    try {
+      if (messaging) {
+        fcmToken = await messaging().getToken();
       }
-      
-      if (token?.data || fcmToken) {
+    } catch (fcmErr) {
+      console.log('Failed to get FCM token:', fcmErr.message);
+    }
+
+    // 3. Save whatever tokens we got
+    try {
+      if (expoPushToken?.data || fcmToken) {
         await api.put('/users/push-token', { 
-          pushToken: token?.data, 
+          pushToken: expoPushToken?.data, 
           fcmToken: fcmToken 
         });
       }
     } catch (e) {
-      if (e.message && e.message.includes('EXPERIENCE_NOT_FOUND')) {
-        console.log('Push Token skipped: EAS Project ID not configured or invalid.');
-      } else {
-        console.log('Error getting push token:', e.message || e);
-      }
+      console.log('Failed to save push tokens to DB:', e.message);
     }
   } else {
     console.log('Must use physical device for Push Notifications');
