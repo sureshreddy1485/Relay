@@ -46,7 +46,6 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
         actions: [
           {
             title: 'Reply',
-            icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
             pressAction: { id: 'reply' },
             input: { allowFreeFormInput: true, placeholder: 'Reply to message...' }
           },

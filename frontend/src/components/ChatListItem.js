@@ -41,9 +41,42 @@ const disappearIcon = (seconds) => {
 
 // ── Typing Animation Component ────────────────────────────────────────────────
 const TypingAnimation = () => {
+  const anim1 = React.useRef(new Animated.Value(0)).current;
+  const anim2 = React.useRef(new Animated.Value(0)).current;
+  const anim3 = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    let anims = [];
+    const animateDot = (val, delay) => {
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(val, { toValue: -3, duration: 250, useNativeDriver: false }),
+          Animated.timing(val, { toValue: 0, duration: 250, useNativeDriver: false }),
+          Animated.delay(400 - delay)
+        ])
+      );
+      anim.start();
+      anims.push(anim);
+    };
+
+    animateDot(anim1, 0);
+    animateDot(anim2, 150);
+    animateDot(anim3, 300);
+
+    return () => {
+      anims.forEach(a => a.stop());
+    };
+  }, []);
+
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 6 }}>
-      <Text style={{ fontSize: 13, color: Colors.primary, fontWeight: '600', fontStyle: 'italic', marginRight: 4 }}>typing...</Text>
+      <Text style={{ fontSize: 13, color: Colors.primary, fontWeight: '600', fontStyle: 'italic', marginRight: 4 }}>typing</Text>
+      <View style={{ flexDirection: 'row', gap: 2, paddingBottom: 2 }}>
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: anim1 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: anim2 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: anim3 }] }]} />
+      </View>
     </View>
   );
 };
