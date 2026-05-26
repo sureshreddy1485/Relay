@@ -71,9 +71,8 @@ export default function App() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      import('./src/services/pushNotifications').then(({ registerForPushNotificationsAsync }) => {
-        registerForPushNotificationsAsync();
-      });
+      const { registerForPushNotificationsAsync } = require('./src/services/pushNotifications');
+      registerForPushNotificationsAsync();
     }
   }, [isAuthenticated]);
 
@@ -182,6 +181,7 @@ export default function App() {
         console.error('Error handling foreground data message:', e);
       }
     });
+    } // Close if (messaging)
 
     return () => {
       if (unsubscribe) unsubscribe();

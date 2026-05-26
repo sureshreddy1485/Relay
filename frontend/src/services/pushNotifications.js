@@ -3,7 +3,12 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import api from './api';
-import messaging from '@react-native-firebase/messaging';
+let messaging;
+try {
+  messaging = require('@react-native-firebase/messaging').default;
+} catch (e) {
+  console.log('Firebase messaging not available in pushNotifications');
+}
 import notifee, { AndroidImportance } from '@notifee/react-native';
 
 
@@ -47,11 +52,11 @@ export async function registerForPushNotificationsAsync() {
       
       let fcmToken = null;
       try {
-        if (Platform.OS === 'android') {
+        if (messaging && Platform.OS === 'android') {
           // Register Firebase explicitly on Android if needed
           await messaging().registerDeviceForRemoteMessages();
+          fcmToken = await messaging().getToken();
         }
-        fcmToken = await messaging().getToken();
       } catch (fcmErr) {
         console.log('Failed to get FCM token:', fcmErr.message);
       }
