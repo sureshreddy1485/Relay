@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import notifee, { EventType } from '@notifee/react-native';
+import messaging from '@react-native-firebase/messaging';
 // RootNavigator dynamically imported later to allow Colors override
 // import RootNavigator from './src/navigation/RootNavigator';
 import useAuthStore from './src/store/useAuthStore';
@@ -16,8 +17,8 @@ Notifications.setNotificationHandler({
   handleNotification: async () => {
     const isActive = AppState.currentState === 'active';
     return {
-      shouldShowAlert: !isActive, // Don't show system banner if app is open
-      shouldPlaySound: true, // System sound respects silent mode!
+      shouldShowAlert: true, // Always show system banner
+      shouldPlaySound: true, // System sound respects silent mode
       shouldSetBadge: true,
     };
   },
@@ -156,7 +157,35 @@ export default function App() {
     }
     checkInitialNotification();
 
-    return unsubscribe;
+    // 3. App in Foreground: Handle Incoming Data Messages
+    const unsubscribeFCM = messaging().onMessage(async remoteMessage => {
+      const data = remoteMessage.data;
+      if (!data) return;
+
+      try {
+        const sender = data.sender ? JSON.parse(data.sender) : null;
+        const chat = data.chat ? JSON.parse(data.chat) : null;
+        const title = data.title || 'New Message';
+        const body = data.body || '';
+        const chatId = data.chatId;
+
+        // Check if user is actively viewing this chat room
+        const useChatStore = require('./src/store/useChatStore').default;
+        const { selectedChat } = useChatStore.getState();
+        
+        if (chatId && sender && selectedChat?._id?.toString() !== chatId?.toString()) {
+          const { displayMessagingNotification } = require('./src/services/notificationHelper');
+          await displayMessagingNotification({ chatId, sender, chat, title, body });
+        }
+      } catch (e) {
+        console.error('Error handling foreground data message:', e);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeFCM();
+    };
   }, []);
 
   const RootNavigator = themeLoaded ? require('./src/navigation/RootNavigator').default : null;

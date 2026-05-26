@@ -74,35 +74,8 @@ const connectSocket = (userId) => {
     if (selectedChat?._id !== chatId || AppState.currentState !== 'active') {
       incrementUnread(chatId);
       
-      // Show system or in-app notification
-      if (!message.isSystemMessage) {
-        const title = message.chat?.isGroupChat 
-          ? message.chat.chatName 
-          : (message.sender?.displayName || message.sender?.username || 'New Message');
-        let body = message.content || (message.mediaUrl ? '📷 Media' : 'New message');
-        if (message.messageType === 'group_invite') {
-          try {
-            const parsed = JSON.parse(message.content);
-            body = `Invited you to join ${parsed.groupName || 'a group'}`;
-          } catch (e) {
-            body = 'Group Invitation';
-          }
-        }
-        
-        if (AppState.currentState === 'active') {
-
-          
-          // Show the custom banner UI
-          useChatStore.getState().showNotification({
-            messageId: message._id,
-            chatId,
-            title,
-            body,
-            avatar: message.chat?.isGroupChat ? message.chat?.groupPicture : message.sender?.profilePicture,
-            chat: message.chat,
-          });
-        }
-      }
+      // System push notifications (FCM or APNs) handle foreground popups.
+      // We only emit delivered status here.
       // Emit delivered status if app is active but not in chat
       if (AppState.currentState === 'active') {
         const currentUserId = useAuthStore.getState().user?._id;

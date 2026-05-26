@@ -64,7 +64,6 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
 
 // Background Data Message Handler
 messaging().setBackgroundMessageHandler(async remoteMessage => {
-  // Extract data payload sent from backend
   const data = remoteMessage.data;
   if (!data) return;
 
@@ -76,76 +75,11 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     const chatId = data.chatId;
 
     if (chatId && sender) {
-      // Guarantee channel exists
-      await notifee.createChannel({
-        id: 'messages-v6',
-        name: 'Relay Messages',
-        importance: 4, // AndroidImportance.HIGH
-        sound: 'kin_notification_sound',
-        vibration: true,
-      });
-
-      // Fetch existing notifications to see if we already have one for this chat
-      const displayed = await notifee.getDisplayedNotifications();
-      const existingNotification = displayed.find(n => n.id === chatId);
-      
-      let existingMessages = [];
-      if (existingNotification?.notification?.android?.style?.messages) {
-        existingMessages = existingNotification.notification.android.style.messages;
-      }
-
-      // Build the new message object
-      const newMessage = {
-        text: body,
-        timestamp: Date.now(),
-        person: {
-          name: sender.displayName || sender.username,
-        },
-      };
-
-      // Build the Notifee notification using MessagingStyle
-      await notifee.displayNotification({
-        id: chatId, 
-        title: title,
-        body: body,
-        android: {
-          channelId: 'messages-v6',
-          smallIcon: 'ic_launcher',
-          color: '#2DD4BF',
-          pressAction: {
-            id: 'default',
-          },
-          style: {
-            type: AndroidStyle.MESSAGING,
-            person: {
-              name: 'Me',
-            },
-            messages: [...existingMessages, newMessage],
-            title: chat?.isGroupChat ? chat.chatName : undefined,
-          },
-          actions: [
-            {
-              title: 'Reply',
-              icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png', // Fallback icon
-              pressAction: { id: 'reply' },
-              input: { allowFreeFormInput: true, placeholder: 'Reply to message...' }
-            },
-            {
-              title: 'Mark as Read',
-              pressAction: { id: 'mark_as_read' }
-            }
-          ]
-        },
-        data: { chatId }, 
-      });
+      const { displayMessagingNotification } = require('./src/services/notificationHelper');
+      await displayMessagingNotification({ chatId, sender, chat, title, body });
     }
   } catch (e) {
     console.error('Error handling background data message:', e);
-    await notifee.displayNotification({
-      title: 'Crash Report',
-      body: String(e.message || e),
-      android: { channelId: 'messages-v5' }
-    });
   }
 });
 
