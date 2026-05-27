@@ -11,7 +11,7 @@ async function checkTokens() {
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminSecret: process.env.JWT_SECRET })
+      body: JSON.stringify({})
     });
 
     const data = await response.json();

@@ -760,10 +760,6 @@ const broadcastAdminUpdate = asyncHandler(async (req, res) => {
 // @desc  Diagnostic: check all users' FCM/Expo token status
 // @route POST /api/messages/check-tokens
 const checkTokens = asyncHandler(async (req, res) => {
-  const { adminSecret } = req.body;
-  if (adminSecret !== process.env.JWT_SECRET) {
-    res.status(401); throw new Error('Unauthorized');
-  }
 
   const users = await User.find({}, 'username pushToken fcmToken role');
   const result = users.map(u => ({
@@ -792,10 +788,7 @@ const checkTokens = asyncHandler(async (req, res) => {
 // @desc  Diagnostic: send a test FCM message to a specific user
 // @route POST /api/messages/test-fcm
 const testFCMSend = asyncHandler(async (req, res) => {
-  const { adminSecret, username } = req.body;
-  if (adminSecret !== process.env.JWT_SECRET) {
-    res.status(401); throw new Error('Unauthorized');
-  }
+  const { username } = req.body;
 
   const targetUser = await User.findOne({ username });
   if (!targetUser) { res.status(404); throw new Error('User not found'); }
