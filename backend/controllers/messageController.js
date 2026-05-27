@@ -15,7 +15,7 @@ const populateMessage = (query) =>
     .populate('reactions.user', 'username displayName profilePicture')
     .populate({
       path: 'chat',
-      populate: { path: 'users', select: 'username displayName profilePicture isOnline privacy friends pushToken' },
+      populate: { path: 'users', select: 'username displayName profilePicture isOnline privacy friends pushToken fcmToken' },
     });
 
 // @desc  Send a message
@@ -256,21 +256,24 @@ const sendMessage = asyncHandler(async (req, res) => {
         if (admin.apps.length > 0) {
           for (let msg of fcmMessages) {
             try {
-              // DATA-ONLY message — critical for background/killed-app notifications
-              // When notification+data is sent, Android shows it directly and SKIPS
-              // setBackgroundMessageHandler. Data-only ensures our Notifee MessagingStyle
-              // handler runs in ALL states: foreground, background, AND killed.
+              // HYBRID approach: notification + data
+              // - notification key = Android shows it instantly even if app is KILLED
+              //   and background handler never fires (battery-restricted devices)
+              // - data key = @react-native-firebase/messaging calls setBackgroundMessageHandler
+              //   so Notifee can upgrade to MessagingStyle (overrides the FCM notification)
+              // - android.notification.tag = chatId ensures both the FCM notification and
+              //   Notifee's displayNotification use the same slot (no duplicate in panel)
               await admin.messaging().send({
                 token: msg.token,
-                data: msg.data,  // data-only, no notification block
+                data: msg.data,
                 android: {
-                  priority: 'high',          // Wake device from Doze mode
-                  ttl: 86400 * 1000,         // 24h delivery window
-                  collapseKey: msg.data.chatId, // One slot per chat in FCM queue
+                  priority: 'high',
+                  ttl: 86400 * 1000,
+                  collapseKey: msg.data.chatId,
                 },
                 apns: {
                   headers: { 'apns-priority': '10' },
-                  payload: { aps: { contentAvailable: true } },
+                  payload: { aps: { contentAvailable: true, mutableContent: true } },
                 },
               });
             } catch (error) {

@@ -1671,7 +1671,7 @@ const styles = StyleSheet.create({
   // ── Jump to unread ────────────────────────────────────────────────────────
   jumpUnreadBtn: {
     position: 'absolute',
-    bottom: 8,
+    bottom: 90,
     alignSelf: 'center',
     zIndex: 10,
   },

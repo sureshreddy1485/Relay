@@ -87,7 +87,7 @@ export default function LoginScreen({ navigation }) {
   return (
     <LinearGradient colors={['#080F14', '#04070B']} style={[styles.container, { paddingTop: Math.max(insets.top, StatusBar.currentHeight || 0) }]}>
       <StatusBar barStyle="light-content" translucent />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'padding'} style={{ flex: 1 }}>
         <ScrollView 
           ref={scrollRef}
           contentContainerStyle={[
@@ -200,6 +200,11 @@ export default function LoginScreen({ navigation }) {
                   value={securityKey}
                   onChangeText={setSecurityKey}
                   secureTextEntry={!showKey}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      scrollRef.current?.scrollToEnd({ animated: true });
+                    }, 100);
+                  }}
                 />
                 <TouchableOpacity onPress={() => setShowKey(!showKey)} style={styles.eyeBtn}>
                   <Ionicons name={showKey ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.dark.muted} />
