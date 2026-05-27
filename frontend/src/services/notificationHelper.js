@@ -54,7 +54,6 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
       body: body,
       android: {
         channelId: 'relay-messages',
-        smallIcon: 'ic_notification',
         pressAction: { id: 'default' },
         importance: AndroidImportance.HIGH,
         style: {
