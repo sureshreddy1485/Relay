@@ -87,6 +87,18 @@ async function showNotification(chatId, sender, chat, title, body) {
         android: {
           channelId: 'relay-messages',
           pressAction: { id: 'default' },
+          importance: AndroidImportance.HIGH,
+          actions: [
+            {
+              title: '↩ Reply',
+              pressAction: { id: 'reply' },
+              input: { allowFreeFormInput: true, placeholder: 'Reply...' },
+            },
+            {
+              title: '✓ Mark as Read',
+              pressAction: { id: 'mark_as_read' },
+            },
+          ],
         },
         data: { chatId },
       });
