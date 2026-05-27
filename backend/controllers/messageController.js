@@ -757,8 +757,100 @@ const broadcastAdminUpdate = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: `Broadcast sent to ${sentCount} users.` });
 });
 
+// @desc  Diagnostic: check all users' FCM/Expo token status
+// @route POST /api/messages/check-tokens
+const checkTokens = asyncHandler(async (req, res) => {
+  const { adminSecret } = req.body;
+  if (adminSecret !== process.env.JWT_SECRET) {
+    res.status(401); throw new Error('Unauthorized');
+  }
+
+  const users = await User.find({}, 'username pushToken fcmToken role');
+  const result = users.map(u => ({
+    username: u.username,
+    role: u.role,
+    hasFcmToken: !!(u.fcmToken && u.fcmToken.length > 10),
+    hasExpoToken: !!(u.pushToken && u.pushToken.length > 10),
+    fcmTokenPreview: u.fcmToken ? u.fcmToken.substring(0, 20) + '...' : '(empty)',
+    expoTokenPreview: u.pushToken ? u.pushToken.substring(0, 30) + '...' : '(empty)',
+  }));
+
+  // Also check if Firebase Admin SDK is initialized
+  let firebaseStatus = 'NOT INITIALIZED';
+  try {
+    const admin = require('firebase-admin');
+    if (admin.apps.length > 0) {
+      firebaseStatus = 'INITIALIZED ✅';
+    }
+  } catch (e) {
+    firebaseStatus = 'FAILED: ' + e.message;
+  }
+
+  res.status(200).json({ success: true, users: result, firebaseStatus });
+});
+
+// @desc  Diagnostic: send a test FCM message to a specific user
+// @route POST /api/messages/test-fcm
+const testFCMSend = asyncHandler(async (req, res) => {
+  const { adminSecret, username } = req.body;
+  if (adminSecret !== process.env.JWT_SECRET) {
+    res.status(401); throw new Error('Unauthorized');
+  }
+
+  const targetUser = await User.findOne({ username });
+  if (!targetUser) { res.status(404); throw new Error('User not found'); }
+
+  if (!targetUser.fcmToken) {
+    return res.status(200).json({
+      success: false,
+      message: `User "${username}" has NO FCM token saved. This means the app never generated one. The user needs to: 1) Install the new APK, 2) Log out and log back in.`,
+      fcmToken: null,
+      pushToken: targetUser.pushToken || null,
+    });
+  }
+
+  // Try to send a test FCM data-only message
+  try {
+    const admin = require('firebase-admin');
+    if (admin.apps.length === 0) {
+      return res.status(200).json({
+        success: false,
+        message: 'Firebase Admin SDK is NOT initialized on this server. Check FIREBASE_SERVICE_ACCOUNT env variable on Render.',
+      });
+    }
+
+    const result = await admin.messaging().send({
+      token: targetUser.fcmToken,
+      data: {
+        chatId: 'test_diagnostic',
+        sender: JSON.stringify({ _id: 'test', username: 'diagnostic', displayName: 'Diagnostic Test' }),
+        chat: JSON.stringify({ isGroupChat: false }),
+        title: '🔔 Test Notification',
+        body: 'If you see this with Reply & Mark as Read buttons, notifications are working!',
+      },
+      android: {
+        priority: 'high',
+        ttl: 60000,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `FCM message sent successfully to "${username}"! Message ID: ${result}`,
+      fcmToken: targetUser.fcmToken.substring(0, 20) + '...',
+    });
+  } catch (e) {
+    res.status(200).json({
+      success: false,
+      message: `FCM send FAILED: ${e.message}`,
+      errorCode: e.code || 'unknown',
+    });
+  }
+});
+
 module.exports = {
   sendMessage, getMessages, markAsRead, markAsDelivered, deleteMessage,
   reactToMessage, forwardMessage, saveMessage, getSavedMessages,
   destructMessage, editMessage, voteOnPoll, broadcastAdminUpdate,
+  checkTokens, testFCMSend,
 };
