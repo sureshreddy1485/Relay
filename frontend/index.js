@@ -133,23 +133,49 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
       if (!token) return;
 
       if (pressAction.id === 'reply' && input) {
-        await axios.post(`${getBaseUrl()}/messages`, {
-          chatId: chatId,
-          content: input,
-          messageType: 'text',
-        }, { headers: { Authorization: `Bearer ${token}` } });
+        // Build FormData since the backend expects multipart/form-data for messages
+        const formData = new FormData();
+        formData.append('chatId', chatId);
+        formData.append('content', input);
+        formData.append('messageType', 'text');
 
+        const response = await fetch(`${getBaseUrl()}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API Error: ${response.status} - ${errorText.substring(0, 50)}`);
+        }
+
+        // Add the reply to the stored message list and update the notification
         await showNotification(chatId,
           { _id: 'me', displayName: 'You', username: 'You' },
           null, notification.title, input);
 
       } else if (pressAction.id === 'mark_as_read') {
-        await axios.put(`${getBaseUrl()}/messages/${chatId}/read`, {}, {
-          headers: { Authorization: `Bearer ${token}` }
+        await fetch(`${getBaseUrl()}/messages/${chatId}/read`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         });
         await notifee.cancelNotification(notification.id || chatId);
       }
-    } catch (e) {}
+    } catch (e) {
+      // Show error notification so the user can see what failed in the background
+      await notifee.displayNotification({
+        id: 'error_debug',
+        title: 'Background Reply Failed',
+        body: e.message || 'Unknown error',
+        android: { channelId: 'relay-messages', pressAction: { id: 'default' } }
+      });
+    }
   }
 });
 
