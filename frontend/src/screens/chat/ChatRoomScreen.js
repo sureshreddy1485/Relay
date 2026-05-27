@@ -202,6 +202,7 @@ export default function ChatRoomScreen({ route, navigation }) {
   const isBotChat = isRelayBotChat || isMicaChat;
   const [showJumpUnread, setShowJumpUnread] = useState(false);
   const unreadIndexRef = useRef(-1);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [fullScreenMedia, setFullScreenMedia] = useState(null);
   const [isSavingMedia, setIsSavingMedia] = useState(false);
   const [mediaCountdownSeconds, setMediaCountdownSeconds] = useState(null);
@@ -1085,6 +1086,11 @@ export default function ChatRoomScreen({ route, navigation }) {
           }}
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingVertical: 12 }}
+          onScroll={(e) => {
+            const offsetY = e.nativeEvent.contentOffset.y;
+            setShowScrollToBottom(offsetY > 400);
+          }}
+          scrollEventThrottle={100}
           ListEmptyComponent={
             searchQuery ? (
               <View style={styles.searchEmpty}>
@@ -1113,6 +1119,22 @@ export default function ChatRoomScreen({ route, navigation }) {
               <Ionicons name="arrow-up" size={16} color="#FFF" />
               <Text style={styles.jumpUnreadText}>Jump to unread</Text>
             </LinearGradient>
+          </TouchableOpacity>
+        )}
+
+        {/* Scroll to bottom floating button */}
+        {showScrollToBottom && !showJumpUnread && (
+          <TouchableOpacity
+            style={styles.scrollToBottomBtn}
+            activeOpacity={0.85}
+            onPress={() => {
+              flatRef.current?.scrollToOffset({ offset: 0, animated: true });
+              setShowScrollToBottom(false);
+            }}
+          >
+            <View style={styles.scrollToBottomCircle}>
+              <Ionicons name="arrow-down" size={20} color="#FFF" />
+            </View>
           </TouchableOpacity>
         )}
 
@@ -1692,6 +1714,29 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 13,
     fontWeight: '700',
+  },
+
+  // ── Scroll to bottom ──────────────────────────────────────────────────────
+  scrollToBottomBtn: {
+    position: 'absolute',
+    bottom: 80,
+    right: 16,
+    zIndex: 10,
+  },
+  scrollToBottomCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.dark.card,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
 
   // ── Typing indicator ──────────────────────────────────────────────────────
