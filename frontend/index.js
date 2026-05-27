@@ -43,11 +43,12 @@ async function showNotification(chatId, sender, chat, title, body) {
       const existing = displayed.find(n => n.id === chatId);
       
       // If there's an existing notification, grab its body and append the new one
-      if (existing?.notification?.body) {
-        fullBody = existing.notification.body + '\n' + body;
+      const oldBody = existing?.notification?.android?.style?.text || existing?.notification?.body;
+      if (oldBody) {
+        fullBody = oldBody + '\n' + body;
         
         // Try to count previous lines to update the title
-        const previousLines = existing.notification.body.split('\n');
+        const previousLines = oldBody.split('\n');
         messageCount = previousLines.length + 1;
       }
     } catch (e) {}
