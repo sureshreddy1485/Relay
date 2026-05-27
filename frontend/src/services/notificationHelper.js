@@ -1,44 +1,7 @@
 import notifee, { AndroidStyle, AndroidImportance } from '@notifee/react-native';
-import * as FileSystem from 'expo-file-system';
 
-const MAX_STORED = 10;
-
-// Read messages directly from local disk (bulletproof in Headless JS)
-async function getFileMessages(chatId) {
-  try {
-    const fileUri = `${FileSystem.documentDirectory}notif_chat_${chatId}.json`;
-    const info = await FileSystem.getInfoAsync(fileUri);
-    if (info.exists) {
-      const content = await FileSystem.readAsStringAsync(fileUri);
-      return JSON.parse(content);
-    }
-  } catch (e) {
-    console.log('File read error:', e);
-  }
-  return [];
-}
-
-// Write messages to local disk
-async function saveFileMessages(chatId, messages) {
-  try {
-    const fileUri = `${FileSystem.documentDirectory}notif_chat_${chatId}.json`;
-    const trimmed = messages.slice(-MAX_STORED);
-    await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(trimmed));
-  } catch (e) {
-    console.log('File write error:', e);
-  }
-}
-
-export async function clearStoredMessages(chatId) {
-  try {
-    const fileUri = `${FileSystem.documentDirectory}notif_chat_${chatId}.json`;
-    await FileSystem.deleteAsync(fileUri, { idempotent: true });
-    await notifee.cancelNotification(chatId);
-  } catch (e) {}
-}
-
+// Ensure the Notifee channel exists
 async function ensureChannel() {
-  if (!notifee) return;
   try {
     await notifee.createChannel({
       id: 'relay-messages',
@@ -48,44 +11,56 @@ async function ensureChannel() {
       vibration: true,
       vibrationPattern: [0, 250, 250, 250],
     });
-  } catch (e) {}
+  } catch (e) {
+    console.log('Channel creation error:', e);
+  }
 }
 
 export const displayMessagingNotification = async ({ chatId, sender, chat, title, body }) => {
-  if (!chatId || !sender || !notifee) return;
+  if (!chatId || !sender) return;
 
   try {
     await ensureChannel();
 
-    const newMessage = {
+    const senderName = sender.displayName || sender.username || 'Unknown';
+    const senderId = sender._id ? sender._id.toString() : 'user';
+
+    // Build message for MessagingStyle
+    const message = {
       text: body,
       timestamp: Date.now(),
       person: {
-        id: sender._id ? sender._id.toString() : (sender.username || 'user'),
-        name: sender.displayName || sender.username || 'Unknown',
+        id: senderId,
+        name: senderName,
       },
     };
 
-    // 1. Fetch robustly from filesystem
-    const existingMessages = await getFileMessages(chatId);
-    const updatedMessages = [...existingMessages, newMessage];
-    
-    // 2. Save back to filesystem immediately
-    await saveFileMessages(chatId, updatedMessages);
+    // Try to stack with existing notification (pure Notifee native call, no Expo modules)
+    let messages = [message];
+    try {
+      const displayed = await notifee.getDisplayedNotifications();
+      const existing = displayed.find(n => n.id === chatId);
+      if (existing && existing.notification && existing.notification.android &&
+          existing.notification.android.style && existing.notification.android.style.messages) {
+        messages = [...existing.notification.android.style.messages, message];
+      }
+    } catch (e) {
+      // Stacking failed, just show single message — that's fine
+    }
 
-    // 3. Display rich MessagingStyle notification
     await notifee.displayNotification({
       id: chatId,
       title: title,
       body: body,
       android: {
         channelId: 'relay-messages',
+        smallIcon: 'ic_notification',
         pressAction: { id: 'default' },
-        importance: AndroidImportance.HIGH, 
+        importance: AndroidImportance.HIGH,
         style: {
           type: AndroidStyle.MESSAGING,
           person: { name: 'Me', id: 'me' },
-          messages: updatedMessages,
+          messages: messages,
           title: chat?.isGroupChat ? (chat.chatName || chat.groupName || title) : undefined,
           group: chat?.isGroupChat || false,
         },
@@ -95,7 +70,7 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
             pressAction: { id: 'reply' },
             input: {
               allowFreeFormInput: true,
-              placeholder: `Reply to ${sender.displayName || sender.username}...`,
+              placeholder: `Reply to ${senderName}...`,
             },
           },
           {
@@ -107,6 +82,12 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
       data: { chatId },
     });
   } catch (e) {
-    console.error('Failed to display Notifee notification:', e);
+    console.error('Notifee display failed:', e);
   }
 };
+
+export async function clearStoredMessages(chatId) {
+  try {
+    await notifee.cancelNotification(chatId);
+  } catch (e) {}
+}
