@@ -3,17 +3,8 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import api from './api';
-let messaging;
-try {
-  messaging = require('@react-native-firebase/messaging').default;
-} catch (e) {
-  console.log('Firebase messaging not available in pushNotifications');
-}
-let notifee = null;
-try {
-  const notifeeModule = require('@notifee/react-native');
-  notifee = notifeeModule.default;
-} catch (e) {}
+import messaging from '@react-native-firebase/messaging';
+import notifee from '@notifee/react-native';
 export async function registerForPushNotificationsAsync() {
   let token;
 
