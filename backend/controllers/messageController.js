@@ -705,8 +705,60 @@ const voteOnPoll = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc  Admin Broadcast to all users (bypass local DNS issues)
+// @route POST /api/messages/broadcast
+// @access Private (admin secret)
+const broadcastAdminUpdate = asyncHandler(async (req, res) => {
+  const { content, adminSecret } = req.body;
+  if (!content) { res.status(400); throw new Error('No content provided'); }
+
+  // Validate secret
+  if (adminSecret !== process.env.JWT_SECRET) {
+    res.status(401); throw new Error('Unauthorized broadcast attempt');
+  }
+
+  const botUser = await User.findOne({ username: 'relay_bot' });
+  if (!botUser) { res.status(404); throw new Error('relay_bot not found'); }
+
+  const users = await User.find({ role: 'user', username: { $nin: ['relay_bot', 'relay', 'mica_bot'] } });
+  let sentCount = 0;
+
+  for (const user of users) {
+    try {
+      let chat = await Chat.findOne({
+        isGroupChat: false,
+        $and: [
+          { users: { $elemMatch: { $eq: botUser._id } } },
+          { users: { $elemMatch: { $eq: user._id } } }
+        ]
+      });
+
+      if (!chat) {
+        chat = await Chat.create({
+          chatName: 'sender',
+          isGroupChat: false,
+          users: [botUser._id, user._id],
+          theme: 'default'
+        });
+      }
+
+      const newMessage = await Message.create({
+        sender: botUser._id,
+        content: content,
+        chat: chat._id,
+        messageType: 'text'
+      });
+
+      await Chat.findByIdAndUpdate(chat._id, { latestMessage: newMessage._id });
+      sentCount++;
+    } catch (err) {}
+  }
+
+  res.status(200).json({ success: true, message: `Broadcast sent to ${sentCount} users.` });
+});
+
 module.exports = {
   sendMessage, getMessages, markAsRead, markAsDelivered, deleteMessage,
   reactToMessage, forwardMessage, saveMessage, getSavedMessages,
-  destructMessage, editMessage, voteOnPoll,
+  destructMessage, editMessage, voteOnPoll, broadcastAdminUpdate,
 };
