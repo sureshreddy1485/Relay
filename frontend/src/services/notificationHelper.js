@@ -1,45 +1,14 @@
-// notificationHelper.js — WhatsApp/Telegram-style MessagingStyle notifications
-// Uses AsyncStorage to persist message history per chat (so stacking works reliably)
-import notifee, { AndroidStyle } from '@notifee/react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import notifee, { AndroidStyle, AndroidImportance } from '@notifee/react-native';
 
-const STORAGE_KEY_PREFIX = 'notif_msgs_';
-const MAX_STORED_MESSAGES = 10; // Keep last 10 messages per chat in notification
-
-// Get stored messages for a chat from AsyncStorage
-async function getStoredMessages(chatId) {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY_PREFIX + chatId);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return [];
-}
-
-// Save messages for a chat to AsyncStorage
-async function saveStoredMessages(chatId, messages) {
-  try {
-    // Only keep the last MAX_STORED_MESSAGES
-    const trimmed = messages.slice(-MAX_STORED_MESSAGES);
-    await AsyncStorage.setItem(STORAGE_KEY_PREFIX + chatId, JSON.stringify(trimmed));
-  } catch (e) {}
-}
-
-// Clear stored messages for a chat (call this when user reads / dismisses)
-export async function clearStoredMessages(chatId) {
-  try {
-    await AsyncStorage.removeItem(STORAGE_KEY_PREFIX + chatId);
-  } catch (e) {}
-}
-
-// Ensure the Notifee channel exists — must be called before displayNotification
+// Ensure the Notifee channel exists
 async function ensureChannel() {
   if (!notifee) return;
   try {
     await notifee.createChannel({
       id: 'relay-messages',
       name: 'Relay Messages',
-      importance: 5, // IMPORTANCE_HIGH — triggers heads-up popup + sound + vibration
-      sound: 'kin_notification_sound', // filename in android/app/src/main/res/raw/ (no extension)
+      importance: AndroidImportance.HIGH, // 4 (HIGH) is required to show action buttons!
+      sound: 'kin_notification_sound',
       vibration: true,
       vibrationPattern: [0, 250, 250, 250],
     });
@@ -47,34 +16,12 @@ async function ensureChannel() {
 }
 
 export const displayMessagingNotification = async ({ chatId, sender, chat, title, body }) => {
-  if (!chatId || !sender) return;
-
-  if (!notifee) {
-    // Fallback: use expo-notifications if Notifee native module not available
-    try {
-      const Notifications = require('expo-notifications');
-      await Notifications.scheduleNotificationAsync({
-        identifier: chatId,
-        content: {
-          title,
-          body,
-          sound: true,
-          data: { chatId },
-        },
-        trigger: null,
-      });
-    } catch (e) {}
-    return;
-  }
+  if (!chatId || !sender || !notifee) return;
 
   try {
-    // 1. Ensure channel exists (safe to call multiple times — Android deduplicates)
     await ensureChannel();
 
-    // 2. Load existing messages from AsyncStorage (reliable across background/foreground)
-    const existingMessages = await getStoredMessages(chatId);
-
-    // 3. Build the new message object
+    // 1. Build the new message
     const newMessage = {
       text: body,
       timestamp: Date.now(),
@@ -84,19 +31,30 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
       },
     };
 
-    // 4. Append and save
-    const updatedMessages = [...existingMessages, newMessage];
-    await saveStoredMessages(chatId, updatedMessages);
+    // 2. Natively retrieve existing messages from the currently visible notification
+    // This perfectly bypasses AsyncStorage background issues
+    let updatedMessages = [newMessage];
+    try {
+      const activeNotifications = await notifee.getDisplayedNotifications();
+      const existingNotif = activeNotifications.find(n => n.id === chatId);
+      
+      if (existingNotif && existingNotif.notification.android?.style?.messages) {
+        const previousMessages = existingNotif.notification.android.style.messages;
+        updatedMessages = [...previousMessages, newMessage];
+      }
+    } catch (e) {
+      console.log('Could not fetch active notifications for stacking:', e);
+    }
 
-    // 5. Display MessagingStyle notification — same ID = updates the existing panel entry
+    // 3. Display the notification
     await notifee.displayNotification({
-      id: chatId,          // Fixed ID per chat = WhatsApp stacking behaviour
+      id: chatId,          // Keeps everything in one WhatsApp-style slot
       title: title,
       body: body,
       android: {
         channelId: 'relay-messages',
         pressAction: { id: 'default' },
-        // MessagingStyle — shows all stacked messages like WhatsApp
+        importance: AndroidImportance.HIGH, // Force high priority to show Reply buttons natively
         style: {
           type: AndroidStyle.MESSAGING,
           person: {
@@ -121,9 +79,6 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
             pressAction: { id: 'mark_as_read' },
           },
         ],
-        // Show heads-up popup even if another notification from same app is showing
-        showChronometer: false,
-        ongoing: false,
       },
       data: { chatId },
     });
@@ -131,3 +86,11 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
     console.error('Failed to display Notifee notification:', e);
   }
 };
+
+export async function clearStoredMessages(chatId) {
+  // Not needed anymore since we don't use AsyncStorage, 
+  // Notifee clears the messages when the notification is dismissed or cancelled.
+  try {
+    await notifee.cancelNotification(chatId);
+  } catch (e) {}
+}

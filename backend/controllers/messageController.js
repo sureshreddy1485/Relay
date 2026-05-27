@@ -205,7 +205,7 @@ const sendMessage = asyncHandler(async (req, res) => {
               }
             });
             pushSent = true;
-          } /* else if (targetUser.pushToken && Expo.isExpoPushToken(targetUser.pushToken)) {
+          } else if (targetUser.pushToken && Expo.isExpoPushToken(targetUser.pushToken)) {
             // iOS / Fallback uses Expo Push
             pushMessages.push({
               type: 'expo',
@@ -218,7 +218,7 @@ const sendMessage = asyncHandler(async (req, res) => {
               data: { chatId: chat._id.toString() },
             });
             pushSent = true;
-          } */
+          }
           
           if (pushSent) {
             // Mark as delivered to this user since we are sending a push notification!
