@@ -4,21 +4,8 @@ import { StatusBar, LogBox, View, Animated, StyleSheet, Image, Text, Alert, AppS
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
-let notifee = null;
-let EventType = null;
-try {
-  const notifeeModule = require('@notifee/react-native');
-  notifee = notifeeModule.default;
-  EventType = notifeeModule.EventType;
-} catch (e) {
-  console.log('Notifee not available (Expo Go), skipping...');
-}
-let messaging;
-try {
-  messaging = require('@react-native-firebase/messaging').default;
-} catch (e) {
-  console.log('Firebase messaging native module missing, skipping...');
-}
+import notifee, { EventType } from '@notifee/react-native';
+import messaging from '@react-native-firebase/messaging';
 // RootNavigator dynamically imported later to allow Colors override
 // import RootNavigator from './src/navigation/RootNavigator';
 import useAuthStore from './src/store/useAuthStore';

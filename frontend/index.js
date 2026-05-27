@@ -1,19 +1,6 @@
 import { registerRootComponent } from 'expo';
-let messaging;
-try {
-  messaging = require('@react-native-firebase/messaging').default;
-} catch (e) {}
-let notifee = null;
-let AndroidStyle = null;
-let EventType = null;
-try {
-  const notifeeModule = require('@notifee/react-native');
-  notifee = notifeeModule.default;
-  AndroidStyle = notifeeModule.AndroidStyle;
-  EventType = notifeeModule.EventType;
-} catch (e) {
-  console.log('Notifee native module not found, skipping background events...');
-}
+import messaging from '@react-native-firebase/messaging';
+import notifee, { AndroidStyle, EventType } from '@notifee/react-native';
 
 import App from './App';
 import AsyncStorage from '@react-native-async-storage/async-storage';

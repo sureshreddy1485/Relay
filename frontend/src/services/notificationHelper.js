@@ -1,12 +1,7 @@
 // notificationHelper.js — WhatsApp/Telegram-style MessagingStyle notifications
 // Uses AsyncStorage to persist message history per chat (so stacking works reliably)
-let notifee = null;
-let AndroidStyle = null;
-try {
-  const notifeeModule = require('@notifee/react-native');
-  notifee = notifeeModule.default;
-  AndroidStyle = notifeeModule.AndroidStyle;
-} catch (e) {}
+import notifee, { AndroidStyle } from '@notifee/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY_PREFIX = 'notif_msgs_';
 const MAX_STORED_MESSAGES = 10; // Keep last 10 messages per chat in notification
@@ -14,7 +9,6 @@ const MAX_STORED_MESSAGES = 10; // Keep last 10 messages per chat in notificatio
 // Get stored messages for a chat from AsyncStorage
 async function getStoredMessages(chatId) {
   try {
-    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     const raw = await AsyncStorage.getItem(STORAGE_KEY_PREFIX + chatId);
     if (raw) return JSON.parse(raw);
   } catch (e) {}
@@ -24,7 +18,6 @@ async function getStoredMessages(chatId) {
 // Save messages for a chat to AsyncStorage
 async function saveStoredMessages(chatId, messages) {
   try {
-    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     // Only keep the last MAX_STORED_MESSAGES
     const trimmed = messages.slice(-MAX_STORED_MESSAGES);
     await AsyncStorage.setItem(STORAGE_KEY_PREFIX + chatId, JSON.stringify(trimmed));
@@ -34,7 +27,6 @@ async function saveStoredMessages(chatId, messages) {
 // Clear stored messages for a chat (call this when user reads / dismisses)
 export async function clearStoredMessages(chatId) {
   try {
-    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     await AsyncStorage.removeItem(STORAGE_KEY_PREFIX + chatId);
   } catch (e) {}
 }
