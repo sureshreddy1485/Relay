@@ -35,30 +35,39 @@ async function showNotification(chatId, sender, chat, title, body) {
     };
 
     // 3. Try to stack with existing notification
-    let allMessages = [newMsg];
+    let fullBody = body;
+    let messageCount = 1;
+    
     try {
       const displayed = await notifee.getDisplayedNotifications();
       const existing = displayed.find(n => n.id === chatId);
-      if (existing?.notification?.android?.style?.messages) {
-        allMessages = [...existing.notification.android.style.messages, newMsg];
+      
+      // If there's an existing notification, grab its body and append the new one
+      if (existing?.notification?.body) {
+        fullBody = existing.notification.body + '\n' + body;
+        
+        // Try to count previous lines to update the title
+        const previousLines = existing.notification.body.split('\n');
+        messageCount = previousLines.length + 1;
       }
     } catch (e) {}
 
-    // 4. Display notification with actions
+    const displayTitle = messageCount > 1 
+      ? `${title} (${messageCount} new messages)`
+      : title;
+
+    // 4. Display notification with actions (BIGTEXT is globally supported on all Android skins)
     await notifee.displayNotification({
       id: chatId,
-      title: title,
-      body: body,
+      title: displayTitle,
+      body: fullBody,
       android: {
         channelId: 'relay-messages',
         pressAction: { id: 'default' },
         importance: AndroidImportance.HIGH,
         style: {
-          type: AndroidStyle.MESSAGING,
-          person: { name: 'Me', id: 'me' },
-          messages: allMessages,
-          title: chat?.isGroupChat ? (chat.chatName || chat.groupName || title) : undefined,
-          group: chat?.isGroupChat || false,
+          type: AndroidStyle.BIGTEXT,
+          text: fullBody,
         },
         actions: [
           {
