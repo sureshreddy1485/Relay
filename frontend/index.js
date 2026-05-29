@@ -14,61 +14,65 @@ const getBaseUrl = () => process.env.EXPO_PUBLIC_API_URL || 'https://relay-api-j
 // ═══════════════════════════════════════════════════════════════
 async function showNotification(chatId, sender, chat, title, body) {
   try {
-    // 1. Create channel
+    // 1. Create channel (Use new ID to force Android to apply new sound settings)
     await notifee.createChannel({
-      id: 'relay-messages',
+      id: 'relay-messages-v4',
       name: 'Relay Messages',
       importance: AndroidImportance.HIGH,
-      sound: 'kin_notification_sound',
+      sound: 'relay_notification_sound', // Android looks up relay_notification_sound.mp3 or .wav
       vibration: true,
       vibrationPattern: [0, 250, 250, 250],
     });
 
-    const senderName = sender.displayName || sender.username || 'Unknown';
-    const senderId = sender._id ? sender._id.toString() : 'user';
+    const senderName = sender?.displayName || sender?.username || 'Unknown';
+    const senderId = sender?._id ? sender._id.toString() : 'user';
 
-    // 2. Build new message
-    const newMsg = {
-      text: body,
+    // 2. Manage message stacking natively via Notifee
+    const message = {
+      text: body || '',
       timestamp: Date.now(),
-      person: { id: senderId, name: senderName },
+      person: {
+        id: senderId,
+        name: senderName,
+      },
     };
 
-    // 3. Try to stack with existing notification
-    let fullBody = body;
-    let messageCount = 1;
-    
+    let styleMessages = [message];
+
     try {
+      // Fetch currently displayed notifications to see if this chat already has one active
       const displayed = await notifee.getDisplayedNotifications();
-      const existing = displayed.find(n => n.id === chatId);
+      const existing = displayed.find(n => n.id === chatId || n.notification?.id === chatId);
       
-      // If there's an existing notification, grab its body and append the new one
-      const oldBody = existing?.notification?.android?.style?.text || existing?.notification?.body;
-      if (oldBody) {
-        fullBody = oldBody + '\n' + body;
-        
-        // Try to count previous lines to update the title
-        const previousLines = oldBody.split('\n');
-        messageCount = previousLines.length + 1;
+      if (existing && existing.notification?.android?.style?.messages) {
+        styleMessages = [...existing.notification.android.style.messages, message];
       }
-    } catch (e) {}
+    } catch (e) {
+      console.log("Failed to fetch displayed notifications for stacking", e);
+    }
 
-    const displayTitle = messageCount > 1 
-      ? `${title} (${messageCount} new messages)`
-      : title;
+    // Keep only the last 15 messages so it doesn't crash the system bundle size
+    if (styleMessages.length > 15) {
+      styleMessages = styleMessages.slice(styleMessages.length - 15);
+    }
 
-    // 4. Display notification with actions (BIGTEXT is globally supported on all Android skins)
+    const isGroup = chat?.isGroupChat || false;
+
+    // 3. Display notification with actions using MESSAGING style (like WhatsApp)
     await notifee.displayNotification({
       id: chatId,
-      title: displayTitle,
-      body: fullBody,
+      title: title,
+      body: body,
       android: {
-        channelId: 'relay-messages',
+        channelId: 'relay-messages-v4',
         pressAction: { id: 'default' },
         importance: AndroidImportance.HIGH,
         style: {
-          type: AndroidStyle.BIGTEXT,
-          text: fullBody,
+          type: AndroidStyle.MESSAGING,
+          person: { name: 'Me', id: 'me' },
+          messages: styleMessages,
+          title: isGroup ? (chat.chatName || chat.groupName || title) : undefined,
+          group: isGroup,
         },
         actions: [
           {
@@ -76,7 +80,7 @@ async function showNotification(chatId, sender, chat, title, body) {
             pressAction: { id: 'reply' },
             input: {
               allowFreeFormInput: true,
-              placeholder: `Reply to ${senderName}...`,
+              placeholder: `Reply...`,
             },
           },
           {
@@ -88,14 +92,14 @@ async function showNotification(chatId, sender, chat, title, body) {
       data: { chatId },
     });
   } catch (e) {
-    // Last resort: show a basic notification without any fancy styling
+    // Last resort: show a basic notification if MESSAGING style fails
     try {
       await notifee.displayNotification({
         id: chatId,
         title: title,
         body: body,
         android: {
-          channelId: 'relay-messages',
+          channelId: 'relay-messages-v4',
           pressAction: { id: 'default' },
           importance: AndroidImportance.HIGH,
           actions: [
@@ -124,7 +128,9 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
   const chatId = notification?.data?.chatId;
 
   if (type === EventType.DISMISSED && chatId) {
-    try { await notifee.cancelNotification(chatId); } catch (e) {}
+    try { 
+      await notifee.cancelNotification(chatId); 
+    } catch (e) {}
     return;
   }
 
@@ -134,47 +140,41 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
       if (!token) return;
 
       if (pressAction.id === 'reply' && input) {
-        // Build FormData since the backend expects multipart/form-data for messages
-        const formData = new FormData();
-        formData.append('chatId', chatId);
-        formData.append('content', input);
-        formData.append('messageType', 'text');
-
-        const response = await fetch(`${getBaseUrl()}/messages`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`API Error: ${response.status} - ${errorText.substring(0, 50)}`);
-        }
-
-        // Add the reply to the stored message list and update the notification
-        await showNotification(chatId,
-          { _id: 'me', displayName: 'You', username: 'You' },
-          null, notification.title, input);
-
-      } else if (pressAction.id === 'mark_as_read') {
-        await fetch(`${getBaseUrl()}/messages/${chatId}/read`, {
-          method: 'PUT',
+        const textContent = typeof input === 'string' ? input : (input.text || input.input || JSON.stringify(input));
+        // Use axios instead of fetch for bulletproof headless requests
+        await axios.post(`${getBaseUrl()}/messages`, {
+          chatId: chatId,
+          content: textContent,
+          messageType: 'text'
+        }, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
+
+        // Add the reply to the stored message list and update the notification
+        await showNotification(chatId,
+          { displayName: 'You' }, // dummy sender
+          null, notification.title || 'Chat', textContent);
+
+      } else if (pressAction.id === 'mark_as_read') {
+        await axios.put(`${getBaseUrl()}/messages/${chatId}/read`, {}, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         await notifee.cancelNotification(notification.id || chatId);
       }
     } catch (e) {
-      // Show error notification so the user can see what failed in the background
+      const errorMsg = e.response?.data?.message || e.message || 'Unknown network error';
+      // Clear the spinner immediately by updating the notification with an error message
       await notifee.displayNotification({
-        id: 'error_debug',
-        title: 'Background Reply Failed',
-        body: e.message || 'Unknown error',
-        android: { channelId: 'relay-messages', pressAction: { id: 'default' } }
+        id: chatId,
+        title: '⚠️ Reply Failed',
+        body: errorMsg,
+        android: { channelId: 'relay-messages-v4', pressAction: { id: 'default' } },
+        data: { chatId }
       });
     }
   }

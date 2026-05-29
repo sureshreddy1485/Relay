@@ -179,8 +179,8 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
     try {
       await expo.sendPushNotificationsAsync([{
         to: targetUser.pushToken,
-        channelId: 'messages-v6',
-        sound: 'kin_notification_sound.wav',
+        channelId: 'relay-messages-v4',
+        sound: 'relay_notification_sound.mp3',
         title: 'New Friend Request',
         body: `${sender.displayName || sender.username} sent you a friend request`,
         data: { type: 'friend_request' }

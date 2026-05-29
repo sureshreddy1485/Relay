@@ -6,20 +6,24 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const broadcastMessage = async (messageContent) => {
   if (!messageContent) {
     console.error('❌ Error: No message content provided.');
-    console.log('Usage: node broadcast.js "Your message here"');
+    console.log('Usage: node scripts/broadcast.js "Your message here"');
     process.exit(1);
   }
 
   try {
-    console.log('📡 Hitting live Render API to bypass local DNS blocks...');
+    console.log('📡 Sending broadcast request to production server...');
     
-    // Hit the deployed production API
-    const API_URL = 'https://relay-api-jlpx.onrender.com/api/messages/broadcast';
-    
-    const response = await fetch(API_URL, {
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is missing from .env');
+    }
+
+    // You can also change this to your local server (e.g. http://localhost:5000) if testing locally.
+    const apiUrl = 'https://relay-api-jlpx.onrender.com/api/messages/broadcast';
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         content: messageContent,
@@ -30,10 +34,10 @@ const broadcastMessage = async (messageContent) => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'API request failed');
+      throw new Error(data.message || 'Server returned an error');
     }
 
-    console.log(`🎉 Broadcast complete! ${data.message}`);
+    console.log(`🎉 Success! ${data.message}`);
     process.exit(0);
   } catch (error) {
     console.error('❌ Failed to broadcast:', error.message);

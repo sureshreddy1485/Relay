@@ -11,12 +11,12 @@ export async function registerForPushNotificationsAsync() {
   if (Platform.OS === 'android') {
     // Expo fallback channel (for Expo Push Token users)
     try {
-      await Notifications.setNotificationChannelAsync('relay-messages', {
+      await Notifications.setNotificationChannelAsync('relay-messages-v4', {
         name: 'Relay Messages',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#06B6D4',
-        sound: 'kin_notification_sound.wav',
+        sound: 'relay_notification_sound.mp3', // Note: User will use .mp3 now
         enableVibrate: true,
       });
     } catch (e) {

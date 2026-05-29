@@ -4,10 +4,10 @@ import notifee, { AndroidStyle, AndroidImportance } from '@notifee/react-native'
 async function ensureChannel() {
   try {
     await notifee.createChannel({
-      id: 'relay-messages',
+      id: 'relay-messages-v4',
       name: 'Relay Messages',
       importance: AndroidImportance.HIGH,
-      sound: 'kin_notification_sound',
+      sound: 'relay_notification_sound',
       vibration: true,
       vibrationPattern: [0, 250, 250, 250],
     });
@@ -53,7 +53,7 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
       title: title,
       body: body,
       android: {
-        channelId: 'relay-messages',
+        channelId: 'relay-messages-v4',
         pressAction: { id: 'default' },
         importance: AndroidImportance.HIGH,
         style: {

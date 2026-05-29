@@ -210,8 +210,8 @@ const sendMessage = asyncHandler(async (req, res) => {
             pushMessages.push({
               type: 'expo',
               to: targetUser.pushToken,
-              channelId: 'relay-messages',
-              sound: 'kin_notification_sound.wav',
+              channelId: 'relay-messages-v4',
+              sound: 'relay_notification_sound.mp3',
               color: '#2DD4BF',
               title,
               body: pushBody,

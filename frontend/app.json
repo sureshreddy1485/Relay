@@ -65,7 +65,7 @@
         {
           "icon": "./assets/icon.png",
           "sounds": [
-            "./assets/kin_notification_sound.wav"
+            "./assets/relay_notification_sound.mp3"
           ]
         }
       ],
