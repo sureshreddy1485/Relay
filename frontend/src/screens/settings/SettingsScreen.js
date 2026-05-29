@@ -321,7 +321,7 @@ export default function SettingsScreen({ navigation }) {
       const update = await Promise.race([
         Updates.checkForUpdateAsync(),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 5000)
+          setTimeout(() => reject(new Error('timeout')), 20000)
         ),
       ]);
       setCheckingUpdate(false);
