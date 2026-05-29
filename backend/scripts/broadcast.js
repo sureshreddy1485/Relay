@@ -38,7 +38,6 @@ const broadcastMessage = async (messageContent) => {
     }
 
     console.log(`🎉 Success! ${data.message}`);
-    process.exit(0);
   } catch (error) {
     console.error('❌ Failed to broadcast:', error.message);
     process.exit(1);

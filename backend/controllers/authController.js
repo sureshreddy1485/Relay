@@ -126,9 +126,17 @@ const login = asyncHandler(async (req, res) => {
   user.lastSeen = new Date();
   if (!user.devices) user.devices = [];
   
-  // Find if this device already exists
-  const existingDeviceIndex = user.devices.findIndex(d => d.deviceId === sessionId);
+  // Find if this exact deviceId already exists
+  let existingDeviceIndex = user.devices.findIndex(d => d.deviceId === sessionId);
+  
+  // If not found by ID, look for the same deviceName (e.g. user reinstalled the app on the same phone)
+  if (existingDeviceIndex === -1 && deviceName !== 'Unknown Device') {
+    existingDeviceIndex = user.devices.findIndex(d => d.deviceName === deviceName);
+  }
+
   if (existingDeviceIndex !== -1) {
+    // Replace the old session with the new one
+    user.devices[existingDeviceIndex].deviceId = sessionId;
     user.devices[existingDeviceIndex].lastActive = Date.now();
     user.devices[existingDeviceIndex].deviceName = deviceName;
   } else {
