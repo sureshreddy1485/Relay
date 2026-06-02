@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import * as ScreenCapture from 'expo-screen-capture';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ScrollView,
   ActivityIndicator, Alert, Platform, StatusBar, Dimensions,
@@ -19,6 +21,15 @@ const isSmall = width <= 380;
 
 export default function StoriesScreen({ navigation }) {
   const { showAlert } = useAlert();
+
+  useFocusEffect(
+    useCallback(() => {
+      ScreenCapture.preventScreenCaptureAsync().catch(() => {});
+      return () => {
+        ScreenCapture.allowScreenCaptureAsync().catch(() => {});
+      };
+    }, [])
+  );
   const { user } = useAuthStore();
   const [stories, setStories] = useState([]);
   const [isLoading, setIsLoading] = useState(false);

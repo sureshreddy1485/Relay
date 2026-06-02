@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import * as ScreenCapture from 'expo-screen-capture';
 import {
   View, Text, Image, StyleSheet, TouchableOpacity,
   Dimensions, StatusBar, Platform, Animated, Modal,
@@ -11,7 +12,7 @@ import api from '../../services/api';
 import useAuthStore from '../../store/useAuthStore';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useAlert } from '../../components/CustomAlert';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useFocusEffect } from '@react-navigation/native';
 
 const StoryVideo = ({ url, paused, mediaLoading, setMediaLoading }) => {
   const player = useVideoPlayer(url, p => {
@@ -70,6 +71,15 @@ const formatViewedTime = (dateStr) => {
 
 export default function StoryViewerScreen({ route, navigation }) {
   const { showAlert } = useAlert();
+
+  useFocusEffect(
+    useCallback(() => {
+      ScreenCapture.preventScreenCaptureAsync().catch(() => {});
+      return () => {
+        ScreenCapture.allowScreenCaptureAsync().catch(() => {});
+      };
+    }, [])
+  );
   const { stories: initialStories, user: initialStoryUser, allStories, initialUserIndex } = route.params;
   const { user: me } = useAuthStore();
   

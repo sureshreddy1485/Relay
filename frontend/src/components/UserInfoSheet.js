@@ -192,6 +192,35 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
               )}
             </View>
 
+            {isFriend && profile.mutualGroups && profile.mutualGroups.length > 0 && (
+              <View style={styles.mutualGroupsContainer}>
+                <Text style={styles.mutualGroupsTitle}>Mutual Groups</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mutualGroupsScroll}>
+                  {profile.mutualGroups.map(group => (
+                    <TouchableOpacity 
+                      key={group._id} 
+                      style={styles.mutualGroupItem}
+                      onPress={() => {
+                        onClose();
+                        navigation.navigate('ChatRoom', { chat: { ...group, isGroupChat: true } });
+                      }}
+                    >
+                      {group.groupPicture ? (
+                        <Image source={{ uri: group.groupPicture }} style={styles.mutualGroupAvatar} />
+                      ) : (
+                        <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.mutualGroupAvatar}>
+                          <Text style={styles.mutualGroupInitial}>
+                            {(group.chatName || '?').charAt(0).toUpperCase()}
+                          </Text>
+                        </LinearGradient>
+                      )}
+                      <Text style={styles.mutualGroupName} numberOfLines={1}>{group.chatName}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
             {/* ── Actions ─────────────────────────────────────────────── */}
             <View style={styles.actions}>
               {(profile.role !== 'system_bot' && profile.username !== 'mica_bot' && profile.username !== 'relay_bot' && profile.username !== 'relay') ? (
@@ -478,6 +507,13 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.dark.border,
   },
   daysText: { color: Colors.dark.muted, fontSize: 12 },
+  mutualGroupsContainer: { paddingHorizontal: 20, marginBottom: 20 },
+  mutualGroupsTitle: { color: Colors.dark.muted, fontSize: 13, fontWeight: '600', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  mutualGroupsScroll: { gap: 16 },
+  mutualGroupItem: { alignItems: 'center', width: 64 },
+  mutualGroupAvatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  mutualGroupInitial: { fontSize: 20, fontWeight: '700', color: '#FFF' },
+  mutualGroupName: { color: Colors.dark.text, fontSize: 12, textAlign: 'center' },
   actions: {
     backgroundColor: Colors.dark.card, marginHorizontal: 16, borderRadius: 18,
     borderWidth: 1, borderColor: Colors.dark.border, overflow: 'hidden',

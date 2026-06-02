@@ -39,7 +39,20 @@ const getUserProfile = asyncHandler(async (req, res) => {
     throw new Error('User not found');
   }
 
-  res.status(200).json({ success: true, user: sanitizeUser(user, req.user._id) });
+  // Find mutual groups
+  const Chat = require('../models/Chat');
+  const mutualGroups = await Chat.find({
+    isGroupChat: true,
+    $and: [
+      { users: req.user._id },
+      { users: user._id }
+    ]
+  }).select('_id chatName groupPicture');
+
+  const sanitizedUser = sanitizeUser(user, req.user._id);
+  sanitizedUser.mutualGroups = mutualGroups;
+
+  res.status(200).json({ success: true, user: sanitizedUser });
 });
 
 // @desc  Update own profile
