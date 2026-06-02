@@ -1,7 +1,7 @@
 import React from 'react';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet, Platform, DeviceEventEmitter, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Platform, DeviceEventEmitter, Dimensions, Image, AppState, Modal, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChatsListScreen from '../screens/chat/ChatsListScreen';
 import StoriesScreen from '../screens/stories/StoriesScreen';
@@ -10,6 +10,7 @@ import { Colors } from '../theme/colors';
 import useChatStore from '../store/useChatStore';
 import useAuthStore from '../store/useAuthStore';
 import api from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { getSocket } from '../services/socketService';
 
@@ -38,7 +39,41 @@ export default function TabNavigator() {
   const totalUnread  = Object.values(unreadCounts).filter(count => count > 0).length;
   const { user }       = useAuthStore();
   const [unseenStoriesCount, setUnseenStoriesCount] = React.useState(0);
+  const [showAccManager, setShowAccManager] = React.useState(false);
+  const [hasOtherUnread, setHasOtherUnread] = React.useState(false);
+  const { savedAccounts, switchAccount, logout } = useAuthStore();
   const insets       = useSafeAreaInsets();
+  const lastSettingsPressRef = React.useRef(0);
+
+  const checkOtherAccountsUnread = React.useCallback(async () => {
+    const state = useAuthStore.getState();
+    const _savedAccounts = state.savedAccounts;
+    const _user = state.user;
+    if (!_savedAccounts || _savedAccounts.length <= 1 || !_user) {
+      setHasOtherUnread(false);
+      return;
+    }
+    
+    let anyUnread = false;
+    for (const acc of _savedAccounts || []) {
+      if (!acc?.user?._id) continue;
+      if (acc.user._id === _user?._id) continue;
+      try {
+        const res = await api.get('/chats', { headers: { Authorization: `Bearer ${acc.token}` }, ignore401: true });
+        if (res.data.chats.some(c => c.unreadCount > 0)) {
+          anyUnread = true;
+          break;
+        }
+      } catch (e) {
+        if (e.response?.status === 401) {
+          const newSaved = useAuthStore.getState().savedAccounts.filter(a => a?.user?._id !== acc?.user?._id);
+          useAuthStore.setState({ savedAccounts: newSaved });
+          AsyncStorage.setItem('relay_saved_accounts', JSON.stringify(newSaved));
+        }
+      }
+    }
+    setHasOtherUnread(anyUnread);
+  }, []);
 
   const fetchUnseenStories = React.useCallback(async () => {
     if (!user) return;
@@ -67,7 +102,11 @@ export default function TabNavigator() {
 
   React.useEffect(() => {
     fetchUnseenStories();
-    const interval = setInterval(fetchUnseenStories, 30000); // Poll every 30s as fallback
+    checkOtherAccountsUnread();
+    const interval = setInterval(() => {
+      fetchUnseenStories();
+      checkOtherAccountsUnread();
+    }, 30000); // Poll every 30s as fallback
     
     const socket = getSocket();
     if (socket) {
@@ -75,6 +114,9 @@ export default function TabNavigator() {
     }
 
     const sub = DeviceEventEmitter.addListener('story_viewed', fetchUnseenStories);
+    const appSub = AppState.addEventListener('change', next => {
+      if (next === 'active') checkOtherAccountsUnread();
+    });
     
     return () => {
       clearInterval(interval);
@@ -82,16 +124,18 @@ export default function TabNavigator() {
         socket.off('new_story', fetchUnseenStories);
       }
       sub.remove();
+      appSub.remove();
     };
-  }, [fetchUnseenStories]);
+  }, [fetchUnseenStories, checkOtherAccountsUnread]);
 
   // Tab bar height = base height + device bottom inset
   const baseHeight = isSmall ? 56 : 62;
   const tabBarHeight = baseHeight + (insets.bottom || 8);
 
   return (
-    <Tab.Navigator
-      tabBarPosition="bottom"
+    <>
+      <Tab.Navigator
+        tabBarPosition="bottom"
       screenOptions={{
         animationEnabled: false,
         swipeEnabled: true,
@@ -143,13 +187,137 @@ export default function TabNavigator() {
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}
+        listeners={{
+          tabPress: (e) => {
+            const now = Date.now();
+            if (now - lastSettingsPressRef.current < 400) {
+              // Double tap detected
+              const { user: currentUser, savedAccounts, switchAccount } = useAuthStore.getState();
+              if (currentUser && Array.isArray(savedAccounts)) {
+                const validAccounts = savedAccounts.filter(a => a?.user?._id);
+                const otherAccounts = validAccounts.filter(a => String(a.user._id) !== String(currentUser._id));
+                if (otherAccounts.length > 0) {
+                  switchAccount(otherAccounts[0].user._id);
+                }
+              }
+            }
+            lastSettingsPressRef.current = now;
+          },
+          tabLongPress: (e) => {
+            setShowAccManager(true);
+          }
+        }}
         options={{
-          tabBarIcon: ({ focused, color }) => (
-            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={24} color={color} />
-          ),
+          tabBarIcon: ({ focused, color }) => {
+            if (user?.profilePicture) {
+              return (
+                <View style={[styles.profileTabWrap, focused && styles.profileTabWrapFocused]}>
+                  <Image source={{ uri: user.profilePicture }} style={styles.profileTabImg} />
+                  {hasOtherUnread && <View style={styles.dotBadge} />}
+                </View>
+              );
+            }
+            return (
+              <View style={[styles.profileTabWrap, focused && styles.profileTabWrapFocused]}>
+                <View style={[styles.profileTabImg, { backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '700' }}>
+                    {(user?.displayName || user?.username || '?').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                {hasOtherUnread && <View style={styles.dotBadge} />}
+              </View>
+            );
+          },
         }}
       />
     </Tab.Navigator>
+      
+      {/* Account Manager Modal */}
+      <Modal visible={showAccManager} transparent animationType="slide" onRequestClose={() => setShowAccManager(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} activeOpacity={1} onPress={() => setShowAccManager(false)}>
+          <View style={{ backgroundColor: Colors.dark.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: (insets.bottom || 24) + 24 }}>
+            <View style={{ width: 40, height: 4, backgroundColor: Colors.dark.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+            <Text style={{ color: Colors.dark.text, fontSize: 18, fontWeight: '700', marginBottom: 16 }}>Saved Accounts</Text>
+            
+            {(() => {
+              const validAccounts = (Array.isArray(savedAccounts) ? savedAccounts : []).filter(a => a?.user?._id);
+              const activeAcc = validAccounts.find(a => String(a.user._id) === String(user?._id));
+              const otherAccs = validAccounts.filter(a => String(a.user._id) !== String(user?._id));
+              const displayAccounts = activeAcc ? [activeAcc, ...otherAccs] : validAccounts;
+              
+              return (
+                <>
+                  {displayAccounts.map((acc) => (
+                    <TouchableOpacity
+                      key={acc.user._id || Math.random().toString()}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.dark.border }}
+                      onPress={async () => {
+                        if (String(acc.user._id) !== String(user?._id)) {
+                          await switchAccount(acc.user._id);
+                          setShowAccManager(false);
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {acc.user.profilePicture ? (
+                          <Image source={{ uri: acc.user.profilePicture }} style={{ width: 44, height: 44, borderRadius: 22, marginRight: 12, borderWidth: acc.user._id === user?._id ? 2 : 0, borderColor: Colors.primary }} />
+                        ) : (
+                          <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primary, marginRight: 12, alignItems: 'center', justifyContent: 'center', borderWidth: acc.user._id === user?._id ? 2 : 0, borderColor: '#FFF' }}>
+                            <Text style={{ color: '#FFF', fontSize: 18, fontWeight: '700' }}>
+                              {(acc.user.displayName || acc.user.username || '?').charAt(0).toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                        <View>
+                          <Text style={{ color: Colors.dark.text, fontSize: 16, fontWeight: '600' }}>{acc.user.username}</Text>
+                          {acc.user._id === user?._id ? (
+                            <Text style={{ color: Colors.primary, fontSize: 13, fontWeight: '500' }}>Active Account</Text>
+                          ) : (
+                            <Text style={{ color: Colors.dark.muted, fontSize: 13 }}>Tap to switch</Text>
+                          )}
+                        </View>
+                      </View>
+                      
+                      <TouchableOpacity
+                        style={{ padding: 8 }}
+                        onPress={() => {
+                          const newSaved = savedAccounts.filter(a => a?.user?._id !== acc.user._id);
+                          useAuthStore.setState({ savedAccounts: newSaved });
+                          AsyncStorage.setItem('relay_saved_accounts', JSON.stringify(newSaved));
+                          if (acc.user._id === user?._id) {
+                            logout();
+                            setShowAccManager(false);
+                          }
+                        }}
+                      >
+                        <Ionicons name="close-circle" size={24} color={Colors.dark.muted} />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
+                  
+                  {validAccounts.length < 3 && (
+                    <TouchableOpacity
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16 }}
+                      onPress={() => {
+                        setShowAccManager(false);
+                        const { prepareAddAccount } = useAuthStore.getState();
+                        if (prepareAddAccount) prepareAddAccount();
+                      }}
+                    >
+                      <View style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: Colors.dark.muted, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                        <Ionicons name="add" size={24} color={Colors.dark.muted} />
+                      </View>
+                      <Text style={{ color: Colors.dark.text, fontSize: 16, fontWeight: '600' }}>Add Account</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              );
+            })()}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
   );
 }
 
@@ -185,5 +353,22 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     borderWidth: 1.5,
     borderColor: Colors.dark.card,
+  },
+  profileTabWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  profileTabWrapFocused: {
+    borderColor: Colors.primary,
+  },
+  profileTabImg: {
+    width: 23,
+    height: 23,
+    borderRadius: 12,
   },
 });

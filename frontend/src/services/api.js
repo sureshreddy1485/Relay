@@ -25,7 +25,7 @@ const handleError = (error) => {
     'Network error — check your connection';
   error.message = message;
 
-  if (error.response?.status === 401) {
+  if (error.response?.status === 401 && !error.config?.ignore401) {
     if (error.config && error.config.url !== '/auth/login' && error.config.url !== '/auth/signup') {
       const useAuthStore = require('../store/useAuthStore').default;
       useAuthStore.getState().logout();

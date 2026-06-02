@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Image, Alert, Switch, StatusBar, Platform, Modal,
-  TextInput, ActivityIndicator, FlatList,
+  TextInput, ActivityIndicator, FlatList, KeyboardAvoidingView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -688,8 +688,9 @@ export default function GroupInfoScreen({ route, navigation }) {
 
       {/* ── Edit Group Modal ────────────────────────────────────────── */}
       <Modal visible={showEditModal} transparent animationType="slide" onRequestClose={() => setShowEditModal(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowEditModal(false)}>
-          <View style={styles.editSheet} onStartShouldSetResponder={() => true}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowEditModal(false)}>
+            <View style={styles.editSheet} onStartShouldSetResponder={() => true}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 }}>
               <View style={{ width: 24 }} />
               <Text style={[styles.editTitle, { marginBottom: 0 }]}>Edit Group</Text>
@@ -829,6 +830,7 @@ export default function GroupInfoScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Member Profile Sheet ──────────────────────────────────── */}
@@ -952,8 +954,9 @@ export default function GroupInfoScreen({ route, navigation }) {
 
       {/* ── Add Member Modal ─────────────────────────────────────────── */}
       <Modal visible={showAddMemberModal} transparent animationType="slide" onRequestClose={() => setShowAddMemberModal(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowAddMemberModal(false)}>
-          <View style={styles.memberSheet} onStartShouldSetResponder={() => true}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowAddMemberModal(false)}>
+            <View style={styles.memberSheet} onStartShouldSetResponder={() => true}>
             <View style={styles.editHandle} />
             <Text style={[styles.memberSheetName, { color: Colors.primary, fontSize: 18, marginBottom: 16 }]}>Add People to Group</Text>
 
@@ -1043,6 +1046,7 @@ export default function GroupInfoScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Bulk Remove Modal ─────────────────────────────────────────── */}

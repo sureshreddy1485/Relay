@@ -28,7 +28,7 @@ export default function LoginScreen({ navigation }) {
   React.useEffect(() => {
     const loadSavedCredentials = async () => {
       try {
-        const savedArr = await AsyncStorage.getItem('relay_saved_accounts');
+        const savedArr = await AsyncStorage.getItem('relay_saved_logins');
         if (savedArr) {
           const accounts = JSON.parse(savedArr);
           if (Array.isArray(accounts)) setSavedAccounts(accounts);
@@ -76,7 +76,7 @@ export default function LoginScreen({ navigation }) {
         });
         if (newAccounts.length > 3) newAccounts = newAccounts.slice(0, 3);
       }
-      await AsyncStorage.setItem('relay_saved_accounts', JSON.stringify(newAccounts));
+      await AsyncStorage.setItem('relay_saved_logins', JSON.stringify(newAccounts));
       
       connectSocket(user._id);
     } else {

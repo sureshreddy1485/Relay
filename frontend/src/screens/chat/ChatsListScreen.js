@@ -73,6 +73,15 @@ export default function ChatsListScreen({ navigation }) {
     }, [])
   );
 
+  // Auto-refresh when the active user switches
+  useEffect(() => {
+    if (user && user._id) {
+      useChatStore.getState().reset();
+      fetchChats(false);
+      fetchFriendRequests();
+    }
+  }, [user?._id]);
+
   // Real-time: auto-refresh friend request badge when a new request arrives
   useEffect(() => {
     const socket = getSocket();

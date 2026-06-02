@@ -10,12 +10,23 @@ const useAuthStore = create((set, get) => ({
   isAuthenticated: false,
   isLoading: false,
   error: null,
+  savedAccounts: [],
 
   // Hydrate from storage on app start
   hydrate: async () => {
     try {
       let token = await AsyncStorage.getItem('relay_token');
       let userStr = await AsyncStorage.getItem('relay_user');
+
+      let savedStr = await AsyncStorage.getItem('relay_saved_accounts');
+      if (savedStr) {
+        try {
+          const parsed = JSON.parse(savedStr);
+          if (Array.isArray(parsed)) {
+            set({ savedAccounts: parsed });
+          }
+        } catch (e) {}
+      }
 
       if (token && userStr) {
         const user = JSON.parse(userStr);
@@ -46,6 +57,51 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
+  _saveAccountToStore: async (user, token) => {
+    if (!user || !user._id) return;
+    let currentSaved = get().savedAccounts;
+    let saved = Array.isArray(currentSaved) ? [...currentSaved] : [];
+    const exists = saved.findIndex(a => String(a?.user?._id) === String(user._id));
+    if (exists > -1) {
+      saved[exists] = { user, token };
+    } else {
+      saved.push({ user, token });
+    }
+    set({ savedAccounts: saved });
+    await AsyncStorage.setItem('relay_saved_accounts', JSON.stringify(saved));
+  },
+
+  switchAccount: async (targetUserId) => {
+    const saved = get().savedAccounts;
+    const target = saved.find(a => String(a?.user?._id) === String(targetUserId));
+    if (!target) return false;
+
+    // Save current session state before switching
+    const currentToken = get().token;
+    const currentUser = get().user;
+    if (currentToken && currentUser) {
+      await get()._saveAccountToStore(currentUser, currentToken);
+    }
+
+    setAuthHeader(target.token);
+    await AsyncStorage.setItem('relay_token', target.token);
+    await AsyncStorage.setItem('relay_user', JSON.stringify(target.user));
+    set({ user: target.user, token: target.token, isAuthenticated: true });
+
+    try {
+      // Reset and fetch new chats immediately so the UI updates
+      const useChatStore = require('./useChatStore').default;
+      if (useChatStore && useChatStore.getState) {
+        useChatStore.getState().reset();
+        useChatStore.getState().fetchChats();
+      }
+    } catch (e) {
+      console.log('Failed to reset chat store on switch:', e);
+    }
+    
+    return true;
+  },
+
   signup: async (formData) => {
     set({ isLoading: true, error: null });
     try {
@@ -65,6 +121,7 @@ const useAuthStore = create((set, get) => ({
       await AsyncStorage.setItem('relay_user', JSON.stringify(data.user));
       setAuthHeader(data.token);
       set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
+      await get()._saveAccountToStore(data.user, data.token);
       return { success: true };
     } catch (err) {
       const message = err.response?.data?.message || 'Signup failed';
@@ -87,6 +144,7 @@ const useAuthStore = create((set, get) => ({
       await AsyncStorage.setItem('relay_user', JSON.stringify(data.user));
       setAuthHeader(data.token);
       set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
+      await get()._saveAccountToStore(data.user, data.token);
       return { success: true };
     } catch (err) {
       const message = err.response?.data?.message || 'Login failed';
@@ -103,12 +161,36 @@ const useAuthStore = create((set, get) => ({
     await AsyncStorage.removeItem('relay_user');
     setAuthHeader(null);
     set({ user: null, token: null, isAuthenticated: false });
+    try {
+      const useChatStore = require('./useChatStore').default;
+      useChatStore.getState().reset();
+    } catch (e) {}
+  },
+
+  prepareAddAccount: async () => {
+    // Save current session before dropping out locally
+    const currentToken = get().token;
+    const currentUser = get().user;
+    if (currentToken && currentUser) {
+      await get()._saveAccountToStore(currentUser, currentToken);
+    }
+    
+    // Clear local state ONLY - do NOT call /auth/logout
+    await AsyncStorage.removeItem('relay_token');
+    await AsyncStorage.removeItem('relay_user');
+    setAuthHeader(null);
+    set({ user: null, token: null, isAuthenticated: false });
+    try {
+      const useChatStore = require('./useChatStore').default;
+      useChatStore.getState().reset();
+    } catch (e) {}
   },
 
   updateUser: (updates) => {
     const updated = { ...get().user, ...updates };
     set({ user: updated });
     AsyncStorage.setItem('relay_user', JSON.stringify(updated));
+    get()._saveAccountToStore(updated, get().token);
   },
 
   setError: (error) => set({ error }),

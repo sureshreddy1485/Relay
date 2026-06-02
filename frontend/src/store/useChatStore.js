@@ -22,6 +22,17 @@ const useChatStore = create((set, get) => ({
   },
   hideNotification: () => set({ inAppNotification: null }),
 
+  reset: () => set({
+    chats: [],
+    selectedChat: null,
+    messages: {},
+    typingUsers: {},
+    unreadCounts: {},
+    isLoadingChats: false,
+    isLoadingMessages: false,
+    inAppNotification: null,
+  }),
+
   fetchChats: async (silent = false) => {
     // Only show the loading spinner on the very first load (no chats yet)
     if (!silent && get().chats.length === 0) {

@@ -110,13 +110,13 @@ export default function SignupScreen({ navigation }) {
       // Save credentials locally if user opted in
       if (saveInfo) {
         try {
-          const raw = await AsyncStorage.getItem('relay_saved_accounts');
+          const raw = await AsyncStorage.getItem('relay_saved_logins');
           let accounts = raw ? JSON.parse(raw) : [];
           // Remove existing entry for same username
           accounts = accounts.filter(a => a.username !== username.toLowerCase().trim());
           // Prepend new entry; cap at 3
           accounts = [{ username: username.toLowerCase().trim(), email: email.toLowerCase().trim(), password }, ...accounts].slice(0, 3);
-          await AsyncStorage.setItem('relay_saved_accounts', JSON.stringify(accounts));
+          await AsyncStorage.setItem('relay_saved_logins', JSON.stringify(accounts));
         } catch (_) {}
       }
     }

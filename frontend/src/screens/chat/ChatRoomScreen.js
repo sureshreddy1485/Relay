@@ -112,6 +112,25 @@ function TypingBubble({ username }) {
   );
 }
 
+const formatChatDateSeparator = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  
+  const diffTime = today - targetDate;
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7 && diffDays > 1) {
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+  }
+  return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 export default function ChatRoomScreen({ route, navigation }) {
   const { showAlert } = useAlert();
   const initialChat = route.params.chat;
@@ -1021,10 +1040,21 @@ export default function ChatRoomScreen({ route, navigation }) {
           data={displayMessages}
           inverted
           keyExtractor={(item) => item._id}
-          renderItem={({ item }) => (
-            <MessageBubble
-              message={item}
-              currentUser={user}
+          renderItem={({ item, index }) => {
+            const nextItem = displayMessages[index + 1];
+            const showDate = !nextItem || new Date(item.createdAt).toDateString() !== new Date(nextItem.createdAt).toDateString();
+            return (
+              <View>
+                {showDate && (
+                  <View style={styles.dateSeparatorContainer}>
+                    <View style={styles.dateSeparatorBadge}>
+                      <Text style={styles.dateSeparatorText}>{formatChatDateSeparator(item.createdAt)}</Text>
+                    </View>
+                  </View>
+                )}
+                <MessageBubble
+                  message={item}
+                  currentUser={user}
               chat={chat}
               chatUsers={chat.users || []}
               isGroup={chat.isGroupChat}
@@ -1073,7 +1103,9 @@ export default function ChatRoomScreen({ route, navigation }) {
               onSelectToggle={() => toggleSelectMessage(item._id)}
               onLongPress={() => setSelectionMode(true)}
             />
-          )}
+              </View>
+            );
+          }}
           onEndReached={loadMore}
           onEndReachedThreshold={0.3}
           onScrollToIndexFailed={(info) => {
@@ -1630,6 +1662,25 @@ const styles = StyleSheet.create({
   headerStatus: { fontSize: 12 },
   headerRight: { flexDirection: 'row', gap: 2 },
   iconBtn: { padding: 6 },
+
+  dateSeparatorContainer: {
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  dateSeparatorBadge: {
+    backgroundColor: Colors.dark.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  dateSeparatorText: {
+    color: Colors.dark.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize'
+  },
 
   // ── Search bar ────────────────────────────────────────────────────────────
   searchBar: {
