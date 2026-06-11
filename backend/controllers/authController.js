@@ -3,8 +3,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Chat = require('../models/Chat');
 const Message = require('../models/Message');
-const BotEngine = require('../utils/BotEngine');
-const { getMicaBotId } = require('../utils/botHelper');
+const BotManager = require('../utils/BotManager');
+const { getMicaBotId, getRelayBotId } = require('../utils/botHelper');
 const { encryptSecurityKey, verifySecurityKey } = require('../utils/securityKey');
 const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
 
@@ -153,7 +153,7 @@ const login = asyncHandler(async (req, res) => {
   await user.save({ validateBeforeSave: false });
 
   // Send a security notification from Relay (Hardcoded text, zero Groq API usage)
-  let relayId = BotEngine.relayBotId || require('../utils/botHelper').getRelayBotId();
+  let relayId = getRelayBotId();
   if (relayId) {
     try {
       let chat = await Chat.findOne({
@@ -176,12 +176,13 @@ const login = asyncHandler(async (req, res) => {
       const dateString = new Date().toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' });
       const msgContent = `🔒 **Security Alert: New Login**\n\nYour account was just accessed from a new device.\n\n📱 **Device:** ${deviceName}\n🕒 **Time:** ${dateString}\n\n⚠️ **Note:** For security, only 3 active devices are allowed at once. Older sessions will be automatically terminated.\n\nIf this was you, simply ignore this message.`;
 
-      await BotEngine.sendCustomMessage(chat, io, {
-        sender: relayId,
-        chat: chat._id,
-        content: msgContent,
-        messageType: 'text',
-      });
+      await BotManager.sendCustomMessage(
+        chat,
+        io,
+        relayId,
+        msgContent,
+        'text'
+      );
     } catch (err) {
       console.error('Failed to send login notification:', err);
     }

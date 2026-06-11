@@ -517,8 +517,10 @@ const addToGroup = asyncHandler(async (req, res) => {
     });
   }
 
-  const BotEngine = require('../utils/BotEngine');
-  BotEngine.onUserJoinedGroup(updatedChat, targetUserId, io);
+  const BotManager = require('../utils/BotManager');
+  if (typeof BotManager.onUserJoinedGroup === 'function') {
+    BotManager.onUserJoinedGroup(updatedChat, targetUserId, io);
+  }
 
   res.status(200).json({ success: true, chat: updatedChat });
 });

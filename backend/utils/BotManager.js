@@ -361,6 +361,27 @@ class BotManager {
     const settings = await GroupGameSettings.findOne({ groupId });
     return settings ? (settings.activeBot || 'mica') : 'mica';
   }
+
+  async onUserJoinedGroup(chat, newUserId, io) {
+    try {
+      const activeBotStr = await this.getActiveBotStr(chat._id);
+      const activeBotId = await this.getActiveBotId(chat._id);
+      const User = require('../models/User');
+      const targetUser = await User.findById(newUserId);
+      if (!targetUser) return;
+      
+      let welcomeMsg = `Welcome ${targetUser.displayName || targetUser.username}!`;
+      if (activeBotStr === 'mars') {
+        welcomeMsg = `Welcome aboard, ${targetUser.displayName || targetUser.username}. Don't worry, I'll only judge you a little.`;
+      } else {
+        welcomeMsg = `Hello ${targetUser.displayName || targetUser.username}! Welcome to the group! ✨`;
+      }
+      
+      await this.sendCustomMessage(chat, io, activeBotId, welcomeMsg);
+    } catch(e) {
+      console.error('Error in onUserJoinedGroup:', e);
+    }
+  }
 }
 
 const manager = new BotManager();
