@@ -37,7 +37,7 @@ class BotManager {
     let text = (message.content || '').trim();
     let cleanCommandText = text.toLowerCase().replace(/^(?:@?mica\s+|@?mars\s+)/i, '').trim();
     
-    const isGroupAdmin = chat.isGroupChat && (chat.groupAdmin.toString() === senderId || chat.admins?.some(a => a.toString() === senderId));
+    const isGroupAdmin = chat.isGroupChat && ((chat.groupAdmin && chat.groupAdmin.toString() === senderId) || (chat.admins && chat.admins.some(a => a.toString() === senderId)));
 
     // Switch logic
     if (cleanCommandText === 'switch to mars' || cleanCommandText === 'bring mars back') {
