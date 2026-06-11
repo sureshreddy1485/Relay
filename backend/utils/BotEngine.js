@@ -26,7 +26,7 @@ class BotEngine {
 
     // 1. Check if it's an alias creation command (Admin only check should be inside AliasManager or here)
     if (CommandRegistry.isAliasCommand(text)) {
-      const [cmdPart, aliasPart] = text.split('==').map(s => s.trim().toLowerCase());
+      const [cmdPart, aliasPart] = text.split(/==?/).map(s => s.trim().toLowerCase());
       if (CommandRegistry.isValidGameCommand(cmdPart) && aliasPart) {
         // TODO: Validate admin
         await AliasManager.setAlias(chat._id, aliasPart, cmdPart);
@@ -47,7 +47,7 @@ class BotEngine {
       return this.sendCustomMessage(chat, io, {
         sender: this.micaId,
         chat: chat._id,
-        content: `**✨ System Intelligence ✨**\nHere are the commands I currently support!\n\n🎮 **Games (just type the word!)**\n• riddle\n• guess\n• assassination\n• doubleagent\n• trivia\n\n🛠️ **Utilities**\n• activity\n• leaderboard`,
+        content: `**✨ System Intelligence ✨**\nHere are the commands I currently support!\n\n🎮 **Games (just type the word!)**\n• riddle\n• guess\n• scramble (or jumble)\n• assassination\n• doubleagent\n• trivia\n\n🛠️ **Utilities**\n• activity\n• leaderboard`,
         messageType: 'text'
       });
     }
@@ -131,7 +131,7 @@ class BotEngine {
         let globalLb = `🌍 **Global Group Leaderboard** 🌍\n\n`;
         topGroups.forEach((g, i) => {
           const groupName = groups.find(x => x._id.toString() === g._id.toString())?.chatName || 'Unknown Group';
-          globalLb += `${i + 1}. ${groupName} - ${g.count} msgs\n`;
+          globalLb += `${i + 1}. [[${g._id}|${groupName}]] - ${g.count} msgs\n`;
         });
         
         return this.sendCustomMessage(chat, io, {
@@ -155,6 +155,9 @@ class BotEngine {
       } else if (lowerCmd === 'guess') {
         const GuessWordGame = require('../games/modes/GuessWord');
         return GuessWordGame.start(chat, message.sender, io);
+      } else if (lowerCmd === 'scramble' || lowerCmd === 'jumble') {
+        const ScrambleGame = require('../games/modes/Scramble');
+        return ScrambleGame.start(chat, message.sender, io);
       } else if (lowerCmd === 'assassination') {
         const AssassinationGame = require('../games/modes/Assassination');
         return AssassinationGame.start(chat, message.sender, io);

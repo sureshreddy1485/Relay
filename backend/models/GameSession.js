@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const GameSessionSchema = new mongoose.Schema({
   groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chat', required: true },
-  gameType: { type: String, enum: ['assassination', 'doubleagent', 'riddle', 'guess'], required: true },
+  gameType: { type: String, enum: ['assassination', 'doubleagent', 'riddle', 'guess', 'scramble', 'jumble'], required: true },
   status: { type: String, enum: ['lobby', 'active', 'finished', 'cancelled'], default: 'lobby' },
   players: [{
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

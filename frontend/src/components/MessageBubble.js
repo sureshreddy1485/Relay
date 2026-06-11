@@ -591,10 +591,44 @@ export default function MessageBubble({
 
   const renderFormattedText = (text) => {
     if (!text) return null;
-    const parts = text.split(/(\*\*.*?\*\*)/g);
+    const parts = text.split(/(\*\*.*?\*\*|\[\[.*?\|.*?\]\])/g);
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         return <Text key={index} style={{ fontWeight: 'bold' }}>{part.slice(2, -2)}</Text>;
+      }
+      if (part.startsWith('[[') && part.endsWith(']]')) {
+        const inner = part.slice(2, -2);
+        const [groupId, ...nameParts] = inner.split('|');
+        const groupName = nameParts.join('|');
+        return (
+          <Text 
+            key={index} 
+            style={{ fontWeight: 'bold', color: Colors.primary, textDecorationLine: 'underline' }}
+            onPress={async () => {
+              const useChatStore = require('../store/useChatStore').default;
+              const existingChat = useChatStore.getState().chats.find(c => c._id === groupId);
+              if (existingChat) {
+                navigation.push('ChatRoom', { chat: existingChat });
+                return;
+              }
+              try {
+                const api = require('../services/api').default;
+                const { data } = await api.put(`/chats/group/${groupId}/add`, { userId: undefined });
+                useChatStore.getState().addChat(data.chat);
+                navigation.push('ChatRoom', { chat: data.chat });
+              } catch (e) {
+                const errorMsg = e.response?.data?.message || 'Failed to join group';
+                if (errorMsg === 'User already in group') {
+                  if (showAlert) showAlert('Notice', 'You are already in the group!');
+                } else {
+                  if (showAlert) showAlert('Error', errorMsg);
+                }
+              }
+            }}
+          >
+            {groupName}
+          </Text>
+        );
       }
       return <Text key={index}>{part}</Text>;
     });

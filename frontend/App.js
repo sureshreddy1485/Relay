@@ -139,10 +139,17 @@ export default function App() {
               clearStoredMessages(chatId);
               notifee.cancelNotification(chatId);
             } catch (e) {}
-            const { navigationRef } = require('./src/navigation/RootNavigator');
-            if (navigationRef && navigationRef.isReady()) {
-              navigationRef.navigate('ChatRoom', { chatId });
-            }
+            let attempts = 0;
+            const navigateWhenReady = setInterval(() => {
+              const { navigationRef } = require('./src/navigation/RootNavigator');
+              if (navigationRef && navigationRef.isReady()) {
+                clearInterval(navigateWhenReady);
+                navigationRef.navigate('ChatRoom', { chatId });
+              } else if (attempts >= 25) { // 5 seconds max wait
+                clearInterval(navigateWhenReady);
+              }
+              attempts++;
+            }, 200);
           }
         });
       } catch (e) {
@@ -161,12 +168,17 @@ export default function App() {
               await clearStoredMessages(chatId);
               await notifee.cancelNotification(chatId);
             } catch (e) {}
-            setTimeout(() => {
+            let attempts = 0;
+            const navigateWhenReady = setInterval(() => {
               const { navigationRef } = require('./src/navigation/RootNavigator');
               if (navigationRef && navigationRef.isReady()) {
+                clearInterval(navigateWhenReady);
                 navigationRef.navigate('ChatRoom', { chatId });
+              } else if (attempts >= 25) { // 5 seconds max wait
+                clearInterval(navigateWhenReady);
               }
-            }, 1000);
+              attempts++;
+            }, 200);
           }
         } catch (e) {
           console.log('Notifee getInitialNotification failed:', e);

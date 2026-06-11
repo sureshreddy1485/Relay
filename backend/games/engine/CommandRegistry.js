@@ -1,4 +1,4 @@
-const GAME_COMMANDS = ['riddle', 'guess', 'assassination', 'doubleagent', 'mafia'];
+const GAME_COMMANDS = ['riddle', 'guess', 'assassination', 'doubleagent', 'mafia', 'scramble', 'jumble'];
 
 class CommandRegistry {
   static isValidGameCommand(command) {
@@ -6,7 +6,7 @@ class CommandRegistry {
   }
 
   static isAliasCommand(text) {
-    return text.includes('==');
+    return text.includes('=');
   }
 }
 

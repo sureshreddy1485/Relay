@@ -133,9 +133,9 @@ const formatChatDateSeparator = (dateString) => {
 
 export default function ChatRoomScreen({ route, navigation }) {
   const { showAlert } = useAlert();
-  const initialChat = route.params.chat;
-  const storeChat = useChatStore(s => s.chats.find(c => c._id === initialChat._id));
-  const chat = storeChat || initialChat;
+  const passedChatId = route.params.chatId || route.params.chat?._id;
+  const storeChat = useChatStore(s => s.chats.find(c => c._id === passedChatId));
+  const chat = storeChat || route.params.chat || { _id: passedChatId, users: [] };
   const { user } = useAuthStore();
   const chats = useChatStore(s => s.chats);
   const messages = useChatStore(s => s.messages);
@@ -1265,7 +1265,12 @@ export default function ChatRoomScreen({ route, navigation }) {
 
 
         {/* Input bar — paddingBottom includes gesture nav inset */}
-        {!isRelayBotChat && (
+        {isRelayBotChat ? (
+          <View style={[styles.restrictedBar, { paddingBottom: (insets.bottom || 8) + 12 }]}>
+            <Ionicons name="lock-closed" size={16} color={Colors.dark.muted} style={{ marginRight: 6 }} />
+            <Text style={styles.restrictedText}>Messages are restricted for this chat.</Text>
+          </View>
+        ) : (
           <View style={[styles.inputBar, { paddingBottom: (insets.bottom || 8) + 6 }]}>
           <TouchableOpacity onPress={() => setShowAttach(!showAttach)} style={styles.inputIconBtn}>
             <Ionicons name={showAttach ? 'close' : 'add-circle-outline'} size={26} color={Colors.primary} />
@@ -2168,4 +2173,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
   },
+  restrictedBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.dark.surface,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.dark.border,
+  },
+  restrictedText: {
+    color: Colors.dark.muted,
+    fontSize: 14,
+    fontWeight: '500',
+  }
 });

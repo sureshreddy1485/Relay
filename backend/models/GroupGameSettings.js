@@ -7,7 +7,7 @@ const GroupGameSettingsSchema = new mongoose.Schema({
     of: String,
     default: {}
   },
-  enabledGames: [{ type: String, default: ['assassination', 'doubleagent', 'riddle', 'guess'] }],
+  enabledGames: [{ type: String, default: ['assassination', 'doubleagent', 'riddle', 'guess', 'scramble', 'jumble'] }],
   cooldowns: {
     globalDelayMs: { type: Number, default: 30000 },
     perUserDelayMs: { type: Number, default: 10000 }
