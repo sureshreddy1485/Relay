@@ -158,10 +158,10 @@ const sendMessage = asyncHandler(async (req, res) => {
   // Update chat's latest message
   await Chat.findByIdAndUpdate(chatId, { latestMessage: message._id });
 
-  // Let BotEngine process the message (async, doesn't block response)
+  // Let BotManager process the message (async, doesn't block response)
   const io = req.app.get('io');
-  const BotEngine = require('../utils/BotEngine');
-  BotEngine.processMessage(message, chat, io);
+  const BotManager = require('../utils/BotManager');
+  BotManager.processMessage(message, chat, io);
 
   // Emit via socket to all participants' personal rooms
   let pushMessages = [];

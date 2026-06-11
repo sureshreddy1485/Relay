@@ -1,14 +1,14 @@
 const GameManager = require('../engine/GameManager');
 const GameSession = require('../../models/GameSession');
-const { getMicaBotId } = require('../../utils/botHelper');
+const { getMarsBotId } = require('../../utils/botHelper');
 
 class DoubleAgentGame {
   constructor() {
-    this.botId = getMicaBotId();
+    
     this.sessions = new Map();
   }
 
-  async start(chat, sender, io) {
+  async start(chat, sender, io, botId) {
     const groupId = chat._id.toString();
     
     const gameState = {
@@ -121,9 +121,19 @@ class DoubleAgentGame {
   }
 
   async sendBotMessage(chat, io, content) {
-    const botEngine = require('../../utils/BotEngine');
-    await botEngine.sendCustomMessage(chat, io, {
-      sender: this.botId,
+    const botManager = require('../../utils/BotManager');
+    const botStr = await botManager.getActiveBotStr(chat._id);
+    
+    if (botStr === 'mica') {
+      content = content.replace('🚨 **CASE FILE OPENED', '🎮 **NEW GAME');
+      content = content.replace('Try not to disappoint me.', 'First to answer correctly wins!');
+      content = content.replace('Finally. Someone in this group has a functioning brain.', '🎉 **CORRECT!**');
+      content = content.replace(/Wow\. You all gave up\..*Embarrassing\./, '🏳️ **GAME OVER!**');
+    }
+
+    const botManager = require('../../utils/BotManager');
+    await botManager.sendCustomMessage(chat, io, {
+      sender: await botManager.getActiveBotId(chat._id),
       chat: chat._id,
       content: content,
       messageType: 'text'

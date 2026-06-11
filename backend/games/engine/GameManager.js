@@ -26,6 +26,16 @@ class GameManager {
     }
     return false; // Not handled
   }
+
+  async incrementScore(groupId, userId, points = 1) {
+    const GroupGameSettings = require('../../models/GroupGameSettings');
+    const settings = await GroupGameSettings.findOneAndUpdate(
+      { groupId },
+      { $inc: { [`scores.${userId}`]: points } },
+      { new: true, upsert: true }
+    );
+    return settings.scores.get(userId.toString()) || points;
+  }
 }
 
 module.exports = new GameManager();

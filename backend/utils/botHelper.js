@@ -3,6 +3,7 @@ const Chat = require('../models/Chat');
 
 let micaBotId = null;
 let relayBotId = null;
+let marsBotId = null;
 
 const initializeMicaBot = async () => {
   try {
@@ -95,9 +96,53 @@ const initializeRelayBot = async () => {
 
 const getRelayBotId = () => relayBotId;
 
+const initializeMarsBot = async () => {
+  try {
+    let mars = await User.findOne({ username: 'mars_bot' });
+    if (!mars) {
+      mars = await User.create({
+        username: 'mars_bot',
+        email: 'mars@relay.system',
+        password: 'MarsSystemBotPassword123!@#',
+        securityKey: 'system_bot_key_mars',
+        displayName: 'Mars',
+        bio: 'The smart troublemaker of the chat. I host games and judge you silently.',
+        profilePicture: 'https://res.cloudinary.com/dz3m8nxj3/image/upload/v1720000000/relay/profile_pictures/mars_bot.jpg', // Placeholder or add later
+        role: 'system_bot',
+        isVerified: true,
+      });
+    } else {
+      let changed = false;
+      if (mars.displayName !== 'Mars') { mars.displayName = 'Mars'; changed = true; }
+      if (mars.email !== 'mars@relay.system') { mars.email = 'mars@relay.system'; changed = true; }
+      if (!mars.bio?.includes('troublemaker')) { mars.bio = 'The smart troublemaker of the chat. I host games and judge you silently.'; changed = true; }
+      if (changed) await mars.save();
+    }
+    marsBotId = mars._id;
+
+    // Force Mars into all existing group chats
+    const result = await Chat.updateMany(
+      { isGroupChat: true, users: { $ne: marsBotId } },
+      { $push: { users: marsBotId } }
+    );
+    
+    if (result.modifiedCount > 0) {
+      console.log(`Injected Mars into ${result.modifiedCount} existing groups.`);
+    }
+
+    console.log('Mars Bot initialized successfully.');
+  } catch (err) {
+    console.error('Error initializing Mars bot:', err);
+  }
+};
+
+const getMarsBotId = () => marsBotId;
+
 module.exports = {
   initializeMicaBot,
   getMicaBotId,
   initializeRelayBot,
   getRelayBotId,
+  initializeMarsBot,
+  getMarsBotId,
 };

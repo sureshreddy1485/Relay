@@ -1,6 +1,6 @@
 const GameManager = require('../engine/GameManager');
 const GameSession = require('../../models/GameSession');
-const { getMicaBotId } = require('../../utils/botHelper');
+const { getMarsBotId } = require('../../utils/botHelper');
 
 const WORD_DATABASE = [
   "crow", "moon", "fire", "piano", "mirror", "guitar", "ocean", "mountain", "river", "forest",
@@ -37,11 +37,11 @@ function jumbleWord(word) {
 
 class ScrambleGame {
   constructor() {
-    this.botId = getMicaBotId();
+    
     this.sessions = new Map();
   }
 
-  async start(chat, sender, io) {
+  async start(chat, sender, io, botId) {
     const groupId = chat._id;
     const word = WORD_DATABASE[Math.floor(Math.random() * WORD_DATABASE.length)];
     const jumbled = jumbleWord(word);
@@ -65,7 +65,7 @@ class ScrambleGame {
       state: gameState
     }).catch(console.error);
 
-    await this.sendBotMessage(chat, io, `🔤 **WORD SCRAMBLE!** Unscramble the letters to find the word. The capitalized letter is the starting letter!\n\n**Jumbled:** ${jumbled}\n\n(Type your guess! Type "reset" to give up)`);
+    await this.sendBotMessage(chat, io, `🚨 **CASE FILE OPENED: SCRAMBLE**\n\nSomebody scrambled this word. Unscramble it, if you can. Capital letter is the start:\n\n**${jumbled}**\n\n(Type your guess! Type "reset" if you give up)`);
   }
 
   async handleMessage(message, chat, io) {
@@ -83,7 +83,7 @@ class ScrambleGame {
       this.sessions.delete(groupId);
 
       GameSession.findOneAndUpdate({ groupId: chat._id, status: 'active' }, { status: 'finished' }).catch(console.error);
-      await this.sendBotMessage(chat, io, `🏳️ **GAME OVER!** The word was **${state.word.toUpperCase()}**!`);
+      await this.sendBotMessage(chat, io, `🏳️ Wow. You all gave up. The word was **${state.word.toUpperCase()}**. Embarrassing.`);
       return true;
     }
 
@@ -95,7 +95,9 @@ class ScrambleGame {
       const winnerName = message.sender.displayName || message.sender.username;
       GameSession.findOneAndUpdate({ groupId: chat._id, status: 'active' }, { status: 'finished' }).catch(console.error);
       
-      await this.sendBotMessage(chat, io, `🎉 **CORRECT!** ${winnerName} got it! The word was **${state.word.toUpperCase()}**! It took ${state.attempts} attempts.`);
+      const newScore = await GameManager.incrementScore(groupId, message.sender._id || message.sender);
+      
+      await this.sendBotMessage(chat, io, `Finally. Someone in this group has a functioning brain. ${winnerName} got it! The word was **${state.word.toUpperCase()}**! You now have ${newScore} points.`);
       return true; 
     }
 
@@ -103,9 +105,19 @@ class ScrambleGame {
   }
 
   async sendBotMessage(chat, io, content) {
-    const botEngine = require('../../utils/BotEngine');
-    await botEngine.sendCustomMessage(chat, io, {
-      sender: this.botId,
+    const botManager = require('../../utils/BotManager');
+    const botStr = await botManager.getActiveBotStr(chat._id);
+    
+    if (botStr === 'mica') {
+      content = content.replace('🚨 **CASE FILE OPENED', '🎮 **NEW GAME');
+      content = content.replace('Try not to disappoint me.', 'First to answer correctly wins!');
+      content = content.replace('Finally. Someone in this group has a functioning brain.', '🎉 **CORRECT!**');
+      content = content.replace(/Wow\. You all gave up\..*Embarrassing\./, '🏳️ **GAME OVER!**');
+    }
+
+    const botManager = require('../../utils/BotManager');
+    await botManager.sendCustomMessage(chat, io, {
+      sender: await botManager.getActiveBotId(chat._id),
       chat: chat._id,
       content: content,
       messageType: 'text'

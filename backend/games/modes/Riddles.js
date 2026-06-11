@@ -1,6 +1,6 @@
 const GameManager = require('../engine/GameManager');
 const GameSession = require('../../models/GameSession');
-const { getMicaBotId } = require('../../utils/botHelper');
+const { getMarsBotId } = require('../../utils/botHelper');
 
 // 100% Local, Zero-AI Riddle Database
 const RIDDLE_DATABASE = [
@@ -15,10 +15,10 @@ const RIDDLE_DATABASE = [
 
 class RiddlesGame {
   constructor() {
-    this.botId = getMicaBotId();
+    
   }
 
-  async start(chat, sender, io) {
+  async start(chat, sender, io, botId) {
     const groupId = chat._id;
     
     // Select a random riddle
@@ -49,7 +49,7 @@ class RiddlesGame {
     }).catch(console.error);
 
     // Announce the riddle
-    await this.sendBotMessage(chat, io, `🧠 **RIDDLE TIME!** First to answer correctly wins.\n\n"${riddle.question}"\n\n(Type your guess in the chat! Type "reset" to give up.)`);
+    await this.sendBotMessage(chat, io, `🚨 **CASE FILE OPENED: RIDDLE**\n\nSolve this, if you can:\n\n"${riddle.question}"\n\n(Type your guess! Type "reset" if it's too hard)`);
   }
 
   async handleMessage(message, chat, io) {
@@ -72,7 +72,7 @@ class RiddlesGame {
         { status: 'finished', endedAt: Date.now() }
       ).catch(console.error);
 
-      await this.sendBotMessage(chat, io, `🏳️ **GAME OVER!** You guys gave up.\n\nThe answer was **${state.answer.toUpperCase()}** 😭`);
+      await this.sendBotMessage(chat, io, `🏳️ Wow. You all gave up. The answer was **${state.answer.toUpperCase()}**. Embarrassing.`);
       return true;
     }
 
@@ -92,8 +92,10 @@ class RiddlesGame {
         { status: 'finished', endedAt: Date.now() }
       ).catch(console.error);
 
+      const newScore = await GameManager.incrementScore(groupId, message.sender._id || message.sender);
+
       // Announce winner
-      await this.sendBotMessage(chat, io, `🎉 **CORRECT!** ${winnerName} got it! \n\nThe answer was **${state.answer.toUpperCase()}**.\nIt took the group ${state.attempts} attempts.`);
+      await this.sendBotMessage(chat, io, `Finally. Someone in this group has a functioning brain. ${winnerName} got it! \n\nThe answer was **${state.answer.toUpperCase()}**.\nYou now have ${newScore} points.`);
       return true; // We handled this message
     }
 
@@ -117,9 +119,19 @@ class RiddlesGame {
   }
 
   async sendBotMessage(chat, io, content) {
-    const botEngine = require('../../utils/BotEngine');
-    await botEngine.sendCustomMessage(chat, io, {
-      sender: this.botId,
+    const botManager = require('../../utils/BotManager');
+    const botStr = await botManager.getActiveBotStr(chat._id);
+    
+    if (botStr === 'mica') {
+      content = content.replace('🚨 **CASE FILE OPENED', '🎮 **NEW GAME');
+      content = content.replace('Try not to disappoint me.', 'First to answer correctly wins!');
+      content = content.replace('Finally. Someone in this group has a functioning brain.', '🎉 **CORRECT!**');
+      content = content.replace(/Wow\. You all gave up\..*Embarrassing\./, '🏳️ **GAME OVER!**');
+    }
+
+    const botManager = require('../../utils/BotManager');
+    await botManager.sendCustomMessage(chat, io, {
+      sender: await botManager.getActiveBotId(chat._id),
       chat: chat._id,
       content: content,
       messageType: 'text'

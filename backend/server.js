@@ -44,9 +44,10 @@ connectDB().then(async () => {
     console.log('🧹 Purged ghost online sessions');
   } catch(e) { console.error('Failed to purge online sessions', e); }
 
-  const { initializeMicaBot, initializeRelayBot } = require('./utils/botHelper');
+  const { initializeMicaBot, initializeRelayBot, initializeMarsBot } = require('./utils/botHelper');
   initializeMicaBot();
   initializeRelayBot();
+  initializeMarsBot();
 });
 
 const app = express();

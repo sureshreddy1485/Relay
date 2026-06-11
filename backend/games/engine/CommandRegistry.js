@@ -1,4 +1,4 @@
-const GAME_COMMANDS = ['riddle', 'guess', 'assassination', 'doubleagent', 'mafia', 'scramble', 'jumble'];
+const GAME_COMMANDS = ['riddle', 'guess', 'assassination', 'doubleagent', 'mafia', 'scramble', 'jumble', 'reset', 'emojiguess'];
 
 class CommandRegistry {
   static isValidGameCommand(command) {

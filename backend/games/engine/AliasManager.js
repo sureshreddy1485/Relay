@@ -55,6 +55,22 @@ class AliasManager {
     
     return true;
   }
+  
+  async removeAlias(groupId, alias) {
+    const cleanAlias = alias.trim().toLowerCase();
+    
+    await GroupGameSettings.findOneAndUpdate(
+      { groupId },
+      { $unset: { [`aliases.${cleanAlias}`]: "" } },
+      { new: true }
+    );
+    
+    const aliases = await this.loadGroupSettings(groupId);
+    delete aliases[cleanAlias];
+    this.cache.set(groupId.toString(), aliases);
+    
+    return true;
+  }
 }
 
 module.exports = new AliasManager();

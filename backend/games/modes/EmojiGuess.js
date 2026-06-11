@@ -2,15 +2,20 @@ const GameManager = require('../engine/GameManager');
 const GameSession = require('../../models/GameSession');
 const { getMarsBotId } = require('../../utils/botHelper');
 
-const WORD_DATABASE = [
-  { word: "crow", clues: ["It has wings", "It is usually black", "It caws"] },
-  { word: "moon", clues: ["It is in the sky", "It is visible at night", "It affects the tides"] },
-  { word: "fire", clues: ["It is hot", "It needs oxygen", "It produces light"] },
-  { word: "piano", clues: ["It is an instrument", "It has keys", "It is black and white"] },
-  { word: "mirror", clues: ["It is made of glass", "It reflects light", "You look at it every morning"] }
+const EMOJI_DATABASE = [
+  { answer: "spider-man", emoji: "🕷️👨" },
+  { answer: "the lion king", emoji: "🦁👑" },
+  { answer: "batman", emoji: "🦇👨" },
+  { answer: "harry potter", emoji: "⚡👓🧙‍♂️" },
+  { answer: "finding nemo", emoji: "🔎🐟" },
+  { answer: "titanic", emoji: "🚢🧊💔" },
+  { answer: "star wars", emoji: "⭐⚔️🌌" },
+  { answer: "jurassic park", emoji: "🦖🏞️" },
+  { answer: "pizza", emoji: "🍕" },
+  { answer: "burger", emoji: "🍔" }
 ];
 
-class GuessWordGame {
+class EmojiGuessGame {
   constructor() {
     
     this.sessions = new Map();
@@ -18,14 +23,13 @@ class GuessWordGame {
 
   async start(chat, sender, io, botId) {
     const groupId = chat._id;
-    const wordData = WORD_DATABASE[Math.floor(Math.random() * WORD_DATABASE.length)];
+    const item = EMOJI_DATABASE[Math.floor(Math.random() * EMOJI_DATABASE.length)];
     
     const gameState = {
-      gameType: 'guess',
+      gameType: 'emojiguess',
       status: 'active',
-      word: wordData.word,
-      clues: wordData.clues,
-      currentClueIndex: 0,
+      answer: item.answer,
+      emoji: item.emoji,
       startedAt: Date.now(),
       attempts: 0
     };
@@ -35,29 +39,12 @@ class GuessWordGame {
 
     GameSession.create({
       groupId,
-      gameType: 'guess',
+      gameType: 'emojiguess',
       status: 'active',
       state: gameState
     }).catch(console.error);
 
-    await this.sendBotMessage(chat, io, `🔤 **GUESS THE WORD!** I'm thinking of a word. First to guess it wins!\n\n**Clue 1:** ${gameState.clues[0]}\n\n(Type your guess! Type "reset" to give up)`);
-
-    // Send the next clues every 20 seconds
-    gameState.intervalId = setInterval(() => this.sendNextClue(groupId, chat, io), 20000);
-  }
-
-  async sendNextClue(groupId, chat, io) {
-    const state = this.sessions.get(groupId.toString());
-    if (!state || state.status !== 'active') return;
-
-    state.currentClueIndex++;
-    if (state.currentClueIndex < state.clues.length) {
-      await this.sendBotMessage(chat, io, `🔍 **Clue ${state.currentClueIndex + 1}:** ${state.clues[state.currentClueIndex]}`);
-    } else {
-      // Out of clues, stop interval but keep game alive until someone gets it or resets
-      if (state.intervalId) clearInterval(state.intervalId);
-      await this.sendBotMessage(chat, io, `⚠️ That was the last clue! Keep guessing, or type "reset" to give up!`);
-    }
+    await this.sendBotMessage(chat, io, `🚨 **CASE FILE OPENED: EMOJI GUESS**\n\nDecode this, geniuses:\n\n${item.emoji}\n\n(Type your guess! Type "reset" if it's too hard for you)`);
   }
 
   async handleMessage(message, chat, io) {
@@ -70,18 +57,20 @@ class GuessWordGame {
     state.attempts++;
 
     if (text === 'reset') {
-      if (state.intervalId) clearInterval(state.intervalId);
       state.status = 'finished';
       GameManager.endGame(groupId);
       this.sessions.delete(groupId);
 
       GameSession.findOneAndUpdate({ groupId: chat._id, status: 'active' }, { status: 'finished' }).catch(console.error);
-      await this.sendBotMessage(chat, io, `🏳️ **GAME OVER!** The word was **${state.word.toUpperCase()}**!`);
+      await this.sendBotMessage(chat, io, `🏳️ Wow. You all gave up. The answer was **${state.answer.toUpperCase()}**. Embarrassing.`);
       return true;
     }
 
-    if (text.includes(state.word.toLowerCase())) {
-      if (state.intervalId) clearInterval(state.intervalId);
+    // strip punctuation and spaces for comparison
+    const cleanGuess = text.replace(/[^a-z0-9]/gi, '');
+    const cleanAnswer = state.answer.replace(/[^a-z0-9]/gi, '');
+
+    if (cleanGuess === cleanAnswer || text.includes(state.answer)) {
       state.status = 'finished';
       GameManager.endGame(groupId);
       this.sessions.delete(groupId);
@@ -90,8 +79,8 @@ class GuessWordGame {
       GameSession.findOneAndUpdate({ groupId: chat._id, status: 'active' }, { status: 'finished' }).catch(console.error);
       
       const newScore = await GameManager.incrementScore(groupId, message.sender._id || message.sender);
-
-    await this.sendBotMessage(chat, io, `Finally. Someone in this group has a functioning brain. ${winnerName} got it! The word was **${state.word.toUpperCase()}**! You now have ${newScore} points.`);
+      
+      await this.sendBotMessage(chat, io, `Finally. Someone in this group has a functioning brain. ${winnerName} got it! The answer was **${state.answer.toUpperCase()}**! You now have ${newScore} points.`);
       return true; 
     }
 
@@ -119,4 +108,4 @@ class GuessWordGame {
   }
 }
 
-module.exports = new GuessWordGame();
+module.exports = new EmojiGuessGame();
