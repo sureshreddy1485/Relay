@@ -45,7 +45,9 @@ async function showNotification(chatId, sender, chat, title, body, imageUrl) {
       const existing = displayed.find(n => n.id === chatId || n.notification?.id === chatId);
       
       if (existing && existing.notification?.android?.style?.messages) {
-        styleMessages = [...existing.notification.android.style.messages, message];
+        // Sanitize existing messages in case previous bugs corrupted the stored array
+        const existingMessages = existing.notification.android.style.messages.filter(m => m && m.text !== undefined && m.timestamp);
+        styleMessages = [...existingMessages, message];
       }
     } catch (e) {
       console.log("Failed to fetch displayed notifications for stacking", e);
@@ -91,6 +93,19 @@ async function showNotification(chatId, sender, chat, title, body, imageUrl) {
     await notifee.displayNotification(notificationConfig);
   } catch (e) {
     console.log("Failed to display notification", e);
+    try {
+      await notifee.displayNotification({
+        id: chatId + '_error',
+        title: 'Notification Error',
+        body: e.message || 'Unknown error occurred',
+        android: {
+          channelId: 'relay-messages-v5',
+          importance: AndroidImportance.HIGH,
+        },
+      });
+    } catch (fallbackErr) {
+      console.log("Fallback failed", fallbackErr);
+    }
   }
 }
 

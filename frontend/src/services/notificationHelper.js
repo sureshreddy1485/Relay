@@ -42,7 +42,8 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
       const existing = displayed.find(n => n.id === chatId);
       if (existing && existing.notification && existing.notification.android &&
           existing.notification.android.style && existing.notification.android.style.messages) {
-        messages = [...existing.notification.android.style.messages, message];
+        const existingMessages = existing.notification.android.style.messages.filter(m => m && m.text !== undefined && m.timestamp);
+        messages = [...existingMessages, message];
       }
     } catch (e) {
       // Stacking failed, just show single message — that's fine
