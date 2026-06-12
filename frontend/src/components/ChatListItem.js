@@ -126,8 +126,18 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
   const lastMsg = chat.latestMessage;
   let lastMsgText = 'No messages yet';
   if (lastMsg) {
+    const isJoinReq = lastMsg.messageType === 'join_request' || (lastMsg.isSystemMessage && lastMsg.content?.startsWith('{') && lastMsg.content?.includes('userId'));
+    
     if (lastMsg.deletedForEveryone)                              lastMsgText = '🚫 Deleted';
     else if (lastMsg.messageType === 'group_invite')             lastMsgText = '💌 Group Invitation';
+    else if (isJoinReq) {
+      try {
+        const parsed = JSON.parse(lastMsg.content);
+        lastMsgText = parsed.text || 'Requested to join';
+      } catch (e) {
+        lastMsgText = 'Requested to join';
+      }
+    }
     else if (lastMsg.mediaType === 'image')                      lastMsgText = '📷 Photo';
     else if (lastMsg.mediaType === 'video')                      lastMsgText = '🎥 Video';
     else if (lastMsg.mediaType === 'audio' || lastMsg.mediaType === 'voice') lastMsgText = '🎤 Voice';

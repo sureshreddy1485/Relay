@@ -249,7 +249,11 @@ export default function MessageBubble({
   }
 
   if (isJoinReq && reqData) {
-    const amIAdmin = isGroup && chat && (chat.groupAdmin === currentUserId || chat.admins?.includes(currentUserId));
+    const myId = currentUser?._id?.toString();
+    const amIAdmin = isGroup && chat && (
+      (chat.groupAdmin?._id || chat.groupAdmin)?.toString() === myId ||
+      chat.admins?.some(a => (a._id || a).toString() === myId)
+    );
     const isProcessed = !!message.inviteAccepted;
 
     return (
