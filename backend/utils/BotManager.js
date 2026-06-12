@@ -493,12 +493,50 @@ class BotManager {
 
       await Chat.findByIdAndUpdate(chat._id, { latestMessage: message._id });
 
+      const User = require('../models/User');
+      const users = await User.find({ _id: { $in: chat.users } });
+
       if (io) {
         const leanMsg = message.toObject ? message.toObject() : message;
         chat.users.forEach((userId) => {
           const uId = userId._id || userId;
           io.to(uId.toString()).emit('new_message', leanMsg);
         });
+      }
+
+      // Send Push Notifications for Bot Messages
+      const admin = require('firebase-admin');
+      if (admin.apps.length > 0) {
+        for (const user of users) {
+          if (user._id.toString() !== senderId.toString() && user.fcmToken) {
+            try {
+              await admin.messaging().send({
+                token: user.fcmToken,
+                data: {
+                  chatId: chat._id.toString(),
+                  sender: JSON.stringify({ _id: message.sender._id, username: message.sender.username, displayName: message.sender.displayName }),
+                  chat: JSON.stringify({ isGroupChat: chat.isGroupChat, chatName: chat.groupName }),
+                  title: chat.isGroupChat ? (chat.groupName || 'Group Chat') : (message.sender.displayName || message.sender.username),
+                  body: content,
+                },
+                android: {
+                  priority: 'high',
+                  ttl: 86400 * 1000,
+                  collapseKey: chat._id.toString(),
+                  notification: {
+                    title: chat.isGroupChat ? (chat.groupName || 'Group Chat') : (message.sender.displayName || message.sender.username),
+                    body: content,
+                    channelId: 'relay-messages-v4',
+                    sound: 'relay_notification_sound',
+                    tag: chat._id.toString(),
+                  }
+                }
+              });
+            } catch (err) {
+              console.error('Bot FCM push error:', err);
+            }
+          }
+        }
       }
     } catch (e) {
       console.error('Bot message send error:', e);
