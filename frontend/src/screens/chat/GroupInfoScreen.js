@@ -859,7 +859,7 @@ export default function GroupInfoScreen({ route, navigation }) {
                 if (selectedMember && selectedMember._id !== myId) {
                    areFriends = user?.friends?.some(f => (f._id || f).toString() === selectedMember._id.toString());
                 }
-                if (selectedMember?._id === myId || areFriends || selectedMember?.username === 'mica_bot') {
+                if (selectedMember?._id === myId || areFriends || selectedMember?.username === 'mica_bot' || selectedMember?.username === 'mars_bot') {
                   return <Text style={styles.memberSheetUsername}>@{selectedMember?.username}</Text>;
                 }
                 return <Text style={[styles.memberSheetUsername, { fontStyle: 'italic' }]}>@Hidden (Add friend to view)</Text>;
@@ -867,7 +867,7 @@ export default function GroupInfoScreen({ route, navigation }) {
             </View>
 
             {/* Actions */}
-            {selectedMember?.role !== 'system_bot' && selectedMember?.username !== 'mica_bot' && (
+            {selectedMember?.role !== 'system_bot' && selectedMember?.username !== 'mica_bot' && selectedMember?.username !== 'mars_bot' && (
               <View style={styles.memberSheetActions}>
                 {/* Message / DM */}
                 {(() => {

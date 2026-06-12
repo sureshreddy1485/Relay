@@ -154,7 +154,7 @@ export default function UserProfileScreen({ route, navigation }) {
 
           {/* Profile Details */}
           <Text style={styles.displayName}>{profile.displayName || profile.username}</Text>
-          {isFriend || (authUser && authUser._id === profile._id) || profile.username === 'mica_bot' ? (
+          {isFriend || (authUser && authUser._id === profile._id) || profile.username === 'mica_bot' || profile.username === 'mars_bot' ? (
             <Text style={styles.username}>@{profile.username}</Text>
           ) : (
             <Text style={[styles.username, { fontStyle: 'italic' }]}>@Hidden (Add friend to view)</Text>
