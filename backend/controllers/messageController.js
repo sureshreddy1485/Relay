@@ -187,7 +187,7 @@ const sendMessage = asyncHandler(async (req, res) => {
         if (targetUser) {
           let pushBody = content || `Sent a ${messageType}`;
           if (isEncrypted) pushBody = '🔒 Encrypted Message';
-          const title = chat.isGroupChat ? chat.groupName : (req.user.displayName || req.user.username);
+          const title = chat.isGroupChat ? chat.chatName : (req.user.displayName || req.user.username);
           
           let pushSent = false;
           
@@ -199,7 +199,7 @@ const sendMessage = asyncHandler(async (req, res) => {
               data: {
                 chatId: chat._id.toString(),
                 sender: JSON.stringify({ _id: req.user._id, username: req.user.username, displayName: req.user.displayName }),
-                chat: JSON.stringify({ isGroupChat: chat.isGroupChat, chatName: chat.groupName }),
+                chat: JSON.stringify({ isGroupChat: chat.isGroupChat, chatName: chat.chatName }),
                 title: title,
                 body: pushBody,
               }

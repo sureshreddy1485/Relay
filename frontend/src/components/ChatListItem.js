@@ -40,10 +40,10 @@ const disappearIcon = (seconds) => {
 };
 
 // ── Typing Animation Component ────────────────────────────────────────────────
-const TypingAnimation = () => {
+const TypingAnimation = ({ text }) => {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 6 }}>
-      <Text style={{ fontSize: 13, color: Colors.primary, fontWeight: '600', fontStyle: 'italic', marginRight: 4 }}>typing...</Text>
+      <Text style={{ fontSize: 13, color: Colors.primary, fontWeight: '600', fontStyle: 'italic', marginRight: 4 }}>{text || 'typing...'}</Text>
     </View>
   );
 };
@@ -66,7 +66,16 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
   const unreadCount   = useChatStore(s => s.unreadCounts[chat._id?.toString()] || 0);
   
   const typingUsers   = useChatStore(s => s.typingUsers[chat._id?.toString()] || EMPTY_ARRAY);
-  const isTyping      = typingUsers.some(id => id && id.toString() !== currentUser?._id?.toString());
+  const activeTypingUserIds = typingUsers.filter(id => id && id.toString() !== currentUser?._id?.toString());
+  const isTyping      = activeTypingUserIds.length > 0;
+  
+  let typingText = 'typing...';
+  if (isTyping && chat.isGroupChat) {
+    const typingUser = chat.users?.find(u => u._id === activeTypingUserIds[0] || u._id?.toString() === activeTypingUserIds[0]?.toString());
+    if (typingUser) {
+      typingText = `${typingUser.displayName || typingUser.username} is typing...`;
+    }
+  }
 
   const lastMsg = chat.latestMessage;
   let lastMsgText = 'No messages yet';
@@ -139,7 +148,7 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
 
         {/* Bottom row: last message + badge icons */}
         <View style={styles.bottomRow}>
-          {isTyping ? <TypingAnimation /> : <Text style={styles.lastMsg} numberOfLines={1}>{lastMsgText}</Text>}
+          {isTyping ? <TypingAnimation text={typingText} /> : <Text style={styles.lastMsg} numberOfLines={1}>{lastMsgText}</Text>}
           <View style={styles.badgeRow}>
             {/* Mute icon shown under the time */}
             {isMuted && (

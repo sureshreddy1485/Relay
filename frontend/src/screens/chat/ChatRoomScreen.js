@@ -102,11 +102,12 @@ function TypingBubble({ username }) {
   }, []);
 
   return (
-    <View style={styles.typingBubbleContainer}>
-      <View style={[styles.messageBubble, styles.otherMessage, { paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
-        <Animated.View style={[styles.typingDotLarge, { transform: [{ translateY: dot1 }] }]} />
-        <Animated.View style={[styles.typingDotLarge, { transform: [{ translateY: dot2 }] }]} />
-        <Animated.View style={[styles.typingDotLarge, { transform: [{ translateY: dot3 }] }]} />
+    <View style={styles.typingContainer}>
+      {username && <Text style={styles.typingName}>{username} is typing...</Text>}
+      <View style={styles.typingBubble}>
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot1 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot2 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot3 }] }]} />
       </View>
     </View>
   );
