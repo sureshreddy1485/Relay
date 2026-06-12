@@ -89,7 +89,11 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
     >
       {/* ── Avatar + status dot ──────────────────────────────────────────── */}
       <View style={styles.avatarWrap}>
-        {avatar ? (
+        {(!chat.isGroupChat && otherUser?.username === 'mica_bot') ? (
+          <Image source={require('../../assets/mica-profile.png')} style={[styles.avatar, isCameraActive && styles.camBorder]} />
+        ) : (!chat.isGroupChat && otherUser?.username === 'mars_bot') ? (
+          <Image source={require('../../assets/mars-profile.png')} style={[styles.avatar, isCameraActive && styles.camBorder]} />
+        ) : avatar ? (
           <Image
             source={{ uri: avatar }}
             style={[styles.avatar, isCameraActive && styles.camBorder]}

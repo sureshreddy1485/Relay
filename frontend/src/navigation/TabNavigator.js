@@ -1,5 +1,6 @@
 import React from 'react';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet, Platform, DeviceEventEmitter, Dimensions, Image, AppState, Modal, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,6 +45,8 @@ export default function TabNavigator() {
   const { savedAccounts, switchAccount, logout } = useAuthStore();
   const insets       = useSafeAreaInsets();
   const lastSettingsPressRef = React.useRef(0);
+  const settingsTapTimeoutRef = React.useRef(null);
+  const navigation = useNavigation();
 
   const checkOtherAccountsUnread = React.useCallback(async () => {
     const state = useAuthStore.getState();
@@ -189,17 +192,27 @@ export default function TabNavigator() {
         component={SettingsScreen}
         listeners={{
           tabPress: (e) => {
+            e.preventDefault();
             const now = Date.now();
             if (now - lastSettingsPressRef.current < 400) {
               // Double tap detected
+              if (settingsTapTimeoutRef.current) {
+                clearTimeout(settingsTapTimeoutRef.current);
+                settingsTapTimeoutRef.current = null;
+              }
               const { user: currentUser, savedAccounts, switchAccount } = useAuthStore.getState();
               if (currentUser && Array.isArray(savedAccounts)) {
                 const validAccounts = savedAccounts.filter(a => a?.user?._id);
                 const otherAccounts = validAccounts.filter(a => String(a.user._id) !== String(currentUser._id));
                 if (otherAccounts.length > 0) {
                   switchAccount(otherAccounts[0].user._id);
+                  navigation.navigate('Chats');
                 }
               }
+            } else {
+              settingsTapTimeoutRef.current = setTimeout(() => {
+                navigation.navigate('Settings');
+              }, 250);
             }
             lastSettingsPressRef.current = now;
           },

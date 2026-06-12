@@ -26,7 +26,11 @@ const MemberGridItem = ({ member, role, isMe, canManage, onAction, onTap }) => (
     activeOpacity={0.7}
   >
     <View style={styles.gridAvatarWrap}>
-      {member.profilePicture ? (
+      {member.username === 'mica_bot' ? (
+        <Image source={require('../../assets/mica-profile.png')} style={styles.gridAvatar} />
+      ) : member.username === 'mars_bot' ? (
+        <Image source={require('../../assets/mars-profile.png')} style={styles.gridAvatar} />
+      ) : member.profilePicture ? (
         <Image source={{ uri: member.profilePicture }} style={styles.gridAvatar} />
       ) : (
         <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.gridAvatar}>
@@ -98,7 +102,7 @@ export default function GroupInfoScreen({ route, navigation }) {
     
     // Check if user object has system_bot role
     const fullUser = chat.users?.find(u => (u._id || u).toString() === id?.toString());
-    if (fullUser?.role === 'system_bot' || fullUser?.username === 'mica_bot') return 'system_bot';
+    if (fullUser?.role === 'system_bot' || fullUser?.username === 'mica_bot' || fullUser?.username === 'mars_bot') return 'system_bot';
 
     const ownerId = chat.groupAdmin?._id || chat.groupAdmin;
     if (id === ownerId || id?.toString() === ownerId?.toString()) return 'owner';
@@ -371,7 +375,10 @@ export default function GroupInfoScreen({ route, navigation }) {
     return (rank[ra] ?? 2) - (rank[rb] ?? 2);
   });
 
-  const memberCount = chat.users?.length || 0;
+  const memberCount = chat.users?.filter(u => {
+    const un = u.username || '';
+    return un !== 'mica_bot' && un !== 'mars_bot';
+  })?.length || 0;
 
   return (
     <View style={styles.container}>

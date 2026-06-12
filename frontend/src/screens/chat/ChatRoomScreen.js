@@ -929,7 +929,11 @@ export default function ChatRoomScreen({ route, navigation }) {
             >
               {/* Avatar + cam indicator */}
               <View style={styles.avatarWrap}>
-                {headerAvatar ? (
+                {(!chat.isGroupChat && otherUser?.username === 'mica_bot') ? (
+                  <Image source={require('../../../assets/mica-profile.png')} style={[styles.headerAvatar, isCameraActive && styles.avatarCamBorder]} />
+                ) : (!chat.isGroupChat && otherUser?.username === 'mars_bot') ? (
+                  <Image source={require('../../../assets/mars-profile.png')} style={[styles.headerAvatar, isCameraActive && styles.avatarCamBorder]} />
+                ) : headerAvatar ? (
                   <Image
                     source={{ uri: headerAvatar }}
                     style={[styles.headerAvatar, isCameraActive && styles.avatarCamBorder]}

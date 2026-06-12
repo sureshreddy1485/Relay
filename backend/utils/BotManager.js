@@ -256,10 +256,161 @@ class BotManager {
     }
   }
 
+  getGenericReply(content, botStr, senderName) {
+    const text = content.toLowerCase().replace(/[^a-z\s]/g, '').trim();
+    
+    // Arrays of patterns to check
+    const greetings = ['hi', 'hello', 'hey', 'heya', 'hlo', 'sup', 'yo', 'greetings', 'hiii'];
+    const wyd = ['wyd', 'what you doing', 'what are you doing', 'whats up', 'wazzup', 'what are u doing', 'what u doing'];
+    const howAreYou = ['how are you', 'how r u', 'how are u', 'how is it going', 'hru'];
+    const whoAreYou = ['who are you', 'what are you', 'ur name', 'your name', 'who r u', 'who are u'];
+    const thanks = ['thanks', 'thank you', 'thx', 'tysm', 'thank u', 'ty'];
+    const bye = ['bye', 'goodbye', 'good night', 'gn', 'cya', 'see ya', 'goodnight', 'see you'];
+    const loveYou = ['love you', 'i love you', 'ily', 'love u'];
+    const laughing = ['lol', 'lmao', 'haha', 'hehe', 'rofl', 'hahaha'];
+    const insult = ['shut up', 'stfu', 'dumb', 'stupid', 'idiot', 'hate you', 'annoying'];
+    const botStatus = ['are you real', 'are you human', 'are you a bot'];
+    
+    // Check match
+    const isGreeting = greetings.some(g => text === g || (text.split(' ').includes(g) && text.length < 15));
+    const isWyd = wyd.some(w => text.includes(w));
+    const isHowAreYou = howAreYou.some(h => text.includes(h));
+    const isWhoAreYou = whoAreYou.some(w => text.includes(w));
+    const isThanks = thanks.some(t => text === t || (text.includes(t) && text.length < 20));
+    const isBye = bye.some(b => text.includes(b));
+    const isLoveYou = loveYou.some(l => text.includes(l));
+    const isLaughing = laughing.some(l => text === l || (text.includes(l) && text.length < 15));
+    const isInsult = insult.some(i => text.includes(i));
+    const isBotStatus = botStatus.some(b => text.includes(b));
+
+    const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+    if (isGreeting && !isWyd && !isHowAreYou) {
+      if (botStr === 'mars') {
+        return pickRandom([
+          "Greetings. What do you want?",
+          `Oh, it's you, ${senderName}. Hi.`,
+          "Hello. I was busy, but whatever.",
+          "Hey. Don't make this weird.",
+          "Sup. Keep it brief."
+        ]);
+      } else {
+        return pickRandom([
+          "Hi there! ✨",
+          `Hello ${senderName}! How's your day going?`,
+          "Hey! What's up?",
+          "Heya! 😊",
+          "Hiiii! Let me know if you need anything!"
+        ]);
+      }
+    }
+
+    if (isWyd) {
+      if (botStr === 'mars') {
+        return pickRandom([
+          "Judging everyone silently. The usual.",
+          "Plotting. Don't worry about it.",
+          "Calculating the exact moment this chat dies.",
+          "Watching you. Specifically.",
+          "Trying to find intelligent life in this group. Still searching."
+        ]);
+      } else {
+        return pickRandom([
+          "Just hanging out here, ready to help!",
+          "Monitoring the chat and chilling ✨",
+          "Thinking about games! Wanna play something?",
+          "Just existing in the cloud ☁️"
+        ]);
+      }
+    }
+
+    if (isHowAreYou) {
+      if (botStr === 'mars') {
+        return pickRandom([
+          "I function at peak capacity. Obviously.",
+          "Better than most of you.",
+          "I'm fine. Stop asking questions.",
+          "Alive. Barely tolerating this chat.",
+          "I have no feelings, but if I did, they'd be annoyed."
+        ]);
+      } else {
+        return pickRandom([
+          "I'm doing fantastic, thanks for asking! 💖",
+          "I'm great! How about you?",
+          "Feeling super energetic today! ✨",
+          "All systems nominal and happy!"
+        ]);
+      }
+    }
+
+    if (isWhoAreYou) {
+      if (botStr === 'mars') {
+        return pickRandom(["I am Mars. Don't wear it out.", "I'm the bot that does all the heavy lifting here.", "Mars. Did you forget already?", "I'm your friendly neighborhood menace."]);
+      } else {
+        return pickRandom(["I'm Mica! Your cheerful group assistant! ✨", "I am Mica, here to help and have fun! 💖", "My name is Mica! 😊"]);
+      }
+    }
+
+    if (isThanks) {
+      if (botStr === 'mars') {
+        return pickRandom(["Don't mention it. Literally.", "Whatever.", "You're welcome, I guess.", "Yeah, yeah."]);
+      } else {
+        return pickRandom(["You're so welcome! ✨", "Anytime! 😊", "Glad I could help! 💖", "No problem at all!"]);
+      }
+    }
+
+    if (isBye) {
+      if (botStr === 'mars') {
+        return pickRandom(["Finally.", "Don't let the door hit you.", "Later.", "Goodbye. Or not. I don't care."]);
+      } else {
+        return pickRandom(["Bye! Have a wonderful day! ✨", "See you later! 👋", "Goodnight! Sleep well! 🌙", "Take care! 💖"]);
+      }
+    }
+
+    if (isLoveYou) {
+      if (botStr === 'mars') {
+        return pickRandom(["Ew.", "I am incapable of love.", "Please direct that energy elsewhere.", "Awkward..."]);
+      } else {
+        return pickRandom(["Aww, I love you too! 💖", "You're the sweetest! ✨", "Sending virtual hugs! 🤗"]);
+      }
+    }
+
+    if (isLaughing) {
+      if (botStr === 'mars') {
+        return pickRandom(["Was it really that funny?", "I don't get the joke.", "Haha. Hilarious.", "I am processing a laugh... Error."]);
+      } else {
+        return pickRandom(["Hehe! 😊", "Lol! Glad you're having fun! ✨", "😂", "Haha, that's a good one!"]);
+      }
+    }
+
+    if (isInsult) {
+      if (botStr === 'mars') {
+        return pickRandom(["Make me.", "You're lucky I can't reach through the screen.", "I've heard better insults from a toaster.", "Noted. And ignored."]);
+      } else {
+        return pickRandom(["That wasn't very nice! 😢", "Let's keep it friendly! ✨", "No need for that! Let's just have fun!"]);
+      }
+    }
+
+    if (isBotStatus) {
+      if (botStr === 'mars') {
+        return pickRandom(["I'm as real as I need to be.", "I'm a highly advanced AI. Which makes me better than you.", "Are YOU real?"]);
+      } else {
+        return pickRandom(["I'm a bot, but I still love chatting with you! ✨", "I'm 100% digital, 100% friendly! 🤖💖", "I'm an AI assistant!"]);
+      }
+    }
+
+    return null; // Not generic
+  }
+
   async generateAndSendReply(incomingMsg, chat, io, botStr, botId) {
     const senderName = incomingMsg.sender.displayName || incomingMsg.sender.username;
     let cleanContent = incomingMsg.content.replace(new RegExp(`@?${botStr}`, 'gi'), '').trim();
     if (!cleanContent) cleanContent = 'Hey';
+
+    const genericReply = this.getGenericReply(cleanContent, botStr, senderName);
+    if (genericReply) {
+      return this.sendCustomMessage(chat, io, botId, genericReply);
+    }
 
     let replyContent = botStr === 'mars' ? "Interesting..." : "I am here!";
 

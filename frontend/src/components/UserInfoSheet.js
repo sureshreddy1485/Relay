@@ -161,7 +161,11 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
             {/* ── Profile ─────────────────────────────────────────────── */}
             <View style={styles.profileSection}>
               <TouchableOpacity style={styles.avatarWrap} onPress={() => { if (profile.profilePicture) setShowFullAvatar(true); }} activeOpacity={0.8}>
-                {profile.profilePicture ? (
+                {profile.username === 'mica_bot' ? (
+                  <Image source={require('../../assets/mica-profile.png')} style={styles.avatar} />
+                ) : profile.username === 'mars_bot' ? (
+                  <Image source={require('../../assets/mars-profile.png')} style={styles.avatar} />
+                ) : profile.profilePicture ? (
                   <Image source={{ uri: profile.profilePicture }} style={styles.avatar} />
                 ) : (
                   <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.avatar}>

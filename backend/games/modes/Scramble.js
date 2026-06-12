@@ -2,12 +2,7 @@ const GameManager = require('../engine/GameManager');
 const GameSession = require('../../models/GameSession');
 const { getMarsBotId } = require('../../utils/botHelper');
 
-const WORD_DATABASE = [
-  "crow", "moon", "fire", "piano", "mirror", "guitar", "ocean", "mountain", "river", "forest",
-  "apple", "banana", "orange", "grape", "mango", "laptop", "mouse", "keyboard", "screen", "window",
-  "shot", "house", "train", "plane", "rocket", "planet", "galaxy", "universe", "star", "sun",
-  "elephant", "tiger", "lion", "zebra", "giraffe", "monkey", "penguin", "dolphin", "whale", "shark"
-];
+const { generate } = require('random-words');
 
 function jumbleWord(word) {
   let arr = word.split('');
@@ -43,7 +38,12 @@ class ScrambleGame {
 
   async start(chat, sender, io, botId) {
     const groupId = chat._id;
-    const word = WORD_DATABASE[Math.floor(Math.random() * WORD_DATABASE.length)];
+    // Generate a random word that's at least 4 letters long
+    let word;
+    do {
+      word = generate({ minLength: 4, maxLength: 8 });
+    } while (!word || word.length < 4);
+    
     const jumbled = jumbleWord(word);
     
     const gameState = {

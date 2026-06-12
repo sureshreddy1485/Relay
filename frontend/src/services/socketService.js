@@ -12,6 +12,17 @@ let socket = null;
 
 const getSocket = () => socket;
 
+const playMessageSound = async () => {
+  try {
+    const { sound } = await Audio.Sound.createAsync(
+      require('../../assets/sent-recieve-notification.mp3')
+    );
+    await sound.playAsync();
+  } catch (error) {
+    console.log('Error playing sound', error);
+  }
+};
+
 const connectSocket = (userId) => {
   if (socket?.connected) return socket;
 
@@ -117,6 +128,7 @@ const connectSocket = (userId) => {
       if (currentUserId && senderId !== currentUserId) {
         api.put(`/messages/${chatId}/read`).catch(() => {});
         markRead(chatId, currentUserId);
+        playMessageSound();
       }
     }
   });
