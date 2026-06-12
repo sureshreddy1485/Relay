@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
@@ -41,9 +41,54 @@ const disappearIcon = (seconds) => {
 
 // ── Typing Animation Component ────────────────────────────────────────────────
 const TypingAnimation = ({ text }) => {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let active = true;
+    const animate = () => {
+      if (!active) return;
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(dot1, { toValue: -3, duration: 250, useNativeDriver: false }),
+          Animated.sequence([
+            Animated.delay(120),
+            Animated.timing(dot2, { toValue: -3, duration: 250, useNativeDriver: false }),
+          ]),
+          Animated.sequence([
+            Animated.delay(240),
+            Animated.timing(dot3, { toValue: -3, duration: 250, useNativeDriver: false }),
+          ]),
+        ]),
+        Animated.parallel([
+          Animated.timing(dot1, { toValue: 0, duration: 250, useNativeDriver: false }),
+          Animated.sequence([
+            Animated.delay(120),
+            Animated.timing(dot2, { toValue: 0, duration: 250, useNativeDriver: false }),
+          ]),
+          Animated.sequence([
+            Animated.delay(240),
+            Animated.timing(dot3, { toValue: 0, duration: 250, useNativeDriver: false }),
+          ]),
+        ]),
+        Animated.delay(150),
+      ]).start(() => {
+        if (active) animate();
+      });
+    };
+    animate();
+    return () => { active = false; };
+  }, []);
+
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 6 }}>
-      <Text style={{ fontSize: 13, color: Colors.primary, fontWeight: '600', fontStyle: 'italic', marginRight: 4 }}>{text || 'typing...'}</Text>
+      <Text style={{ fontSize: 13, color: Colors.primary, fontWeight: '600', fontStyle: 'italic', marginRight: 4 }}>{text || 'typing'}</Text>
+      <View style={{ flexDirection: 'row', gap: 2, alignItems: 'center', marginTop: 4 }}>
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot1 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot2 }] }]} />
+        <Animated.View style={[styles.typingDot, { transform: [{ translateY: dot3 }] }]} />
+      </View>
     </View>
   );
 };
