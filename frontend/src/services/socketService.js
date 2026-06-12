@@ -16,7 +16,7 @@ export const playMessageSound = async () => {
   try {
     const { Audio } = require('expo-av');
     const { sound } = await Audio.Sound.createAsync(
-      require('../../assets/sent-recieve-notification.mp3')
+      require('../../assets/sent-recieve-notification.wav')
     );
     await sound.playAsync();
   } catch (error) {
