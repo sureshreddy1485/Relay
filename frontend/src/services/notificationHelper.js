@@ -9,7 +9,6 @@ async function ensureChannel() {
       importance: AndroidImportance.HIGH,
       sound: 'relay_notification_sound',
       vibration: true,
-      vibrationPattern: [0, 250, 250, 250],
     });
   } catch (e) {
     console.log('Channel creation error:', e);

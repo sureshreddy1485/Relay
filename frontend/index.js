@@ -21,7 +21,6 @@ async function showNotification(chatId, sender, chat, title, body, imageUrl) {
       importance: AndroidImportance.HIGH,
       sound: 'relay_notification_sound', // Android looks up relay_notification_sound.mp3 or .wav
       vibration: true,
-      vibrationPattern: [0, 250, 250, 250],
     });
 
     const senderName = sender?.displayName || sender?.username || 'Unknown';
