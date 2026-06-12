@@ -429,8 +429,17 @@ export default function ChatRoomScreen({ route, navigation }) {
     else setSearchQuery('');
   }, [showSearch]);
 
+  // Load draft on mount
+  useEffect(() => {
+    const draftText = useChatStore.getState().drafts[chat._id?.toString()];
+    if (draftText) {
+      setText(draftText);
+    }
+  }, []);
+
   const handleTyping = (val) => {
     setText(val);
+    useChatStore.getState().setDraft(chat._id, val);
     sendTyping(chat._id, user?._id, user?.username);
     clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(() => stopTyping(chat._id, user?._id), 1500);
@@ -457,6 +466,7 @@ export default function ChatRoomScreen({ route, navigation }) {
     if (!content && !mediaFile && !pollData) return;
     setIsSending(true);
     setText('');
+    useChatStore.getState().setDraft(chat._id, '');
     stopTyping(chat._id, user?._id);
 
     if (editingMessage) {

@@ -109,6 +109,7 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
   const isMuted       = currentUser?.mutedChats?.includes(chat._id);
   const disappear     = disappearIcon(chat.disappearAfter);
   const unreadCount   = useChatStore(s => s.unreadCounts[chat._id?.toString()] || 0);
+  const draftText     = useChatStore(s => s.drafts[chat._id?.toString()]);
   
   const typingUsers   = useChatStore(s => s.typingUsers[chat._id?.toString()] || EMPTY_ARRAY);
   const activeTypingUserIds = typingUsers.filter(id => id && id.toString() !== currentUser?._id?.toString());
@@ -193,7 +194,16 @@ export default function ChatListItem({ chat, currentUser, onPress, onLongPress }
 
         {/* Bottom row: last message + badge icons */}
         <View style={styles.bottomRow}>
-          {isTyping ? <TypingAnimation text={typingText} /> : <Text style={styles.lastMsg} numberOfLines={1}>{lastMsgText}</Text>}
+          {isTyping ? (
+            <TypingAnimation text={typingText} />
+          ) : draftText ? (
+            <Text style={styles.lastMsg} numberOfLines={1}>
+              <Text style={{ color: '#FF4444', fontWeight: 'bold' }}>Draft: </Text>
+              {draftText}
+            </Text>
+          ) : (
+            <Text style={styles.lastMsg} numberOfLines={1}>{lastMsgText}</Text>
+          )}
           <View style={styles.badgeRow}>
             {/* Mute icon shown under the time */}
             {isMuted && (

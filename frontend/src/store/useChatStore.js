@@ -7,6 +7,7 @@ const useChatStore = create((set, get) => ({
   messages: {},       // { chatId: [messages] }
   typingUsers: {},    // { chatId: [userIds] }
   unreadCounts: {},   // { chatId: count }
+  drafts: {},         // { chatId: string }
   isLoadingChats: false,
   isLoadingMessages: false,
   inAppNotification: null,
@@ -28,6 +29,7 @@ const useChatStore = create((set, get) => ({
     messages: {},
     typingUsers: {},
     unreadCounts: {},
+    drafts: {},
     isLoadingChats: false,
     isLoadingMessages: false,
     inAppNotification: null,
@@ -185,6 +187,18 @@ const useChatStore = create((set, get) => ({
     if (!chatId) return;
     const idStr = chatId.toString();
     set({ unreadCounts: { ...get().unreadCounts, [idStr]: 0 } });
+  },
+
+  setDraft: (chatId, text) => {
+    if (!chatId) return;
+    const idStr = chatId.toString();
+    const newDrafts = { ...get().drafts };
+    if (!text || text.trim() === '') {
+      delete newDrafts[idStr];
+    } else {
+      newDrafts[idStr] = text;
+    }
+    set({ drafts: newDrafts });
   },
 
   addChat: (chat) => {
