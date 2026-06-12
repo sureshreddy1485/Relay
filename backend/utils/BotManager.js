@@ -40,6 +40,27 @@ class BotManager {
     const isGroupAdmin = chat.isGroupChat && ((chat.groupAdmin && chat.groupAdmin.toString() === senderId) || (chat.admins && chat.admins.some(a => a.toString() === senderId)));
 
     // Switch logic
+    if (text.toLowerCase() === '!swap') {
+      if (chat.isGroupChat && !isGroupAdmin) {
+        return this.sendCustomMessage(chat, io, activeBotId, "Only group admins can swap bots.");
+      }
+      if (GameManager.hasActiveGame(chat._id)) {
+        return this.sendCustomMessage(chat, io, activeBotId, "An activity is currently active! Please finish it before swapping bots.");
+      }
+      
+      const newActive = activeBotStr === 'mars' ? 'mica' : 'mars';
+      settings.activeBot = newActive;
+      settings.backupBot = activeBotStr;
+      await settings.save();
+      
+      const newBotId = newActive === 'mars' ? marsId : micaId;
+      const swapMessage = newActive === 'mars' 
+        ? "Mica is taking a break. Mars is now active. Try not to annoy me."
+        : "Mars is gone. Mica is here! Let's have some fun! ✨";
+        
+      return this.sendCustomMessage(chat, io, newBotId, swapMessage);
+    }
+
     if (cleanCommandText === 'switch to mars' || cleanCommandText === 'bring mars back') {
       if (chat.isGroupChat && !isGroupAdmin) {
         return this.sendCustomMessage(chat, io, activeBotId, "Only group admins can switch bots.");
