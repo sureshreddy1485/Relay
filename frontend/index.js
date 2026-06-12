@@ -71,8 +71,8 @@ async function showNotification(chatId, sender, chat, title, body) {
           type: AndroidStyle.MESSAGING,
           person: { name: 'Me', id: 'me' },
           messages: styleMessages,
-          title: isGroup ? (chat.chatName || chat.groupName || title) : undefined,
-          group: isGroup,
+          title: isGroup ? (chat?.chatName || chat?.groupName || title) : undefined,
+          isGroupConversation: isGroup,
         },
         actions: [
           {
