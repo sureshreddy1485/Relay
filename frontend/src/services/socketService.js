@@ -86,31 +86,10 @@ const connectSocket = (userId) => {
     if (selectedChat?._id !== chatId || AppState.currentState !== 'active') {
       incrementUnread(chatId);
       
-      // Show local notification via expo-notifications as fallback
-      // (Works in both Expo Go and APK; FCM/Notifee will also fire in APK)
       if (AppState.currentState === 'active' && senderId !== currentUserId) {
-        try {
-          const senderName = message.sender?.displayName || message.sender?.username || 'Someone';
-          const chatName = message.chat?.isGroupChat ? message.chat?.chatName : senderName;
-          let body = message.content || '';
-          if (message.mediaType === 'image') body = '📷 Photo';
-          else if (message.mediaType === 'video') body = '🎥 Video';
-          else if (message.mediaType === 'audio' || message.mediaType === 'voice') body = '🎤 Voice';
-          else if (message.mediaType === 'document') body = '📎 Document';
-
-          await Notifications.scheduleNotificationAsync({
-            identifier: chatId, // Ensure messages overwrite/group in the same chat
-            content: {
-              title: chatName,
-              body: body,
-              sound: true,
-              data: { chatId },
-            },
-            trigger: null, // Show immediately
-          });
-        } catch (e) {
-          // Silently fail if notification can't be shown
-        }
+        // FCM via Notifee handles the actual local notification.
+        // But we still want to play the in-app sound!
+        playMessageSound();
       }
 
       // Emit delivered status if app is active but not in chat

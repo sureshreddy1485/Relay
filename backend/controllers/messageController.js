@@ -202,6 +202,7 @@ const sendMessage = asyncHandler(async (req, res) => {
                 chat: JSON.stringify({ isGroupChat: chat.isGroupChat, chatName: chat.chatName }),
                 title: title,
                 body: pushBody,
+                imageUrl: message.mediaUrl || '',
               }
             });
             pushSent = true;

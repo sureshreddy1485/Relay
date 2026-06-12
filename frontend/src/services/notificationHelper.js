@@ -16,7 +16,7 @@ async function ensureChannel() {
   }
 }
 
-export const displayMessagingNotification = async ({ chatId, sender, chat, title, body }) => {
+export const displayMessagingNotification = async ({ chatId, sender, chat, title, body, imageUrl }) => {
   if (!chatId || !sender) return;
 
   try {
@@ -67,11 +67,15 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
           {
             title: '✓ Mark as Read',
             pressAction: { id: 'mark_as_read' },
-          },
-        ],
       },
       data: { chatId },
-    });
+    };
+
+    if (imageUrl) {
+      notificationConfig.android.largeIcon = imageUrl;
+    }
+
+    await notifee.displayNotification(notificationConfig);
   } catch (e) {
     console.error('Notifee display failed:', e);
   }

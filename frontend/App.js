@@ -208,7 +208,7 @@ export default function App() {
             
             if (chatId && sender && selectedChat?._id?.toString() !== chatId?.toString()) {
               const { displayMessagingNotification } = require('./src/services/notificationHelper');
-              await displayMessagingNotification({ chatId, sender, chat, title, body });
+              await displayMessagingNotification({ chatId, sender, chat, title, body, imageUrl: data.imageUrl });
             }
           } catch (e) {
             console.error('Error handling foreground data message:', e);

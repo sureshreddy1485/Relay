@@ -12,7 +12,7 @@ const getBaseUrl = () => process.env.EXPO_PUBLIC_API_URL || 'https://relay-api-j
 // INLINE notification display — no external module imports
 // This runs in Android headless JS mode when app is killed
 // ═══════════════════════════════════════════════════════════════
-async function showNotification(chatId, sender, chat, title, body) {
+async function showNotification(chatId, sender, chat, title, body, imageUrl) {
   try {
     // 1. Create channel (Use new ID to force Android to apply new sound settings)
     await notifee.createChannel({
@@ -59,7 +59,7 @@ async function showNotification(chatId, sender, chat, title, body) {
     const isGroup = chat?.isGroupChat || false;
 
     // 3. Display notification with actions using MESSAGING style (like WhatsApp)
-    await notifee.displayNotification({
+    const notificationConfig = {
       id: chatId,
       title: title,
       body: body,
@@ -82,29 +82,15 @@ async function showNotification(chatId, sender, chat, title, body) {
         ],
       },
       data: { chatId },
-    });
+    };
+
+    if (imageUrl) {
+      notificationConfig.android.largeIcon = imageUrl;
+    }
+
+    await notifee.displayNotification(notificationConfig);
   } catch (e) {
-    // Last resort: show a basic notification if MESSAGING style fails
-    // (This usually happens if Android blocks overwriting an old BIGTEXT notification)
-    try {
-      await notifee.displayNotification({
-        id: chatId + '_' + Date.now(), // Force a new ID to bypass style conflict
-        title: title,
-        body: body,
-        android: {
-          channelId: 'relay-messages-v5',
-          pressAction: { id: 'default' },
-          importance: AndroidImportance.HIGH,
-          actions: [
-            {
-              title: '✓ Mark as Read',
-              pressAction: { id: 'mark_as_read' },
-            },
-          ],
-        },
-        data: { chatId },
-      });
-    } catch (e2) {}
+    console.log("Failed to display notification", e);
   }
 }
 
@@ -144,7 +130,7 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
         // Add the reply to the stored message list and update the notification
         await showNotification(chatId,
           { displayName: 'You' }, // dummy sender
-          null, notification.title || 'Chat', textContent);
+          null, notification.title || 'Chat', textContent, null);
 
       } else if (pressAction.id === 'mark_as_read') {
         await axios.put(`${getBaseUrl()}/messages/${chatId}/read`, {}, {
@@ -184,7 +170,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     const chatId = data.chatId;
 
     if (chatId && sender) {
-      await showNotification(chatId, sender, chat, title, body);
+      await showNotification(chatId, sender, chat, title, body, data.imageUrl);
     }
   } catch (e) {}
 });
