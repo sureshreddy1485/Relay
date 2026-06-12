@@ -31,6 +31,7 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
       person: {
         id: senderId,
         name: senderName,
+        ...(sender?.profilePicture ? { icon: sender.profilePicture } : {})
       },
     };
 
@@ -48,7 +49,8 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
             timestamp: Number(m.timestamp) || Date.now(),
             person: {
               name: String(m.person?.name || 'Unknown'),
-              id: String(m.person?.id || 'user')
+              id: String(m.person?.id || 'user'),
+              ...(m.person?.icon ? { icon: m.person.icon } : {})
             }
           }));
         messages = [...existingMessages, message];

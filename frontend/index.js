@@ -33,6 +33,7 @@ async function showNotification(chatId, sender, chat, title, body, imageUrl) {
       person: {
         id: senderId,
         name: senderName,
+        ...(sender?.profilePicture ? { icon: sender.profilePicture } : {})
       },
     };
 
@@ -52,7 +53,8 @@ async function showNotification(chatId, sender, chat, title, body, imageUrl) {
             timestamp: Number(m.timestamp) || Date.now(),
             person: {
               name: String(m.person?.name || 'Unknown'),
-              id: String(m.person?.id || 'user')
+              id: String(m.person?.id || 'user'),
+              ...(m.person?.icon ? { icon: m.person.icon } : {})
             }
           }));
         styleMessages = [...existingMessages, message];

@@ -198,7 +198,7 @@ const sendMessage = asyncHandler(async (req, res) => {
               token: targetUser.fcmToken,
               data: {
                 chatId: chat._id.toString(),
-                sender: JSON.stringify({ _id: req.user._id, username: req.user.username, displayName: req.user.displayName }),
+                sender: JSON.stringify({ _id: req.user._id, username: req.user.username, displayName: req.user.displayName, profilePicture: req.user.profilePicture }),
                 chat: JSON.stringify({ isGroupChat: chat.isGroupChat, chatName: chat.chatName }),
                 title: title,
                 body: pushBody,
