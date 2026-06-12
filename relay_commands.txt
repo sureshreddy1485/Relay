@@ -124,3 +124,4 @@ Rules:
 
 * App crashes immediately on opening (in APK):
   This usually means a native package was added but not compiled, OR an environment variable (`EXPO_PUBLIC_...`) is missing in `eas.json`. Check `eas.json`!
+ node scripts/clearBroadcasts.js

@@ -602,6 +602,13 @@ export default function SettingsScreen({ navigation }) {
             iconColor="#8B5CF6"
             onPress={handleCheckUpdate}
           />
+          <SettingRow
+            icon="help-circle-outline"
+            label="Help & User Guide"
+            iconBg="#06B6D420"
+            iconColor="#06B6D4"
+            onPress={() => navigation.navigate('Help')}
+          />
         </View>
 
         {/* ── Account Actions ───────────────────────────────────────────── */}
