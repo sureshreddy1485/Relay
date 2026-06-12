@@ -414,17 +414,21 @@ class BotManager {
 
     let replyContent = botStr === 'mars' ? "Interesting..." : "I am here!";
 
-    if (botStr === 'mica' && !process.env.GROQ_API_KEY) {
-      if (cleanContent.includes('roast')) replyContent = "You want a roast? Your code is so messy even a try-catch block gave up on it. Boom.";
-      else if (cleanContent.includes('ping')) replyContent = "Pong! I'm alive and watching y'all 👀";
-      else replyContent = "Hi! I'm Mica!";
-      return this.sendCustomMessage(chat, io, botId, replyContent);
+    const apiKey = botStr === 'mars' ? process.env.MARS_GROQ_API_KEY : process.env.MICA_GROQ_API_KEY;
+
+    if (!apiKey) {
+      if (botStr === 'mica') {
+        if (cleanContent.includes('roast')) replyContent = "You want a roast? Your code is so messy even a try-catch block gave up on it. Boom.";
+        else if (cleanContent.includes('ping')) replyContent = "Pong! I'm alive and watching y'all 👀";
+        else replyContent = "Hi! I'm Mica!";
+        return this.sendCustomMessage(chat, io, botId, replyContent);
+      } else {
+        const genericReplies = ["Interesting...", "That seems suspicious.", "Bold move."];
+        return this.sendCustomMessage(chat, io, botId, genericReplies[Math.floor(Math.random() * genericReplies.length)]);
+      }
     }
 
     try {
-      const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error("No Groq API key");
-
       const groq = new Groq({ apiKey });
 
       let systemPrompt = "You are Mica, a helpful and friendly group chat assistant. Keep it short and friendly.";
