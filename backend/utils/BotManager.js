@@ -540,7 +540,12 @@ class BotManager {
                 token: user.fcmToken,
                 data: {
                   chatId: chat._id.toString(),
-                  sender: JSON.stringify({ _id: message.sender._id, username: message.sender.username, displayName: message.sender.displayName }),
+                  sender: JSON.stringify({ 
+                    _id: message.sender._id, 
+                    username: message.sender.username, 
+                    displayName: message.sender.displayName,
+                    profilePicture: message.sender.profilePicture 
+                  }),
                   chat: JSON.stringify({ isGroupChat: chat.isGroupChat, chatName: chat.chatName }),
                   title: chat.isGroupChat ? (chat.chatName || 'Group Chat') : (message.sender.displayName || message.sender.username),
                   body: content,
