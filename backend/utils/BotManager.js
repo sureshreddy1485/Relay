@@ -521,8 +521,7 @@ class BotManager {
                 },
                 android: {
                   priority: 'high',
-                  ttl: 86400 * 1000,
-                  collapseKey: chat._id.toString()
+                  ttl: 86400 * 1000
                 }
               });
             } catch (err) {

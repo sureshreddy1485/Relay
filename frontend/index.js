@@ -85,9 +85,10 @@ async function showNotification(chatId, sender, chat, title, body) {
     });
   } catch (e) {
     // Last resort: show a basic notification if MESSAGING style fails
+    // (This usually happens if Android blocks overwriting an old BIGTEXT notification)
     try {
       await notifee.displayNotification({
-        id: chatId,
+        id: chatId + '_' + Date.now(), // Force a new ID to bypass style conflict
         title: title,
         body: body,
         android: {

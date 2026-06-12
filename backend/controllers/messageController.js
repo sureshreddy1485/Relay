@@ -268,8 +268,7 @@ const sendMessage = asyncHandler(async (req, res) => {
                 data: msg.data,
                 android: {
                   priority: 'high',
-                  ttl: 86400 * 1000,
-                  collapseKey: msg.data.chatId
+                  ttl: 86400 * 1000
                 },
                 apns: {
                   headers: { 'apns-priority': '10' },
