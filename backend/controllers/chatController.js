@@ -1195,8 +1195,10 @@ const acceptJoinRequest = asyncHandler(async (req, res) => {
     io.to(userId).emit('chat_updated', fullChat);
   }
 
-  const BotEngine = require('../utils/BotEngine');
-  BotEngine.onUserJoinedGroup(fullChat, userId, io);
+  const BotManager = require('../utils/BotManager');
+  if (typeof BotManager.onUserJoinedGroup === 'function') {
+    BotManager.onUserJoinedGroup(fullChat, userId, io);
+  }
 
   res.status(200).json({ success: true, chat: fullChat });
 });
