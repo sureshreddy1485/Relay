@@ -1216,6 +1216,38 @@ const declineJoinRequest = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, chat: fullChat });
 });
 
+// @desc  Preview a group by ID without joining
+// @route GET /api/chats/group/:id/preview
+// @access Private
+const getGroupPreview = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const chat = await Chat.findById(id).populate('users', 'username displayName profilePicture role').populate('groupAdmin', 'username displayName profilePicture');
+
+  if (!chat || !chat.isGroupChat) {
+    res.status(404); throw new Error('Group Not Found');
+  }
+
+  const isMember = chat.users.some(u => u._id.toString() === req.user._id.toString());
+  const hasRequested = chat.joinRequests && chat.joinRequests.includes(req.user._id);
+
+  res.status(200).json({
+    success: true,
+    chat: {
+      _id: chat._id,
+      chatName: chat.chatName,
+      groupDescription: chat.groupDescription,
+      groupPicture: chat.groupPicture,
+      groupUsername: chat.groupUsername,
+      users: chat.users,
+      groupAdmin: chat.groupAdmin,
+      isPublic: chat.isPublic,
+      joinPrivacy: chat.joinPrivacy,
+      isMember,
+      hasRequested
+    }
+  });
+});
+
 module.exports = {
   accessChat, getChats, createGroupChat, updateGroup, addToGroup, inviteToGroup,
   removeFromGroup, promoteToAdmin, demoteToMember, transferOwnership, leaveGroup,
@@ -1229,4 +1261,5 @@ module.exports = {
   updateChatSecurity,
   acceptJoinRequest,
   declineJoinRequest,
+  getGroupPreview
 };

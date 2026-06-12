@@ -604,25 +604,13 @@ export default function MessageBubble({
           <Text 
             key={index} 
             style={{ fontWeight: 'bold', color: Colors.primary, textDecorationLine: 'underline' }}
-            onPress={async () => {
+            onPress={() => {
               const useChatStore = require('../store/useChatStore').default;
               const existingChat = useChatStore.getState().chats.find(c => c._id === groupId);
               if (existingChat) {
                 navigation.push('ChatRoom', { chat: existingChat });
-                return;
-              }
-              try {
-                const api = require('../services/api').default;
-                const { data } = await api.put(`/chats/group/${groupId}/add`, { userId: undefined });
-                useChatStore.getState().addChat(data.chat);
-                navigation.push('ChatRoom', { chat: data.chat });
-              } catch (e) {
-                const errorMsg = e.response?.data?.message || 'Failed to join group';
-                if (errorMsg === 'User already in group') {
-                  if (showAlert) showAlert('Notice', 'You are already in the group!');
-                } else {
-                  if (showAlert) showAlert('Error', errorMsg);
-                }
+              } else {
+                navigation.push('GroupPreview', { groupId });
               }
             }}
           >

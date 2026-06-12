@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import TabNavigator from './TabNavigator';
 import ChatRoomScreen from '../screens/chat/ChatRoomScreen';
 import GroupInfoScreen from '../screens/chat/GroupInfoScreen';
+import GroupPreviewScreen from '../screens/chat/GroupPreviewScreen';
 import UserProfileScreen from '../screens/user/UserProfileScreen';
 import NewChatScreen from '../screens/chat/NewChatScreen';
 import CreateGroupScreen from '../screens/chat/CreateGroupScreen';
@@ -36,6 +37,7 @@ export default function MainNavigator() {
       <Stack.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
       <Stack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ headerShown: false }} />
       <Stack.Screen name="GroupInfo" component={GroupInfoScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="GroupPreview" component={GroupPreviewScreen} options={{ headerShown: false }} />
       <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen name="NewChat" component={NewChatScreen} options={{ title: 'New Chat' }} />
       <Stack.Screen name="CreateGroup" component={CreateGroupScreen} options={{ headerShown: false }} />

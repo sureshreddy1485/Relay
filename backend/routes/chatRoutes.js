@@ -4,7 +4,7 @@ const {
   accessChat, getChats, createGroupChat, updateGroup, addToGroup, inviteToGroup,
   removeFromGroup, promoteToAdmin, demoteToMember, leaveGroup, togglePinChat,
   toggleArchiveChat, searchPublicChats, setDisappearTimer, toggleMuteChat,
-  deleteChat, updateChatTheme, updateChatSecurity,
+  deleteChat, updateChatTheme, updateChatSecurity, getGroupPreview,
 } = require('../controllers/chatController');
 const { protect } = require('../middlewares/authMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
@@ -13,6 +13,7 @@ router.route('/').get(protect, getChats).post(protect, accessChat);
 router.route('/:id').delete(protect, deleteChat);
 router.post('/group', protect, upload.single('groupPicture'), createGroupChat);
 router.get('/search/public', protect, searchPublicChats);
+router.get('/group/:id/preview', protect, getGroupPreview);
 router.put('/group/:id', protect, upload.single('groupPicture'), updateGroup);
 router.put('/group/:id/add', protect, addToGroup);
 router.put('/group/:id/invite', protect, inviteToGroup);
