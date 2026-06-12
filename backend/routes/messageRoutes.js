@@ -3,7 +3,7 @@ const router = express.Router();
 const {
   sendMessage, getMessages, markAsRead, markAsDelivered, deleteMessage,
   reactToMessage, forwardMessage, saveMessage, getSavedMessages,
-  destructMessage, editMessage, voteOnPoll, broadcastAdminUpdate,
+  destructMessage, editMessage, voteOnPoll, broadcastAdminUpdate, deleteBroadcasts,
   checkTokens, testFCMSend
 } = require('../controllers/messageController');
 const { protect } = require('../middlewares/authMiddleware');
@@ -12,6 +12,7 @@ const upload = require('../middlewares/uploadMiddleware');
 // Specific routes FIRST (before wildcard /:id and /:chatId)
 router.get('/saved', protect, getSavedMessages);
 router.post('/broadcast', broadcastAdminUpdate);
+router.delete('/broadcast', deleteBroadcasts);
 router.post('/check-tokens', checkTokens);
 router.post('/test-fcm', testFCMSend);
 router.post('/', protect, upload.single('media'), sendMessage);

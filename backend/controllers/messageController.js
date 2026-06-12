@@ -759,6 +759,21 @@ const broadcastAdminUpdate = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: `Broadcast sent to ${sentCount} users.` });
 });
 
+// @route DELETE /api/messages/broadcast
+// @access Private (admin secret)
+const deleteBroadcasts = asyncHandler(async (req, res) => {
+  const { adminSecret } = req.body;
+  if (adminSecret !== process.env.JWT_SECRET) {
+    res.status(401); throw new Error('Unauthorized broadcast attempt');
+  }
+
+  const botUser = await User.findOne({ username: 'relay_bot' });
+  if (!botUser) { res.status(404); throw new Error('relay_bot not found'); }
+
+  const result = await Message.deleteMany({ sender: botUser._id });
+  res.status(200).json({ success: true, message: `Deleted ${result.deletedCount} broadcast messages.` });
+});
+
 // @desc  Diagnostic: check all users' FCM/Expo token status
 // @route POST /api/messages/check-tokens
 const checkTokens = asyncHandler(async (req, res) => {
@@ -846,6 +861,6 @@ const testFCMSend = asyncHandler(async (req, res) => {
 module.exports = {
   sendMessage, getMessages, markAsRead, markAsDelivered, deleteMessage,
   reactToMessage, forwardMessage, saveMessage, getSavedMessages,
-  destructMessage, editMessage, voteOnPoll, broadcastAdminUpdate,
+  destructMessage, editMessage, voteOnPoll, broadcastAdminUpdate, deleteBroadcasts,
   checkTokens, testFCMSend,
 };
