@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity, StatusBar, Image,
+  View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity, StatusBar, Image, ScrollView
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../theme/colors';
@@ -21,59 +21,61 @@ export default function WelcomeScreen({ navigation }) {
   }, []);
 
   return (
-    <LinearGradient colors={['#080F14', '#04070B']} style={styles.container}>
+    <LinearGradient colors={['#080F14', '#04070B']} style={{ flex: 1 }}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* Decorative circles */}
       <View style={[styles.circle, { top: -60, right: -60, backgroundColor: Colors.primary + '20' }]} />
       <View style={[styles.circle, { bottom: 200, left: -80, backgroundColor: Colors.primary + '10', width: 200, height: 200 }]} />
 
-      {/* Logo */}
-      <Animated.View style={[styles.logoContainer, { opacity: logoAnim, transform: [{ scale: logoAnim }] }]}>
-        <Image 
-          source={require('../../../assets/icon.png')} 
-          style={styles.logoImage} 
-          resizeMode="contain"
-        />
-        <View style={{ flexDirection: 'row' }}>
-          <Text style={[styles.appName, { color: Colors.primary }]}>Relay</Text>
-        </View>
-        <Text style={styles.tagline}>For the Ones Who Matter</Text>
-      </Animated.View>
-
-      {/* Feature pills */}
-      <Animated.View style={[styles.features, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-        {['🔒 End-to-End Encrypted', '⚡ Realtime Messaging', '🌍 Communities & Channels'].map((f, i) => (
-          <View key={i} style={styles.featurePill}>
-            <Text style={styles.featureText}>{f}</Text>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        {/* Logo */}
+        <Animated.View style={[styles.logoContainer, { opacity: logoAnim, transform: [{ scale: logoAnim }] }]}>
+          <Image 
+            source={require('../../../assets/icon.png')} 
+            style={styles.logoImage} 
+            resizeMode="contain"
+          />
+          <View style={{ flexDirection: 'row' }}>
+            <Text style={[styles.appName, { color: Colors.primary }]}>Relay</Text>
           </View>
-        ))}
-      </Animated.View>
+          <Text style={styles.tagline}>For the Ones Who Matter</Text>
+        </Animated.View>
 
-      {/* CTA Buttons */}
-      <Animated.View style={[styles.buttons, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-        <TouchableOpacity onPress={() => navigation.navigate('Signup')} activeOpacity={0.85}>
-          <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.primaryBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            <Text style={styles.primaryBtnText}>Get Started</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        {/* Feature pills */}
+        <Animated.View style={[styles.features, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          {['🔒 End-to-End Encrypted', '⚡ Realtime Messaging', '🌍 Communities & Channels'].map((f, i) => (
+            <View key={i} style={styles.featurePill}>
+              <Text style={styles.featureText}>{f}</Text>
+            </View>
+          ))}
+        </Animated.View>
 
-        <TouchableOpacity
-          style={styles.secondaryBtn}
-          onPress={() => navigation.navigate('Login')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.secondaryBtnText}>I already have an account</Text>
-        </TouchableOpacity>
-      </Animated.View>
+        {/* CTA Buttons */}
+        <Animated.View style={[styles.buttons, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+          <TouchableOpacity onPress={() => navigation.navigate('Signup')} activeOpacity={0.85}>
+            <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.primaryBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <Text style={styles.primaryBtnText}>Get Started</Text>
+            </LinearGradient>
+          </TouchableOpacity>
 
-      <Text style={styles.footer}>By continuing, you agree to our Terms & Privacy Policy</Text>
+          <TouchableOpacity
+            style={styles.secondaryBtn}
+            onPress={() => navigation.navigate('Login')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.secondaryBtnText}>I already have an account</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        <Text style={styles.footer}>By continuing, you agree to our Terms & Privacy Policy</Text>
+      </ScrollView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
+  container: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 40 },
   circle: { position: 'absolute', width: 250, height: 250, borderRadius: 125 },
   logoContainer: { alignItems: 'center', marginBottom: 48 },
   logoImage: {
@@ -100,5 +102,5 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: Colors.dark.border, backgroundColor: Colors.dark.card + 'AA',
   },
   secondaryBtnText: { color: Colors.dark.text, fontSize: 16, fontWeight: '600' },
-  footer: { position: 'absolute', bottom: 36, color: Colors.dark.muted, fontSize: 11, textAlign: 'center' },
+  footer: { color: Colors.dark.muted, fontSize: 11, textAlign: 'center', marginTop: 40 },
 });
