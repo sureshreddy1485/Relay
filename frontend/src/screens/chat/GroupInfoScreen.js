@@ -27,9 +27,9 @@ const MemberGridItem = ({ member, role, isMe, canManage, onAction, onTap }) => (
   >
     <View style={styles.gridAvatarWrap}>
       {member.username === 'mica_bot' ? (
-        <Image source={require('../../assets/mica-profile.png')} style={styles.gridAvatar} />
+        <Image source={require('../../../assets/mica-profile.png')} style={styles.gridAvatar} />
       ) : member.username === 'mars_bot' ? (
-        <Image source={require('../../assets/mars-profile.png')} style={styles.gridAvatar} />
+        <Image source={require('../../../assets/mars-profile.png')} style={styles.gridAvatar} />
       ) : member.profilePicture ? (
         <Image source={{ uri: member.profilePicture }} style={styles.gridAvatar} />
       ) : (
