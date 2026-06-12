@@ -522,14 +522,7 @@ class BotManager {
                 android: {
                   priority: 'high',
                   ttl: 86400 * 1000,
-                  collapseKey: chat._id.toString(),
-                  notification: {
-                    title: chat.isGroupChat ? (chat.groupName || 'Group Chat') : (message.sender.displayName || message.sender.username),
-                    body: content,
-                    channelId: 'relay-messages-v4',
-                    sound: 'relay_notification_sound',
-                    tag: chat._id.toString(),
-                  }
+                  collapseKey: chat._id.toString()
                 }
               });
             } catch (err) {

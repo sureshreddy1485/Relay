@@ -269,14 +269,7 @@ const sendMessage = asyncHandler(async (req, res) => {
                 android: {
                   priority: 'high',
                   ttl: 86400 * 1000,
-                  collapseKey: msg.data.chatId,
-                  notification: {
-                    title: msg.data.title,
-                    body: msg.data.body,
-                    channelId: 'relay-messages-v4',
-                    sound: 'relay_notification_sound',
-                    tag: msg.data.chatId,
-                  }
+                  collapseKey: msg.data.chatId
                 },
                 apns: {
                   headers: { 'apns-priority': '10' },
