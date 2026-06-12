@@ -26,11 +26,7 @@ const MemberGridItem = ({ member, role, isMe, canManage, onAction, onTap }) => (
     activeOpacity={0.7}
   >
     <View style={styles.gridAvatarWrap}>
-      {member.username === 'mica_bot' ? (
-        <Image source={require('../../../assets/mica-profile.png')} style={styles.gridAvatar} />
-      ) : member.username === 'mars_bot' ? (
-        <Image source={require('../../../assets/mars-profile.png')} style={styles.gridAvatar} />
-      ) : member.profilePicture ? (
+      {member.profilePicture ? (
         <Image source={{ uri: member.profilePicture }} style={styles.gridAvatar} />
       ) : (
         <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.gridAvatar}>

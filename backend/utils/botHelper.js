@@ -17,7 +17,7 @@ const initializeMicaBot = async () => {
         securityKey: 'system_bot_key',
         displayName: 'Mica',
         bio: 'Relay System Assistant. Here to keep things lively!',
-        profilePicture: 'https://res.cloudinary.com/dz3m8nxj3/image/upload/v1779647118/relay/profile_pictures/mica_bot.png',
+        profilePicture: 'https://res.cloudinary.com/dz3m8nxj3/image/upload/v1781247775/mica_profile_png.png',
         role: 'system_bot',
         isVerified: true,
       });
@@ -28,7 +28,7 @@ const initializeMicaBot = async () => {
       if (mica.displayName !== 'Mica')                           { mica.displayName = 'Mica';                                             changed = true; }
       if (mica.email !== 'mica@relay.system')                    { mica.email       = 'mica@relay.system';                                changed = true; }
       if (!mica.bio?.includes('Relay'))                          { mica.bio         = 'Relay System Assistant. Here to keep things lively!'; changed = true; }
-      const MICA_PIC = 'https://res.cloudinary.com/dz3m8nxj3/image/upload/v1779647118/relay/profile_pictures/mica_bot.png';
+      const MICA_PIC = 'https://res.cloudinary.com/dz3m8nxj3/image/upload/v1781247775/mica_profile_png.png';
       if (mica.profilePicture !== MICA_PIC)                      { mica.profilePicture = MICA_PIC;                                       changed = true; }
       if (changed) await mica.save();
     }
@@ -107,7 +107,7 @@ const initializeMarsBot = async () => {
         securityKey: 'system_bot_key_mars',
         displayName: 'Mars',
         bio: 'The smart troublemaker of the chat. I host games and judge you silently.',
-        profilePicture: 'https://res.cloudinary.com/dz3m8nxj3/image/upload/v1720000000/relay/profile_pictures/mars_bot.png', // Placeholder or add later
+        profilePicture: 'https://res.cloudinary.com/dz3m8nxj3/image/upload/v1781247775/mars_profile_png.png',
         role: 'system_bot',
         isVerified: true,
       });
@@ -116,7 +116,7 @@ const initializeMarsBot = async () => {
       if (mars.displayName !== 'Mars') { mars.displayName = 'Mars'; changed = true; }
       if (mars.email !== 'mars@relay.system') { mars.email = 'mars@relay.system'; changed = true; }
       if (!mars.bio?.includes('troublemaker')) { mars.bio = 'The smart troublemaker of the chat. I host games and judge you silently.'; changed = true; }
-      const MARS_PIC = 'https://res.cloudinary.com/dz3m8nxj3/image/upload/v1720000000/relay/profile_pictures/mars_bot.png';
+      const MARS_PIC = 'https://res.cloudinary.com/dz3m8nxj3/image/upload/v1781247775/mars_profile_png.png';
       if (mars.profilePicture !== MARS_PIC) { mars.profilePicture = MARS_PIC; changed = true; }
       if (changed) await mars.save();
     }
