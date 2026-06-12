@@ -45,7 +45,16 @@ async function showNotification(chatId, sender, chat, title, body, imageUrl) {
       
       if (existing && existing.notification?.android?.style?.messages) {
         // Sanitize existing messages in case previous bugs corrupted the stored array
-        const existingMessages = existing.notification.android.style.messages.filter(m => m && m.text !== undefined && m.timestamp);
+        const existingMessages = existing.notification.android.style.messages
+          .filter(m => m && m.text !== undefined && m.timestamp)
+          .map(m => ({
+            text: String(m.text || ''),
+            timestamp: Number(m.timestamp) || Date.now(),
+            person: {
+              name: String(m.person?.name || 'Unknown'),
+              id: String(m.person?.id || 'user')
+            }
+          }));
         styleMessages = [...existingMessages, message];
       }
     } catch (e) {
@@ -72,8 +81,7 @@ async function showNotification(chatId, sender, chat, title, body, imageUrl) {
           type: AndroidStyle.MESSAGING,
           person: { name: 'Me', id: 'me' },
           messages: styleMessages,
-          title: isGroup ? (chat?.chatName || chat?.groupName || title) : undefined,
-          group: isGroup,
+          ...(isGroup ? { title: String(chat?.chatName || chat?.groupName || title || 'Group'), group: true } : {})
         },
         actions: [
           {

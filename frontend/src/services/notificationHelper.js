@@ -41,7 +41,16 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
       const existing = displayed.find(n => n.id === chatId);
       if (existing && existing.notification && existing.notification.android &&
           existing.notification.android.style && existing.notification.android.style.messages) {
-        const existingMessages = existing.notification.android.style.messages.filter(m => m && m.text !== undefined && m.timestamp);
+        const existingMessages = existing.notification.android.style.messages
+          .filter(m => m && m.text !== undefined && m.timestamp)
+          .map(m => ({
+            text: String(m.text || ''),
+            timestamp: Number(m.timestamp) || Date.now(),
+            person: {
+              name: String(m.person?.name || 'Unknown'),
+              id: String(m.person?.id || 'user')
+            }
+          }));
         messages = [...existingMessages, message];
       }
     } catch (e) {
@@ -60,8 +69,7 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
           type: AndroidStyle.MESSAGING,
           person: { name: 'Me', id: 'me' },
           messages: messages,
-          title: chat?.isGroupChat ? (chat.chatName || chat.groupName || title) : undefined,
-          group: chat?.isGroupChat || false,
+          ...(chat?.isGroupChat ? { title: String(chat?.chatName || chat?.groupName || title || 'Group'), group: true } : {})
         },
         actions: [
           {
