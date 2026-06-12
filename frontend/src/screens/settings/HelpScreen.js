@@ -4,12 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../theme/colors';
 
+import { LinearGradient } from 'expo-linear-gradient';
+
 const HelpSection = ({ icon, title, description, color }) => (
   <View style={styles.sectionCard}>
     <View style={styles.sectionHeader}>
-      <View style={[styles.iconWrap, { backgroundColor: color + '20' }]}>
-        <Ionicons name={icon} size={22} color={color} />
-      </View>
+      <LinearGradient colors={[color, color + '80']} style={styles.iconWrap}>
+        <Ionicons name={icon} size={20} color="#FFF" />
+      </LinearGradient>
       <Text style={styles.sectionTitle}>{title}</Text>
     </View>
     <Text style={styles.sectionDesc}>{description}</Text>
@@ -53,37 +55,51 @@ export default function HelpScreen({ navigation }) {
 
         <HelpSection 
           icon="people"
-          title="3. Group Chats & Community"
+          title="3. Communities & Groups"
           color="#10B981"
-          description="Create groups, invite friends, and communicate seamlessly. You can even generate a unique 'Group Tag' that others can scan or search to instantly join your community."
+          description="Create groups, invite friends, and communicate seamlessly. You can make groups Public to list them in the Communities tab. Use 'Auto-Accept Requests' in your group settings to automatically approve new members!"
+        />
+
+        <HelpSection 
+          icon="aperture"
+          title="4. Moments (Stories)"
+          color="#F43F5E"
+          description="Share 24-hour disappearing Moments with your friends! Post photos, text, or videos to your friends, and see who viewed your Moments. It's the best way to share what you're up to!"
+        />
+
+        <HelpSection 
+          icon="people-circle"
+          title="5. Multi-Account Manager"
+          color="#6366F1"
+          description="Got multiple identities? Tap your profile picture on the top right of the Chats screen to open the Account Manager. Add another account and instantly switch between them without logging out!"
         />
 
         <HelpSection 
           icon="planet"
-          title="4. Meet the Bots: Mica & Mars"
+          title="6. Meet the Bots: Mica & Mars"
           color="#8B5CF6"
-          description="Relay features two incredibly smart AI companions. Mica is friendly, helpful, and great at keeping conversations lively. Mars is sarcastic, witty, and a bit of a rebel. In any group chat, the admin can swap the active bot by typing !swap. They play games and even share leaderboards!"
+          description="Relay features two incredibly smart AI companions. Mica is friendly and helpful. Mars is sarcastic and a bit of a rebel. In any group chat, the admin can swap the active bot by typing !swap."
         />
 
         <HelpSection 
           icon="game-controller"
-          title="5. Play Games (Scramble)"
+          title="7. Play Games (Scramble)"
           color="#F59E0B"
           description="Bored? Type '!scramble' in any group chat with Mica or Mars active! The bot will jumble a word, and everyone in the group can race to guess it. Your scores are tracked on the global leaderboard!"
         />
 
         <HelpSection 
           icon="shield-checkmark"
-          title="6. Privacy & Settings"
+          title="8. Privacy & Security"
           color="#EAB308"
-          description="Go to Settings to control who sees your Last Seen, Profile Picture, and Read Receipts. You can also block users, silently remove friends, or temporarily deactivate your account if you need a break."
+          description="Go to Settings to control who sees your Last Seen, Profile Picture, and Read Receipts. You can also silently remove friends, or temporarily deactivate your account if you need a break."
         />
 
         <HelpSection 
           icon="notifications"
-          title="7. Stacked Notifications"
+          title="9. Smart Notifications"
           color="#06B6D4"
-          description="Relay uses native background notifications. Even if the app is completely closed, you will receive notifications securely. You can even reply or mark messages as read directly from your phone's notification panel."
+          description="Relay uses native background notifications. Even if the app is completely closed, you will receive notifications securely. Reply or mark messages as read directly from your phone's notification panel."
         />
 
         <View style={styles.footer}>

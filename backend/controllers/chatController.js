@@ -256,7 +256,7 @@ const createGroupChat = asyncHandler(async (req, res) => {
 // @route PUT /api/chats/group/:id
 // @access Private
 const updateGroup = asyncHandler(async (req, res) => {
-  const { name, chatName, description, groupDescription, isPublic, allowDirectMessages, joinPrivacy } = req.body;
+  const { name, chatName, description, groupDescription, isPublic, allowDirectMessages, joinPrivacy, autoAcceptRequests } = req.body;
   const chat = await Chat.findById(req.params.id);
 
   if (!chat || !chat.isGroupChat) { res.status(404); throw new Error('Group not found'); }
@@ -293,6 +293,9 @@ const updateGroup = asyncHandler(async (req, res) => {
   }
 
   if (allowDirectMessages !== undefined) chat.allowDirectMessages = allowDirectMessages;
+  if (autoAcceptRequests !== undefined) {
+    chat.autoAcceptRequests = autoAcceptRequests === 'true' || autoAcceptRequests === true;
+  }
   let joinPrivacyChangedTo = null;
   if (joinPrivacy !== undefined && chat.joinPrivacy !== joinPrivacy) {
     joinPrivacyChangedTo = joinPrivacy;
@@ -431,33 +434,36 @@ const addToGroup = asyncHandler(async (req, res) => {
     }
     
     if (chat.joinPrivacy === 'invite_only' && !(chat.invitedUsers && chat.invitedUsers.includes(req.user._id))) {
-      if (chat.joinRequests && chat.joinRequests.includes(req.user._id)) {
-        res.status(400); throw new Error('You already sent a join request');
-      }
-      if (!chat.joinRequests) chat.joinRequests = [];
-      chat.joinRequests.push(req.user._id);
-      await chat.save();
-      
-      const Message = require('../models/Message');
-      const sysMsg = await Message.create({
-        sender: req.user._id,
-        chat: chat._id,
-        content: `${req.user.displayName || req.user.username} requested to join`,
-        isSystemMessage: true,
-        messageType: 'system',
-      });
-      chat.latestMessage = sysMsg._id;
-      await chat.save();
-      
-      const fullMsg = await Message.findById(sysMsg._id).populate('sender', 'username displayName profilePicture');
-      const io = req.app.get('io');
-      if (io) {
-        chat.users.forEach(uId => {
-          io.to(uId.toString()).emit('new_message', fullMsg);
+      if (!chat.autoAcceptRequests) {
+        if (chat.joinRequests && chat.joinRequests.includes(req.user._id)) {
+          res.status(400); throw new Error('You already sent a join request');
+        }
+        if (!chat.joinRequests) chat.joinRequests = [];
+        chat.joinRequests.push(req.user._id);
+        await chat.save();
+        
+        const Message = require('../models/Message');
+        const sysMsg = await Message.create({
+          sender: req.user._id,
+          chat: chat._id,
+          content: JSON.stringify({ userId: req.user._id, text: `${req.user.displayName || req.user.username} requested to join` }),
+          isSystemMessage: true,
+          messageType: 'join_request',
         });
-      }
+        chat.latestMessage = sysMsg._id;
+        await chat.save();
+        
+        const fullMsg = await Message.findById(sysMsg._id).populate('sender', 'username displayName profilePicture');
+        const io = req.app.get('io');
+        if (io) {
+          chat.users.forEach(uId => {
+            io.to(uId.toString()).emit('new_message', fullMsg);
+          });
+        }
 
-      return res.status(200).json({ success: true, message: 'Join request sent to admins', status: 'requested' });
+        return res.status(200).json({ success: true, message: 'Join request sent to admins', status: 'requested' });
+      }
+      // If autoAcceptRequests is true, just fall through to immediately add them
     }
   } else {
     // We now enforce invite-only! Admins must invite users via direct message.
@@ -1162,6 +1168,15 @@ const acceptJoinRequest = asyncHandler(async (req, res) => {
   chat.latestMessage = sysMsg._id;
   await chat.save();
 
+  // Mark join_request message as processed
+  const reqMsg = await Message.findOne({ chat: chat._id, messageType: 'join_request', inviteAccepted: false, content: new RegExp(userId) });
+  if (reqMsg) {
+    reqMsg.inviteAccepted = true;
+    await reqMsg.save();
+    const io = req.app.get('io');
+    if (io) io.emit('invite_accepted', { messageId: reqMsg._id, chatId: reqMsg.chat });
+  }
+
   const fullMsg = await Message.findById(sysMsg._id).populate('sender', 'username displayName profilePicture');
 
   const fullChat = await Chat.findById(chat._id)
@@ -1199,6 +1214,16 @@ const declineJoinRequest = asyncHandler(async (req, res) => {
 
   chat.joinRequests = chat.joinRequests.filter(u => u.toString() !== userId);
   await chat.save();
+
+  // Mark join_request message as processed
+  const Message = require('../models/Message');
+  const reqMsg = await Message.findOne({ chat: chat._id, messageType: 'join_request', inviteAccepted: false, content: new RegExp(userId) });
+  if (reqMsg) {
+    reqMsg.inviteAccepted = true;
+    await reqMsg.save();
+    const io = req.app.get('io');
+    if (io) io.emit('invite_accepted', { messageId: reqMsg._id, chatId: reqMsg.chat });
+  }
 
   const fullChat = await Chat.findById(chat._id)
     .populate('users', '-password -securityKey')

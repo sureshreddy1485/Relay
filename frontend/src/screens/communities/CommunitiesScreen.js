@@ -116,7 +116,13 @@ export default function CommunitiesScreen({ navigation }) {
       <TouchableOpacity
         style={styles.card}
         activeOpacity={0.8}
-        onPress={() => navigation.navigate('ChatRoom', { chat: item })}
+        onPress={() => {
+          if (isMember) {
+            navigation.navigate('ChatRoom', { chat: item });
+          } else {
+            navigation.push('GroupPreview', { groupId: item._id });
+          }
+        }}
       >
         {item.groupPicture ? (
           <Image source={{ uri: item.groupPicture }} style={styles.cardImage} />

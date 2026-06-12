@@ -225,10 +225,62 @@ export default function MessageBubble({
     );
   }
 
-  if (message.isSystemMessage) {
+  if (message.isSystemMessage && message.messageType !== 'join_request') {
     return (
       <View style={styles.systemRow}>
         <Text style={styles.systemText}>{message.content}</Text>
+      </View>
+    );
+  }
+
+  if (message.messageType === 'join_request') {
+    let reqData = {};
+    try { reqData = JSON.parse(message.content); } catch (e) {
+      reqData = { text: message.content };
+    }
+    
+    const amIAdmin = isGroup && chat && (chat.groupAdmin === currentUserId || chat.admins?.includes(currentUserId));
+    const isProcessed = !!message.inviteAccepted;
+
+    return (
+      <View style={[styles.systemRow, { marginVertical: 10 }]}>
+        <View style={{ backgroundColor: Colors.dark.card, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: Colors.dark.border, width: '80%', alignItems: 'center' }}>
+          <Text style={[styles.systemText, { marginBottom: 10, color: '#FFF' }]}>{reqData.text || 'Requested to join'}</Text>
+          {amIAdmin && !isProcessed && (
+            <View style={{ flexDirection: 'row', gap: 20 }}>
+              <TouchableOpacity 
+                style={{ backgroundColor: '#EF4444', padding: 8, borderRadius: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
+                onPress={async () => {
+                  try {
+                    const api = require('../services/api').default;
+                    await api.put(`/chats/group/${chat._id}/decline-request`, { userId: reqData.userId });
+                  } catch (e) {
+                    if (showAlert) showAlert('Error', 'Failed to decline');
+                  }
+                }}
+              >
+                <Ionicons name="close" size={20} color="#FFF" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={{ backgroundColor: '#10B981', padding: 8, borderRadius: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
+                onPress={async () => {
+                  try {
+                    const api = require('../services/api').default;
+                    await api.put(`/chats/group/${chat._id}/accept-request`, { userId: reqData.userId });
+                  } catch (e) {
+                    if (showAlert) showAlert('Error', 'Failed to accept');
+                  }
+                }}
+              >
+                <Ionicons name="checkmark" size={20} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+          )}
+          {isProcessed && (
+             <Text style={{ fontSize: 12, color: Colors.dark.muted, fontStyle: 'italic' }}>Processed</Text>
+          )}
+        </View>
       </View>
     );
   }

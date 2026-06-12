@@ -22,6 +22,7 @@ const chatSchema = new mongoose.Schema(
     },
     isPublic: { type: Boolean, default: false },
     joinPrivacy: { type: String, enum: ['anyone', 'invite_only', 'closed'], default: 'anyone' },
+    autoAcceptRequests: { type: Boolean, default: false },
     joinRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     invitedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     bannedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

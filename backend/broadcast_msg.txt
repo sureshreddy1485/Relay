@@ -1,0 +1,19 @@
+🎉 Welcome to the Official Release of Relay V1.0! 🎉
+
+We are thrilled to finally launch Relay, your ultimate messaging, community, and entertainment hub! Here are the incredible features waiting for you:
+
+🚀 1. Lightning Fast Messaging: Send text, voice notes, photos, and videos instantly. React, reply, or even edit your messages within 15 minutes!
+
+👻 2. Ultimate Privacy: Enable Disappearing Messages to make chats self-destruct. Send 'View Once' media for maximum security. Plus, full control over who sees your Last Seen, Read Receipts, and Profile Picture!
+
+🌍 3. Communities & Groups: Build public or private groups. Generate unique Group Tags to share, and use the 'Auto-Accept Requests' feature for effortless community management!
+
+🌟 4. Moments (Stories): Share your life updates with 24-hour disappearing Moments! Post photos and text, and easily see who viewed your stories.
+
+🤖 5. Meet Your New Best Friends - Mica & Mars: Play games, generate images, and chat with our advanced AI! Type !scramble to start a fast-paced word guessing game with your friends, and track your rank on the Global Leaderboard! Admins can swap between Mica's friendliness and Mars' sarcasm by typing !swap.
+
+👤 6. Multi-Account Manager: Got an alter ego? Add multiple accounts and switch between them instantly without ever logging out.
+
+🔔 7. Smart Background Notifications: Never miss a beat. Reply to messages and mark them as read directly from your phone's notification panel, even when the app is completely closed.
+
+Relay is built for speed, privacy, and fun. Thank you for being a part of our journey from day one. Enjoy the app, explore the features, and let's get chatting! 🚀💖

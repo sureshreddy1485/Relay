@@ -70,6 +70,7 @@ export default function GroupInfoScreen({ route, navigation }) {
   const [editName, setEditName] = useState(chat.chatName || '');
   const [editDesc, setEditDesc] = useState(chat.groupDescription || '');
   const [editPrivacy, setEditPrivacy] = useState(chat.joinPrivacy || 'anyone');
+  const [editAutoAccept, setEditAutoAccept] = useState(chat.autoAcceptRequests || false);
   const [editIsPublic, setEditIsPublic] = useState(chat.isPublic !== false);
   const [editAvatar, setEditAvatar] = useState(null);
   const [showFullAvatar, setShowFullAvatar] = useState(false);
@@ -779,6 +780,22 @@ export default function GroupInfoScreen({ route, navigation }) {
                 </TouchableOpacity>
               ))}
             </View>
+            
+            {/* Auto-Accept Requests Toggle (only show if privacy is invite_only) */}
+            {editPrivacy === 'invite_only' && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 24, marginBottom: 24 }}>
+                <View style={{ flex: 1, paddingRight: 15 }}>
+                  <Text style={{ color: Colors.dark.text, fontSize: 15, fontWeight: '600' }}>Auto-Accept Requests</Text>
+                  <Text style={{ color: Colors.dark.muted, fontSize: 13, marginTop: 2 }}>Automatically approve join requests without manual review</Text>
+                </View>
+                <Switch
+                  value={editAutoAccept}
+                  onValueChange={setEditAutoAccept}
+                  trackColor={{ false: Colors.dark.border, true: Colors.primary }}
+                  thumbColor="#FFF"
+                />
+              </View>
+            )}
 
             {/* Save Button */}
             <TouchableOpacity
@@ -792,6 +809,7 @@ export default function GroupInfoScreen({ route, navigation }) {
                   formData.append('name', editName.trim());
                   formData.append('description', editDesc.trim());
                   formData.append('joinPrivacy', editPrivacy);
+                  formData.append('autoAcceptRequests', editAutoAccept);
                   formData.append('isPublic', editIsPublic);
                   if (editAvatar) {
                     formData.append('groupPicture', {
@@ -806,6 +824,7 @@ export default function GroupInfoScreen({ route, navigation }) {
                     chatName: data.chat?.chatName || editName.trim(),
                     groupDescription: data.chat?.groupDescription || editDesc.trim(),
                     joinPrivacy: data.chat?.joinPrivacy || editPrivacy,
+                    autoAcceptRequests: data.chat?.autoAcceptRequests ?? editAutoAccept,
                     isPublic: data.chat?.isPublic ?? editIsPublic,
                     groupPicture: data.chat?.groupPicture || prev.groupPicture,
                   }));
@@ -813,6 +832,7 @@ export default function GroupInfoScreen({ route, navigation }) {
                     chatName: editName.trim(),
                     groupDescription: editDesc.trim(),
                     joinPrivacy: data.chat?.joinPrivacy || editPrivacy,
+                    autoAcceptRequests: data.chat?.autoAcceptRequests ?? editAutoAccept,
                     isPublic: data.chat?.isPublic ?? editIsPublic,
                     groupPicture: data.chat?.groupPicture || chat.groupPicture,
                   });
