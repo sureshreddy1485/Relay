@@ -34,9 +34,9 @@ export default function GroupPreviewScreen({ route, navigation }) {
   const handleJoin = async () => {
     try {
       setIsJoining(true);
-      const { data } = await api.put(`/chats/group/${groupId}/add`);
+      const { data } = await api.put(`/chats/group/${groupId}/add`, {});
       
-      if (data.message === 'Join request sent') {
+      if (data.status === 'requested') {
         setPreview(p => ({ ...p, hasRequested: true }));
         alert('Join request sent to group admins.');
       } else {
@@ -118,23 +118,28 @@ export default function GroupPreviewScreen({ route, navigation }) {
 
         <View style={styles.membersPreviewContainer}>
           <Text style={styles.sectionTitle}>Members Preview</Text>
-          <View style={styles.membersList}>
-            {preview.users.slice(0, 8).map((u, i) => (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.membersList}>
+            {preview.users.slice(0, 10).map((u, i) => (
               <View key={u._id || i} style={styles.memberListItem}>
                 {u.profilePicture ? (
                   <Image source={{ uri: u.profilePicture }} style={styles.memberListAvatar} />
                 ) : (
                   <View style={[styles.memberListAvatar, { backgroundColor: Colors.primary + '40', justifyContent: 'center', alignItems: 'center' }]}>
-                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>{u.displayName?.charAt(0) || u.username?.charAt(0) || '?'}</Text>
+                    <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 18 }}>{u.displayName?.charAt(0) || u.username?.charAt(0) || '?'}</Text>
                   </View>
                 )}
-                <Text style={styles.memberListName}>{u.displayName || u.username}</Text>
+                <Text style={styles.memberListName} numberOfLines={1}>{(u.displayName || u.username).split(' ')[0]}</Text>
               </View>
             ))}
-            {preview.users.length > 8 && (
-              <Text style={styles.memberListMore}>+ {preview.users.length - 8} more members</Text>
+            {preview.users.length > 10 && (
+              <View style={[styles.memberListItem, { justifyContent: 'center' }]}>
+                <View style={[styles.memberListAvatar, { backgroundColor: Colors.dark.border, justifyContent: 'center', alignItems: 'center' }]}>
+                  <Text style={{ color: Colors.dark.text, fontSize: 14, fontWeight: 'bold' }}>+{preview.users.length - 10}</Text>
+                </View>
+                <Text style={styles.memberListName}>More</Text>
+              </View>
             )}
-          </View>
+          </ScrollView>
         </View>
 
       </ScrollView>
@@ -191,12 +196,11 @@ const styles = StyleSheet.create({
   statText: { color: Colors.dark.text, fontSize: 14, fontWeight: '500' },
   description: { color: Colors.dark.muted, fontSize: 15, lineHeight: 22, textAlign: 'center', marginBottom: 30, paddingHorizontal: 10 },
   membersPreviewContainer: { width: '100%', backgroundColor: Colors.dark.card, padding: 20, borderRadius: 16, borderWidth: 1, borderColor: Colors.dark.border },
-  sectionTitle: { color: '#FFF', fontSize: 16, fontWeight: '600', marginBottom: 15 },
-  membersList: { flexDirection: 'column', gap: 12 },
-  memberListItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  memberListAvatar: { width: 36, height: 36, borderRadius: 18 },
-  memberListName: { color: '#FFF', fontSize: 15, fontWeight: '500' },
-  memberListMore: { color: Colors.dark.muted, fontSize: 14, fontStyle: 'italic', marginTop: 5 },
+  sectionTitle: { color: '#FFF', fontSize: 16, fontWeight: '600', marginBottom: 5 },
+  membersList: { flexDirection: 'row', gap: 16, paddingVertical: 10, paddingHorizontal: 5 },
+  memberListItem: { alignItems: 'center', width: 60, gap: 6 },
+  memberListAvatar: { width: 50, height: 50, borderRadius: 25 },
+  memberListName: { color: '#FFF', fontSize: 12, fontWeight: '500', textAlign: 'center' },
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, backgroundColor: Colors.dark.card, borderTopWidth: 1, borderTopColor: Colors.dark.border },
   joinBtn: { backgroundColor: Colors.primary, paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
   joinBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },

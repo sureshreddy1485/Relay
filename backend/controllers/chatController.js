@@ -417,7 +417,7 @@ const updateGroup = asyncHandler(async (req, res) => {
 // @route PUT /api/chats/group/:id/add
 // @access Private
 const addToGroup = asyncHandler(async (req, res) => {
-  const { userId } = req.body;
+  const { userId } = req.body || {};
   const chat = await Chat.findById(req.params.id);
   if (!chat) { res.status(404); throw new Error('Group not found'); }
 
