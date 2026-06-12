@@ -1370,7 +1370,10 @@ export default function ChatRoomScreen({ route, navigation }) {
               addMessage(chat._id, res.data.message);
             }
             useChatStore.getState().updateChat(chat._id, { disappearAfter: seconds });
-          } catch (e) { showAlert('Error', e.message); }
+          } catch (e) {
+            const errorMsg = e.response?.data?.message || e.message || 'Failed to update timer';
+            showAlert('Error', errorMsg);
+          }
         }}
       />
 

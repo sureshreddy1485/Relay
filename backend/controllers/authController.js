@@ -169,6 +169,7 @@ const login = asyncHandler(async (req, res) => {
           chatName: "Relay Security",
           isGroupChat: false,
           users: [user._id, relayId],
+          disappearAfter: 86400,
         });
       }
 

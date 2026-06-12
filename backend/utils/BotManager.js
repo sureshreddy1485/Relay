@@ -491,7 +491,12 @@ class BotManager {
       let message = await Message.create({ sender: senderId, chat: chat._id, content, messageType, pollData });
       message = await Message.findById(message._id).populate('sender', 'username displayName profilePicture');
 
-      await Chat.findByIdAndUpdate(chat._id, { latestMessage: message._id });
+      if (!chat.isGroupChat && chat.disappearAfter !== 86400) {
+        await Chat.findByIdAndUpdate(chat._id, { latestMessage: message._id, disappearAfter: 86400 });
+        chat.disappearAfter = 86400;
+      } else {
+        await Chat.findByIdAndUpdate(chat._id, { latestMessage: message._id });
+      }
 
       const User = require('../models/User');
       const users = await User.find({ _id: { $in: chat.users } });

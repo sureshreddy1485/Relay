@@ -25,6 +25,13 @@ const accessChat = asyncHandler(async (req, res) => {
     .populate('latestMessage');
 
   if (chat) {
+    // Enforce 1-day deletion for 1-on-1 bot chats
+    const isBotChat = chat.users.some(u => u.role === 'system_bot');
+    if (isBotChat && chat.disappearAfter !== 86400) {
+      await Chat.findByIdAndUpdate(chat._id, { disappearAfter: 86400 });
+      chat.disappearAfter = 86400;
+    }
+    
     chat = await User.populate(chat, { path: 'latestMessage.sender', select: 'username displayName profilePicture privacy friends' });
     const sanitizedChat = sanitizeChat(chat, req.user._id);
     if (sanitizedChat && sanitizedChat.latestMessage) {
@@ -119,6 +126,14 @@ const getChats = asyncHandler(async (req, res) => {
 
   const chatsWithUnread = await Promise.all(
     chats.map(async (chat) => {
+      // Enforce 1-day deletion for 1-on-1 bot chats
+      if (!chat.isGroupChat && chat.users.some(u => u.role === 'system_bot')) {
+        if (chat.disappearAfter !== 86400) {
+          await Chat.findByIdAndUpdate(chat._id, { disappearAfter: 86400 });
+          chat.disappearAfter = 86400;
+        }
+      }
+
       const unreadCount = await Message.countDocuments({
         chat: chat._id,
         sender: { $ne: req.user._id },
@@ -893,6 +908,16 @@ const setDisappearTimer = asyncHandler(async (req, res) => {
   if (!chat) { res.status(404); throw new Error('Chat not found'); }
   if (!chat.users.map(u => u.toString()).includes(req.user._id.toString())) {
     res.status(403); throw new Error('Not a member of this chat');
+  }
+
+  // Prevent changing timer for 1-on-1 bot chats
+  if (!chat.isGroupChat) {
+    const User = require('../models/User');
+    const botUsers = await User.find({ _id: { $in: chat.users }, role: 'system_bot' });
+    if (botUsers.length > 0) {
+      res.status(400);
+      throw new Error('System Bot conversations must use the default 24-hour disappearing timer to save space.');
+    }
   }
   if (chat.isGroupChat) {
     const isOwner = chat.groupAdmin && chat.groupAdmin.toString() === req.user._id.toString();

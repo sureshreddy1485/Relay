@@ -737,7 +737,8 @@ const broadcastAdminUpdate = asyncHandler(async (req, res) => {
           chatName: 'sender',
           isGroupChat: false,
           users: [botUser._id, user._id],
-          theme: 'default'
+          theme: 'default',
+          disappearAfter: 86400,
         });
       }
 
