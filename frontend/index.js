@@ -16,7 +16,7 @@ async function showNotification(chatId, sender, chat, title, body) {
   try {
     // 1. Create channel (Use new ID to force Android to apply new sound settings)
     await notifee.createChannel({
-      id: 'relay-messages-v4',
+      id: 'relay-messages-v5',
       name: 'Relay Messages',
       importance: AndroidImportance.HIGH,
       sound: 'relay_notification_sound', // Android looks up relay_notification_sound.mp3 or .wav
@@ -64,7 +64,7 @@ async function showNotification(chatId, sender, chat, title, body) {
       title: title,
       body: body,
       android: {
-        channelId: 'relay-messages-v4',
+        channelId: 'relay-messages-v5',
         pressAction: { id: 'default' },
         importance: AndroidImportance.HIGH,
         style: {
@@ -91,7 +91,7 @@ async function showNotification(chatId, sender, chat, title, body) {
         title: title,
         body: body,
         android: {
-          channelId: 'relay-messages-v4',
+          channelId: 'relay-messages-v5',
           pressAction: { id: 'default' },
           importance: AndroidImportance.HIGH,
           actions: [
@@ -160,7 +160,7 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
         id: chatId,
         title: '⚠️ Reply Failed',
         body: errorMsg,
-        android: { channelId: 'relay-messages-v4', pressAction: { id: 'default' } },
+        android: { channelId: 'relay-messages-v5', pressAction: { id: 'default' } },
         data: { chatId }
       });
     }

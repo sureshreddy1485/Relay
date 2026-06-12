@@ -11,7 +11,7 @@ export async function registerForPushNotificationsAsync() {
   if (Platform.OS === 'android') {
     // Expo fallback channel (for Expo Push Token users)
     try {
-      await Notifications.setNotificationChannelAsync('relay-messages-v4', {
+      await Notifications.setNotificationChannelAsync('relay-messages-v5', {
         name: 'Relay Messages',
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
