@@ -546,6 +546,33 @@ export default function GroupInfoScreen({ route, navigation }) {
                       style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                     />
                   </View>
+
+                  {chat.joinPrivacy === 'invite_only' && (
+                    <>
+                      <View style={[styles.divider, { marginLeft: 56 }]} />
+                      <View style={[styles.settingRow, { paddingVertical: 12, paddingLeft: 56 }]}>
+                        <Text style={styles.settingLabel}>Auto-Accept Join Requests</Text>
+                        <Switch
+                          value={chat.autoAcceptRequests === true}
+                          onValueChange={async (val) => {
+                            const prev = chat.autoAcceptRequests;
+                            setChat(c => ({ ...c, autoAcceptRequests: val }));
+                            useChatStore.getState().updateChat(chat._id, { autoAcceptRequests: val });
+                            try {
+                              await api.put(`/chats/${chat._id}/security`, { autoAcceptRequests: val });
+                            } catch (e) {
+                              setChat(c => ({ ...c, autoAcceptRequests: prev }));
+                              useChatStore.getState().updateChat(chat._id, { autoAcceptRequests: prev });
+                              showAlert('Error', e.message); 
+                            }
+                          }}
+                          trackColor={{ false: '#3A3A3A', true: Colors.primary }}
+                          thumbColor="#FFF"
+                          style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                        />
+                      </View>
+                    </>
+                  )}
                 </>
               )}
             </View>

@@ -1071,7 +1071,7 @@ const updateChatTheme = asyncHandler(async (req, res) => {
 // @route PUT /api/chats/:id/security
 // @access Private
 const updateChatSecurity = asyncHandler(async (req, res) => {
-  const { allowScreenshots, allowForwarding } = req.body;
+  const { allowScreenshots, allowForwarding, autoAcceptRequests } = req.body;
   const chat = await Chat.findById(req.params.id);
   if (!chat) { res.status(404); throw new Error('Chat not found'); }
   
@@ -1092,6 +1092,10 @@ const updateChatSecurity = asyncHandler(async (req, res) => {
   if (allowForwarding !== undefined && allowForwarding !== chat.allowForwarding) {
     actionStrs.push(`turned ${allowForwarding ? 'on' : 'off'} forwarding`);
     chat.allowForwarding = allowForwarding;
+  }
+  if (autoAcceptRequests !== undefined && autoAcceptRequests !== chat.autoAcceptRequests) {
+    actionStrs.push(`turned ${autoAcceptRequests ? 'on' : 'off'} auto-accept join requests`);
+    chat.autoAcceptRequests = autoAcceptRequests;
   }
   
   if (actionStrs.length === 0) {
@@ -1117,7 +1121,7 @@ const updateChatSecurity = asyncHandler(async (req, res) => {
   if (io) {
     chat.users.forEach((userId) => {
       io.to(userId.toString()).emit('new_message', fullMsg);
-      io.to(userId.toString()).emit('chat_updated', { _id: chat._id, allowScreenshots: chat.allowScreenshots, allowForwarding: chat.allowForwarding });
+      io.to(userId.toString()).emit('chat_updated', { _id: chat._id, allowScreenshots: chat.allowScreenshots, allowForwarding: chat.allowForwarding, autoAcceptRequests: chat.autoAcceptRequests });
     });
   }
   
