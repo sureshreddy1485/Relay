@@ -20,7 +20,7 @@ import useChatStore from '../../store/useChatStore';
 import useAuthStore from '../../store/useAuthStore';
 import { Colors } from '../../theme/colors';
 import api, { uploadApi } from '../../services/api';
-import { joinChat, leaveChat, sendTyping, stopTyping, markRead } from '../../services/socketService';
+import { joinChat, leaveChat, sendTyping, stopTyping, markRead, playMessageSound } from '../../services/socketService';
 import MessageBubble from '../../components/MessageBubble';
 import UserInfoSheet from '../../components/UserInfoSheet';
 import { CHAT_THEMES, GROUP_THEMES } from '../../components/ThemeSelectSheet';
@@ -505,6 +505,7 @@ export default function ChatRoomScreen({ route, navigation }) {
     };
 
     useChatStore.getState().addMessage(chat._id, optimisticMessage);
+    playMessageSound();
     const savedReplyTo = replyTo;
     setReplyTo(null);
     // Scroll to bottom so the new message is visible

@@ -12,7 +12,7 @@ let socket = null;
 
 const getSocket = () => socket;
 
-const playMessageSound = async () => {
+export const playMessageSound = async () => {
   try {
     const { sound } = await Audio.Sound.createAsync(
       require('../../assets/sent-recieve-notification.mp3')
