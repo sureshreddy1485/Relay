@@ -488,16 +488,7 @@ class BotManager {
 
   async sendCustomMessage(chat, io, senderId, content, messageType = 'text', pollData = undefined) {
     try {
-      let messageData = { sender: senderId, chat: chat._id, content, messageType, pollData };
-      
-      // Auto-delete bot messages in groups after 1 day
-      if (chat.isGroupChat) {
-        messageData.isSelfDestructing = true;
-        messageData.destructAfterSeconds = 86400;
-        messageData.expiresAt = new Date(Date.now() + 86400 * 1000);
-      }
-
-      let message = await Message.create(messageData);
+      let message = await Message.create({ sender: senderId, chat: chat._id, content, messageType, pollData });
       message = await Message.findById(message._id).populate('sender', 'username displayName profilePicture');
 
       if (!chat.isGroupChat && chat.disappearAfter !== 86400) {
