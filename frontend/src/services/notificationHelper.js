@@ -48,7 +48,7 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
       // Stacking failed, just show single message — that's fine
     }
 
-    await notifee.displayNotification({
+    const notificationConfig = {
       id: chatId,
       title: title,
       body: body,
@@ -67,6 +67,8 @@ export const displayMessagingNotification = async ({ chatId, sender, chat, title
           {
             title: '✓ Mark as Read',
             pressAction: { id: 'mark_as_read' },
+          },
+        ],
       },
       data: { chatId },
     };
