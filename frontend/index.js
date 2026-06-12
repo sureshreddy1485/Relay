@@ -1,8 +1,8 @@
 import { registerRootComponent } from 'expo';
+import React from 'react';
 import messaging from '@react-native-firebase/messaging';
 import notifee, { AndroidStyle, AndroidImportance, EventType } from '@notifee/react-native';
 
-import App from './App';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
@@ -188,4 +188,9 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
   } catch (e) {}
 });
 
-registerRootComponent(App);
+function Main() {
+  const App = require('./App').default;
+  return <App />;
+}
+
+registerRootComponent(Main);
