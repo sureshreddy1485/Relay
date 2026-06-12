@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 import { AppState, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { Audio } from 'expo-av';
+
 import useChatStore from '../store/useChatStore';
 import useAuthStore from '../store/useAuthStore';
 import api from './api';
@@ -14,6 +14,7 @@ const getSocket = () => socket;
 
 export const playMessageSound = async () => {
   try {
+    const { Audio } = require('expo-av');
     const { sound } = await Audio.Sound.createAsync(
       require('../../assets/sent-recieve-notification.mp3')
     );
