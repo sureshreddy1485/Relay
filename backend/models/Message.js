@@ -45,7 +45,7 @@ const messageSchema = new mongoose.Schema(
     isSystemMessage: { type: Boolean, default: false },
     messageType: {
       type: String,
-      enum: ['text', 'image', 'video', 'audio', 'voice', 'document', 'system', 'sticker', 'group_invite', 'poll', 'story_reply'],
+      enum: ['text', 'image', 'video', 'audio', 'voice', 'document', 'system', 'sticker', 'group_invite', 'poll', 'story_reply', 'join_request'],
       default: 'text',
     },
     // For group_invite: true after the invite link has been used once

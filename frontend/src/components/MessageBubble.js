@@ -225,7 +225,22 @@ export default function MessageBubble({
     );
   }
 
-  if (message.isSystemMessage && message.messageType !== 'join_request') {
+  let isJoinReq = message.messageType === 'join_request';
+  let reqData = null;
+  
+  // Backwards compatibility for when join_request enum was missing and it saved as text
+  if (!isJoinReq && message.isSystemMessage && message.content?.startsWith('{') && message.content?.includes('userId')) {
+    try {
+      reqData = JSON.parse(message.content);
+      isJoinReq = true;
+    } catch (e) {}
+  } else if (isJoinReq) {
+    try { reqData = JSON.parse(message.content); } catch (e) {
+      reqData = { text: message.content };
+    }
+  }
+
+  if (message.isSystemMessage && !isJoinReq) {
     return (
       <View style={styles.systemRow}>
         <Text style={styles.systemText}>{message.content}</Text>
@@ -233,12 +248,7 @@ export default function MessageBubble({
     );
   }
 
-  if (message.messageType === 'join_request') {
-    let reqData = {};
-    try { reqData = JSON.parse(message.content); } catch (e) {
-      reqData = { text: message.content };
-    }
-    
+  if (isJoinReq && reqData) {
     const amIAdmin = isGroup && chat && (chat.groupAdmin === currentUserId || chat.admins?.includes(currentUserId));
     const isProcessed = !!message.inviteAccepted;
 
@@ -246,7 +256,7 @@ export default function MessageBubble({
       <View style={[styles.systemRow, { marginVertical: 10 }]}>
         <View style={{ backgroundColor: Colors.dark.card, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: Colors.dark.border, width: '80%', alignItems: 'center' }}>
           <Text style={[styles.systemText, { marginBottom: 10, color: '#FFF' }]}>{reqData.text || 'Requested to join'}</Text>
-          {amIAdmin && !isProcessed && (
+          {amIAdmin && !isProcessed && reqData.userId && (
             <View style={{ flexDirection: 'row', gap: 20 }}>
               <TouchableOpacity 
                 style={{ backgroundColor: '#EF4444', padding: 8, borderRadius: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
