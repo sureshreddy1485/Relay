@@ -72,7 +72,7 @@ async function showNotification(chatId, sender, chat, title, body, imageUrl) {
           person: { name: 'Me', id: 'me' },
           messages: styleMessages,
           title: isGroup ? (chat?.chatName || chat?.groupName || title) : undefined,
-          isGroupConversation: isGroup,
+          group: isGroup,
         },
         actions: [
           {

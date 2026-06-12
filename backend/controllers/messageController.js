@@ -208,6 +208,7 @@ const sendMessage = asyncHandler(async (req, res) => {
             pushSent = true;
           } else if (targetUser.pushToken && Expo.isExpoPushToken(targetUser.pushToken)) {
             // iOS / Fallback uses Expo Push
+            const expoBody = chat.isGroupChat ? `${req.user.displayName || req.user.username}: ${pushBody}` : pushBody;
             pushMessages.push({
               type: 'expo',
               to: targetUser.pushToken,
@@ -215,7 +216,7 @@ const sendMessage = asyncHandler(async (req, res) => {
               sound: 'relay_notification_sound.mp3',
               color: '#2DD4BF',
               title,
-              body: pushBody,
+              body: expoBody,
               data: { chatId: chat._id.toString() },
             });
             pushSent = true;
