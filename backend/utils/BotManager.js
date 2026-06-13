@@ -548,7 +548,7 @@ class BotManager {
                   }),
                   chat: JSON.stringify({ isGroupChat: chat.isGroupChat, chatName: chat.chatName }),
                   title: chat.isGroupChat ? (chat.chatName || 'Group Chat') : (message.sender.displayName || message.sender.username),
-                  body: content,
+                  body: content.replace(/[*_~`]/g, ''),
                   imageUrl: message.mediaUrl || '',
                 },
                 android: {

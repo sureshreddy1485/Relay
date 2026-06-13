@@ -129,7 +129,6 @@ class RiddlesGame {
       content = content.replace(/Wow\. You all gave up\..*Embarrassing\./, '🏳️ **GAME OVER!**');
     }
 
-    const botManager = require('../../utils/BotManager');
     const activeBotId = await botManager.getActiveBotId(chat._id);
     await botManager.sendCustomMessage(chat, io, activeBotId, content, 'text');
   }
