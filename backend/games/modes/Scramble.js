@@ -115,12 +115,8 @@ class ScrambleGame {
       content = content.replace(/Wow\. You all gave up\..*Embarrassing\./, '🏳️ **GAME OVER!**');
     }
 
-    await botManager.sendCustomMessage(chat, io, {
-      sender: await botManager.getActiveBotId(chat._id),
-      chat: chat._id,
-      content: content,
-      messageType: 'text'
-    });
+    const activeBotId = await botManager.getActiveBotId(chat._id);
+    await botManager.sendCustomMessage(chat, io, activeBotId, content, 'text');
   }
 }
 

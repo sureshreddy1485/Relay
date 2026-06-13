@@ -177,12 +177,8 @@ class AssassinationGame {
     }
 
     const botManager = require('../../utils/BotManager');
-    await botManager.sendCustomMessage(chat, io, {
-      sender: await botManager.getActiveBotId(chat._id),
-      chat: chat._id,
-      content: content,
-      messageType: 'text'
-    });
+    const activeBotId = await botManager.getActiveBotId(chat._id);
+    await botManager.sendCustomMessage(chat, io, activeBotId, content, 'text');
   }
 }
 
