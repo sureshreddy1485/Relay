@@ -373,8 +373,8 @@ export default function GroupInfoScreen({ route, navigation }) {
   });
 
   const memberCount = chat.users?.filter(u => {
-    const un = u.username || '';
-    return un !== 'mica_bot' && un !== 'mars_bot';
+    const un = u?.username?.toLowerCase() || '';
+    return u?.role !== 'system_bot' && !['mica_bot', 'mars_bot', 'mars', 'mica', 'relay_bot', 'relay'].includes(un);
   })?.length || 0;
 
   return (

@@ -865,7 +865,10 @@ export default function ChatRoomScreen({ route, navigation }) {
     : otherUser?.lastSeen
     ? formatLastSeen(otherUser.lastSeen)
     : chat.isGroupChat
-    ? `${chat.users?.length || 0} members`
+    ? `${chat.users?.filter(u => {
+        const un = u?.username?.toLowerCase();
+        return u?.role !== 'system_bot' && !['mica_bot', 'mars_bot', 'mars', 'mica', 'relay_bot', 'relay'].includes(un);
+      }).length || 0} members`
     : null;
 
   const statusColor = isCameraActive
@@ -1823,13 +1826,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#1E293B',
     borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 4,
   },
   typingName: {
     fontSize: 13,
     color: '#94A3B8',
-    marginRight: 8,
+    marginBottom: 4,
     fontWeight: '500',
   },
   typingDotsRow: {
@@ -1842,6 +1846,7 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: '#00D2FF',
+    marginHorizontal: 2,
   },
 
   // ── Voice Message Modal ───────────────────────────────────────────────────
