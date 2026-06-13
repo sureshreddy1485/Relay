@@ -395,6 +395,7 @@ export default function GroupInfoScreen({ route, navigation }) {
               setEditDesc(chat.groupDescription || '');
               setEditPrivacy(chat.joinPrivacy || 'anyone');
               setEditIsPublic(chat.isPublic !== false);
+              setEditAutoAccept(chat.autoAcceptRequests || false);
               setEditAvatar(null);
               setShowEditModal(true);
             }}

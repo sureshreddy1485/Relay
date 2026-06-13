@@ -19,6 +19,7 @@ export default function CreateGroupScreen({ navigation, route }) {
   const [groupUsername, setGroupUsername] = useState('');
   const [isPublic, setIsPublic]       = useState(true);
   const [joinPrivacy, setJoinPrivacy] = useState('anyone');
+  const [autoAcceptRequests, setAutoAcceptRequests] = useState(false);
   const [search, setSearch]           = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selected, setSelected]       = useState(preSelected);
@@ -77,6 +78,7 @@ export default function CreateGroupScreen({ navigation, route }) {
       formData.append('users', JSON.stringify(selected.map(u => u._id)));
       formData.append('isPublic', isPublic ? 'true' : 'false');
       formData.append('joinPrivacy', joinPrivacy);
+      formData.append('autoAcceptRequests', autoAcceptRequests);
       if (groupUsername.trim()) {
         const rawUsername = groupUsername.trim().replace(/^@/, '');
         const usernameRegex = /^[a-zA-Z_][a-zA-Z0-9_.]*$/;
@@ -216,6 +218,22 @@ export default function CreateGroupScreen({ navigation, route }) {
                 </TouchableOpacity>
               ))}
             </View>
+            
+            {joinPrivacy === 'invite_only' && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+                <View style={{ flex: 1, paddingRight: 15 }}>
+                  <Text style={{ color: Colors.dark.text, fontSize: 15, fontWeight: '600' }}>Auto-Accept Requests</Text>
+                  <Text style={{ color: Colors.dark.muted, fontSize: 13, marginTop: 2 }}>Automatically approve join requests without manual review</Text>
+                </View>
+                <TouchableOpacity 
+                  onPress={() => setAutoAcceptRequests(!autoAcceptRequests)}
+                  style={[styles.toggleBtn, autoAcceptRequests && styles.toggleBtnActive]}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.toggleDot, autoAcceptRequests && styles.toggleDotActive]} />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
 

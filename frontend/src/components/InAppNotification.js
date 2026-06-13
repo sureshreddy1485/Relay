@@ -40,7 +40,13 @@ export default function InAppNotification() {
     if (displayNotification.chat) {
       useChatStore.getState().selectChat(displayNotification.chat);
       useChatStore.getState().clearUnread(displayNotification.chatId);
-      navigation.navigate('ChatRoom', { chat: displayNotification.chat });
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: 'Tabs' },
+          { name: 'ChatRoom', params: { chat: displayNotification.chat } },
+        ],
+      });
     }
     hideNotification();
   };

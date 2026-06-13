@@ -118,7 +118,13 @@ export default function CommunitiesScreen({ navigation }) {
         activeOpacity={0.8}
         onPress={() => {
           if (isMember) {
-            navigation.navigate('ChatRoom', { chat: item });
+            navigation.reset({
+              index: 1,
+              routes: [
+                { name: 'Tabs' },
+                { name: 'ChatRoom', params: { chat: item } },
+              ],
+            });
           } else {
             navigation.push('GroupPreview', { groupId: item._id });
           }

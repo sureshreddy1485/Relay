@@ -41,7 +41,13 @@ export default function GroupPreviewScreen({ route, navigation }) {
         alert('Join request sent to group admins.');
       } else {
         useChatStore.getState().addChat(data.chat);
-        navigation.replace('ChatRoom', { chat: data.chat });
+        navigation.reset({
+          index: 1,
+          routes: [
+            { name: 'Tabs' },
+            { name: 'ChatRoom', params: { chat: data.chat } },
+          ],
+        });
       }
     } catch (e) {
       alert(e.response?.data?.message || 'Failed to join group');
@@ -152,7 +158,13 @@ export default function GroupPreviewScreen({ route, navigation }) {
             onPress={() => {
               const existingChat = useChatStore.getState().chats.find(c => c._id === preview._id);
               if (existingChat) {
-                navigation.replace('ChatRoom', { chat: existingChat });
+                navigation.reset({
+                  index: 1,
+                  routes: [
+                    { name: 'Tabs' },
+                    { name: 'ChatRoom', params: { chat: existingChat } },
+                  ],
+                });
               }
             }}
           >
@@ -166,7 +178,7 @@ export default function GroupPreviewScreen({ route, navigation }) {
           <TouchableOpacity style={styles.joinBtn} onPress={handleJoin} disabled={isJoining}>
             {isJoining ? <ActivityIndicator color="#FFF" /> : (
               <Text style={styles.joinBtnText}>
-                {preview.joinPrivacy === 'request' ? 'Request to Join' : 'Join Group'}
+                {preview.joinPrivacy === 'invite_only' ? 'Request to Join' : 'Join Group'}
               </Text>
             )}
           </TouchableOpacity>

@@ -1051,6 +1051,8 @@ export default function ChatRoomScreen({ route, navigation }) {
           ref={flatRef}
           data={displayMessages}
           inverted
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           keyExtractor={(item) => item._id}
           renderItem={({ item, index }) => {
             const nextItem = displayMessages[index + 1];

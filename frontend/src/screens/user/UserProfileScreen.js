@@ -45,7 +45,13 @@ export default function UserProfileScreen({ route, navigation }) {
     if (!profile) return;
     try {
       const { data } = await api.post('/chats', { userId: profile._id });
-      navigation.navigate('ChatRoom', { chat: data.chat });
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: 'Tabs' },
+          { name: 'ChatRoom', params: { chat: data.chat } },
+        ],
+      });
     } catch (e) {
       showAlert('Error', e.message || 'Could not open chat');
     }

@@ -62,7 +62,13 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
     onClose();
     try {
       const { data } = await api.post('/chats', { userId: profile._id });
-      navigation.push('ChatRoom', { chat: data.chat });
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: 'Tabs' },
+          { name: 'ChatRoom', params: { chat: data.chat } },
+        ],
+      });
     } catch (e) {
       showAlert('Error', e.message || 'Could not open chat');
     }
@@ -202,7 +208,13 @@ export default function UserInfoSheet({ visible, user: initialUser, chat, curren
                       style={styles.mutualGroupItem}
                       onPress={() => {
                         onClose();
-                        navigation.navigate('ChatRoom', { chat: { ...group, isGroupChat: true } });
+                        navigation.reset({
+                          index: 1,
+                          routes: [
+                            { name: 'Tabs' },
+                            { name: 'ChatRoom', params: { chat: { ...group, isGroupChat: true } } },
+                          ],
+                        });
                       }}
                     >
                       {group.groupPicture ? (

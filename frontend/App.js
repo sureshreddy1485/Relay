@@ -144,7 +144,13 @@ export default function App() {
               const { navigationRef } = require('./src/navigation/RootNavigator');
               if (navigationRef && navigationRef.isReady()) {
                 clearInterval(navigateWhenReady);
-                navigationRef.navigate('ChatRoom', { chatId });
+                navigationRef.reset({
+                  index: 1,
+                  routes: [
+                    { name: 'Tabs' },
+                    { name: 'ChatRoom', params: { chatId } },
+                  ],
+                });
               } else if (attempts >= 25) { // 5 seconds max wait
                 clearInterval(navigateWhenReady);
               }
@@ -173,7 +179,13 @@ export default function App() {
               const { navigationRef } = require('./src/navigation/RootNavigator');
               if (navigationRef && navigationRef.isReady()) {
                 clearInterval(navigateWhenReady);
-                navigationRef.navigate('ChatRoom', { chatId });
+                navigationRef.reset({
+                  index: 1,
+                  routes: [
+                    { name: 'Tabs' },
+                    { name: 'ChatRoom', params: { chatId } },
+                  ],
+                });
               } else if (attempts >= 25) { // 5 seconds max wait
                 clearInterval(navigateWhenReady);
               }

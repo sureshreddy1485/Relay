@@ -210,6 +210,8 @@ const createGroupChat = asyncHandler(async (req, res) => {
     admins: [req.user._id],
     groupDescription: description || '',
     isPublic: isPublic === 'true' || isPublic === true || false,
+    joinPrivacy: req.body.joinPrivacy || 'anyone',
+    autoAcceptRequests: req.body.autoAcceptRequests === 'true' || req.body.autoAcceptRequests === true || false,
   };
 
   if (groupUsername) {
