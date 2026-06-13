@@ -129,11 +129,65 @@ class BotManager {
 
     const resolvedCommand = await AliasManager.resolve(chat._id, cleanCommandText) || cleanCommandText;
 
-    if (resolvedCommand === 'help') {
-      const reply = activeBotStr === 'mars' 
-        ? `**🔥 Mars Operations 🔥**\nI'm not your average assistant.\n\n🎮 **Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n\n🛠️ **Group Data**\n• aliases\n• remove alias_name\n• score\n• reset`
-        : `**✨ System Intelligence ✨**\nHere are the commands I currently support!\n\n🎮 **Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n\n🛠️ **Utilities**\n• activity\n• leaderboard\n• aliases\n• remove alias_name\n• score\n• reset`;
-      return this.sendCustomMessage(chat, io, activeBotId, reply);
+    if (resolvedCommand === 'help' || resolvedCommand.startsWith('help ')) {
+      const helpTarget = resolvedCommand.replace('help', '').trim().toLowerCase();
+      
+      if (helpTarget) {
+        let helpText = '';
+        switch (helpTarget) {
+          case 'riddle':
+            helpText = "**Game: Riddle** 🧠\nI will give you a riddle. The first person to type the correct answer in the chat wins points. If you get stuck, anyone can type 'reset' to give up.";
+            break;
+          case 'guess':
+          case 'guessword':
+            helpText = "**Game: Guess the Word** 🔤\nI will pick a random 5-letter word. You and your friends have to guess it. I will tell you how many letters match your guess. Keep guessing until someone gets it! Type 'reset' to end the game early.";
+            break;
+          case 'emojiguess':
+            helpText = "**Game: Emoji Guess** 🎬\nI will describe a movie, book, or phrase using ONLY emojis. The first person to guess what it means wins! Type 'reset' to skip.";
+            break;
+          case 'scramble':
+          case 'jumble':
+            helpText = "**Game: Scramble** 🌪️\nI will take a word and scramble its letters. The capital letter indicates the first letter of the actual word. Unscramble it and type the answer to win points! Type 'reset' to surrender.";
+            break;
+          case 'doubleagent':
+            helpText = "**Game: Double Agent** 🕵️\nA social deduction game. I will secretly DM everyone their roles. One person is the Double Agent, everyone else is an operative. Operatives get a secret word, the Double Agent gets a similar but different word. You must find out who the Double Agent is by taking turns saying one related word. Vote them out before they blend in!";
+            break;
+          case 'mafia':
+          case 'werewolf':
+            helpText = "**Game: Mafia** 🕴️\nA game of deception! I will secretly assign roles (Mafia, Doctor, Detective, Villager) via DMs. During the 'Night', the Mafia chooses someone to eliminate, the Doctor protects, and the Detective investigates. During the 'Day', the group discusses and votes to lynch a suspect. Can the village survive?";
+            break;
+          case 'assassination':
+            helpText = "**Game: Assassination** 🎯\nEveryone in the group is assigned a secret target via DM. Your goal is to figure out who is targeting you and who your target is. You eliminate your target by sending a specific phrase in the chat. The last person standing wins!";
+            break;
+          case 'aliases':
+            helpText = "**Utility: Aliases** 🔗\nShows a list of all custom command aliases created for this group. You can create an alias by typing `command = my_alias` (e.g., `scramble = jumble`).";
+            break;
+          case 'remove':
+            helpText = "**Utility: Remove Alias** 🗑️\nUse `remove alias_name` to delete a custom alias from the group.";
+            break;
+          case 'score':
+          case 'scores':
+            helpText = "**Utility: Score** 🏆\nShows the leaderboard of points earned by members of this group by winning bot games.";
+            break;
+          case 'activity':
+            helpText = "**Utility: Activity** 📊\n(Mica Only) Shows the message activity statistics for this group and lists the most active members.";
+            break;
+          case 'leaderboard':
+            helpText = "**Utility: Leaderboard** 🌍\n(Mica Only) Shows the global leaderboard of the most active groups across all of Relay.";
+            break;
+          case 'reset':
+            helpText = "**Utility: Reset** 🛑\nStops the currently running game in the group.";
+            break;
+          default:
+            helpText = `I don't have a help page for '${helpTarget}'. Try asking about a specific game like 'help scramble'.`;
+        }
+        return this.sendCustomMessage(chat, io, activeBotId, helpText);
+      } else {
+        const reply = activeBotStr === 'mars' 
+          ? `**🔥 Mars Operations 🔥**\nI'm not your average assistant. Type 'help <command>' for rules.\n\n🎮 **Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n\n🛠️ **Group Data**\n• aliases\n• remove <alias>\n• score\n• reset`
+          : `**✨ System Intelligence ✨**\nHere are the commands I currently support! Type 'help <command>' for details.\n\n🎮 **Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n\n🛠️ **Utilities**\n• activity\n• leaderboard\n• aliases\n• remove <alias>\n• score\n• reset`;
+        return this.sendCustomMessage(chat, io, activeBotId, reply);
+      }
     }
 
     if (resolvedCommand === 'aliases') {
