@@ -187,6 +187,7 @@ const sendMessage = asyncHandler(async (req, res) => {
         if (targetUser) {
           let pushBody = content || `Sent a ${messageType}`;
           if (isEncrypted) pushBody = '🔒 Encrypted Message';
+          pushBody = pushBody.replace(/[*_~`]/g, '');
           const title = chat.isGroupChat ? chat.chatName : (req.user.displayName || req.user.username);
           
           let pushSent = false;

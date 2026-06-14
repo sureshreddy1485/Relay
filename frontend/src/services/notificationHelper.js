@@ -15,8 +15,9 @@ async function ensureChannel() {
   }
 }
 
-export const displayMessagingNotification = async ({ chatId, sender, chat, title, body, imageUrl }) => {
+export const displayMessagingNotification = async ({ chatId, sender, chat, title, body: rawBody, imageUrl }) => {
   if (!chatId || !sender) return;
+  const body = rawBody ? rawBody.replace(/[*_~`]/g, '') : '';
 
   try {
     await ensureChannel();

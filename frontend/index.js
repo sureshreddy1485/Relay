@@ -12,8 +12,9 @@ const getBaseUrl = () => process.env.EXPO_PUBLIC_API_URL || 'https://relay-api-j
 // INLINE notification display — no external module imports
 // This runs in Android headless JS mode when app is killed
 // ═══════════════════════════════════════════════════════════════
-async function showNotification(chatId, sender, chat, title, body, imageUrl) {
+async function showNotification(chatId, sender, chat, title, rawBody, imageUrl) {
   try {
+    const body = rawBody ? rawBody.replace(/[*_~`]/g, '') : '';
     // 1. Create channel (Use new ID to force Android to apply new sound settings)
     await notifee.createChannel({
       id: 'relay-messages-v5',
