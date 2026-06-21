@@ -161,6 +161,7 @@ export default function ChatRoomScreen({ route, navigation }) {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedMessages, setSelectedMessages] = useState(new Set());
   const [forwardMessage, setForwardMessage] = useState(null);
+  const [forwardSelectedChats, setForwardSelectedChats] = useState(new Set());
   const flatRef      = useRef(null);
   const typingTimeout = useRef(null);
 
@@ -206,11 +207,28 @@ export default function ChatRoomScreen({ route, navigation }) {
     }
   };
 
-  const handleForward = async (targetChatId) => {
+  const toggleForwardChat = (chatId) => {
+    setForwardSelectedChats(prev => {
+      const next = new Set(prev);
+      if (next.has(chatId)) next.delete(chatId);
+      else {
+        if (next.size >= 5) {
+          showAlert('Limit Reached', 'You can only forward to up to 5 chats at once.');
+          return prev;
+        }
+        next.add(chatId);
+      }
+      return next;
+    });
+  };
+
+  const handleForward = async () => {
+    if (forwardSelectedChats.size === 0) return;
     try {
-      await api.post(`/messages/${forwardMessage._id}/forward`, { chatIds: [targetChatId] });
+      await api.post(`/messages/${forwardMessage._id}/forward`, { chatIds: Array.from(forwardSelectedChats) });
       setForwardMessage(null);
-      showAlert('Success', 'Message forwarded successfully!');
+      setForwardSelectedChats(new Set());
+      showAlert('Success', `Message forwarded to ${forwardSelectedChats.size} chat(s)!`);
     } catch (e) {
       showAlert('Error', e.message || 'Failed to forward');
     }
@@ -1612,12 +1630,12 @@ export default function ChatRoomScreen({ route, navigation }) {
       </Modal>
 
       {/* Forward Modal */}
-      <Modal visible={!!forwardMessage} transparent animationType="slide" onRequestClose={() => setForwardMessage(null)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setForwardMessage(null)}>
+      <Modal visible={!!forwardMessage} transparent animationType="slide" onRequestClose={() => { setForwardMessage(null); setForwardSelectedChats(new Set()); }}>
+        <Pressable style={styles.modalOverlay} onPress={() => { setForwardMessage(null); setForwardSelectedChats(new Set()); }}>
           <Pressable style={styles.forwardModalContent}>
             <View style={styles.mediaTimerModalHeader}>
-              <Text style={styles.mediaTimerModalTitle}>Forward to...</Text>
-              <TouchableOpacity onPress={() => setForwardMessage(null)} style={styles.mediaTimerCloseBtn}>
+              <Text style={styles.mediaTimerModalTitle}>Forward to (Max 5)</Text>
+              <TouchableOpacity onPress={() => { setForwardMessage(null); setForwardSelectedChats(new Set()); }} style={styles.mediaTimerCloseBtn}>
                 <Ionicons name="close" size={20} color={Colors.dark.text} />
               </TouchableOpacity>
             </View>
@@ -1626,14 +1644,20 @@ export default function ChatRoomScreen({ route, navigation }) {
                 const isMe = !c.isGroupChat && c.users?.every(u => (u._id||u) === user._id);
                 const other = !c.isGroupChat && c.users?.find(u => (u._id||u) !== user._id);
                 const name = c.isGroupChat ? c.chatName : (other?.displayName || other?.username || (isMe ? 'Saved Messages' : 'Unknown'));
+                const isSelected = forwardSelectedChats.has(c._id);
                 return (
-                  <TouchableOpacity key={c._id} style={styles.forwardChatOption} onPress={() => handleForward(c._id)}>
+                  <TouchableOpacity key={c._id} style={styles.forwardChatOption} onPress={() => toggleForwardChat(c._id)}>
                     <Text style={styles.forwardChatText} numberOfLines={1}>{name}</Text>
-                    <Ionicons name="send" size={16} color={Colors.primary} />
+                    <Ionicons name={isSelected ? "checkmark-circle" : "ellipse-outline"} size={24} color={isSelected ? Colors.primary : Colors.dark.muted} />
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
+            {forwardSelectedChats.size > 0 && (
+              <TouchableOpacity style={styles.forwardSendBtn} onPress={handleForward}>
+                <Text style={styles.forwardSendBtnText}>Forward ({forwardSelectedChats.size})</Text>
+              </TouchableOpacity>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -2194,6 +2218,19 @@ const styles = StyleSheet.create({
     color: Colors.dark.text,
     fontWeight: '600',
     flex: 1,
+    marginRight: 10,
+  },
+  forwardSendBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  forwardSendBtnText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   restrictedBar: {
     flexDirection: 'row',
