@@ -586,6 +586,7 @@ export default function MessageBubble({
 
   const openModal = () => { 
     if (message.deletedForEveryone) return;
+    if (message.isOptimistic) return;
     setTab('actions'); 
     setShowActions(true); 
   };
