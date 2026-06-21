@@ -974,7 +974,11 @@ export default function MessageBubble({
 
       {/* Reactions — below the bubble */}
       {message.reactions?.length > 0 && (
-        <View style={[styles.reactionsRow, isMine ? styles.reactionsRowMine : styles.reactionsRowTheirs]}>
+        <View style={[
+          styles.reactionsRow, 
+          isMine ? styles.reactionsRowMine : styles.reactionsRowTheirs,
+          { paddingLeft: (isGroup && !isMine && message.sender) ? 52 : 16 }
+        ]}>
           {groupedReactions().map((g, i) => (
             <TouchableOpacity
               key={i}

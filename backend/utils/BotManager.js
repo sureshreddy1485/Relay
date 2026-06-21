@@ -163,7 +163,14 @@ class BotManager {
             helpText = "**Utility: Aliases** 🔗\nShows a list of all custom command aliases created for this group. You can create an alias by typing `command = my_alias` (e.g., `scramble = jumble`).";
             break;
           case 'remove':
-            helpText = "**Utility: Remove Alias** 🗑️\nUse `remove alias_name` to delete a custom alias from the group.";
+            helpText = "**Utility: Remove** 🗑️\nUse `remove <alias_name>` to delete a custom alias from the group.\nUse `remove inactive <days>` (e.g. `remove inactive 30`) to kick members who haven't sent a message in that many days (Admins only).";
+            break;
+          case 'summarize':
+            helpText = "**Utility: Summarize** 📝\n(Mica Only) Use `summarize <text>` to have Mica automatically provide a concise summary of the given text.";
+            break;
+          case 'calculate':
+          case 'calc':
+            helpText = "**Utility: Math** 🧮\n(Mica Only) Send any simple math expression (like `20/2` or `5 * (10 + 2)`) and Mica will automatically calculate the result.";
             break;
           case 'score':
           case 'scores':
@@ -178,14 +185,26 @@ class BotManager {
           case 'reset':
             helpText = "**Utility: Reset** 🛑\nStops the currently running game in the group.";
             break;
+          case 'games':
+            helpText = "**🎮 Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n*(For a deep dive or rules, type `help <game>` — e.g. `help riddle`)*";
+            break;
+          case 'ai':
+            helpText = "**🤖 AI & Smart Tools**\n(Mica Only)\n\n• summarize <text>\n• Just type any math expression (e.g. `20/2`)!\n\n*(For more details, type `help <tool>` — e.g. `help summarize`)*";
+            break;
+          case 'stats':
+            helpText = "**📈 Stats & Leaderboards**\n\n• score\n• activity (Mica only)\n• leaderboard (Mica only)\n\n*(For a deep dive, type `help <command>` — e.g. `help score`)*";
+            break;
+          case 'admin':
+            helpText = "**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n\n*(For a deep dive, type `help <command>` — e.g. `help aliases`)*";
+            break;
           default:
-            helpText = `I don't have a help page for '${helpTarget}'. Try asking about a specific game like 'help scramble'.`;
+            helpText = `I don't have a help page for '${helpTarget}'. Try asking about a specific category like 'help games' or a specific game like 'help scramble'.`;
         }
         return this.sendCustomMessage(chat, io, activeBotId, helpText);
       } else {
         const reply = activeBotStr === 'mars' 
-          ? `**🔥 Mars Operations 🔥**\nI'm not your average assistant. Type 'help <command>' for rules.\n\n🎮 **Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n\n🛠️ **Group Data**\n• aliases\n• remove <alias>\n• score\n• reset`
-          : `**✨ System Intelligence ✨**\nHere are the commands I currently support! Type 'help <command>' for details.\n\n🎮 **Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n\n🛠️ **Utilities**\n• activity\n• leaderboard\n• aliases\n• remove <alias>\n• score\n• reset`;
+          ? `**🔥 Mars Operations 🔥**\nI'm not your average assistant. Type a category below to see what I can do:\n\n• **help games**\n• **help stats**\n• **help admin**`
+          : `**✨ System Intelligence ✨**\nHere are the categories of commands I support. Type a category to see its commands:\n\n• **help games**\n• **help ai**\n• **help stats**\n• **help admin**`;
         return this.sendCustomMessage(chat, io, activeBotId, reply);
       }
     }
@@ -202,8 +221,96 @@ class BotManager {
       return this.sendCustomMessage(chat, io, activeBotId, content.trim());
     }
 
+    // AI Summarize
+    if (cleanCommandText.startsWith('summarize ') && activeBotStr === 'mica') {
+       const textToSummarize = cleanCommandText.replace('summarize ', '').trim();
+       if (!textToSummarize) return this.sendCustomMessage(chat, io, activeBotId, "Please provide some text to summarize. (e.g. `summarize This is a long story...`)");
+
+       try {
+           const micaGroq = new Groq({ apiKey: process.env.MICA_GROQ_API_KEY });
+           const completion = await micaGroq.chat.completions.create({
+               messages: [
+                 { role: 'system', content: 'You are Mica, a smart, concise AI assistant. Provide a brief summary of the text provided by the user. Keep it short and to the point.' },
+                 { role: 'user', content: textToSummarize }
+               ],
+               model: 'llama3-8b-8192',
+           });
+           const summary = completion.choices[0]?.message?.content || "Sorry, I couldn't summarize that.";
+           return this.sendCustomMessage(chat, io, activeBotId, `📝 **Summary:**\n${summary}`);
+       } catch (error) {
+           console.error("Groq summarize error:", error);
+           return this.sendCustomMessage(chat, io, activeBotId, "Sorry, my summarization engine is currently down.");
+       }
+    }
+
+    // Math calculation (implicit or explicit)
+    if (activeBotStr === 'mica' && /^[0-9+\-*/().\s]+$/.test(cleanCommandText)) {
+       try {
+           const mathExpr = cleanCommandText.replace(/\s+/g, '');
+           if (/[+\-*/]/.test(mathExpr) && /[0-9]/.test(mathExpr)) {
+               const result = new Function('return ' + mathExpr)();
+               if (isFinite(result)) {
+                   let formattedResult = Number.isInteger(result) ? result.toFixed(1) : parseFloat(result.toFixed(4)).toString();
+                   return this.sendCustomMessage(chat, io, activeBotId, `${formattedResult}`);
+               }
+           }
+       } catch(e) {
+           // Invalid math expression, just pass through
+       }
+    }
+
     if (cleanCommandText.startsWith('remove ') && !cleanCommandText.match(/remove (\d+)/)) {
-      const aliasToRemove = cleanCommandText.replace('remove ', '').trim();
+      const args = cleanCommandText.split(' ').slice(1);
+      
+      if (args[0] === 'inactive') {
+        if (!chat.isGroupChat) return this.sendCustomMessage(chat, io, activeBotId, "This command can only be used in groups.");
+        if (!isGroupAdmin) return this.sendCustomMessage(chat, io, activeBotId, "Only group admins can remove inactive members.");
+        
+        let days = parseInt(args[1], 10);
+        if (isNaN(days) || days < 1) days = 30; // default 30 days
+
+        const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        
+        const activeUserIdsRaw = await Message.distinct('sender', {
+          chat: chat._id,
+          createdAt: { $gte: cutoffDate }
+        });
+        const activeUserIds = activeUserIdsRaw.map(id => id.toString());
+
+        const bots = [micaId, marsId, getRelayBotId()].map(id => id?.toString()).filter(Boolean);
+        
+        let removedCount = 0;
+        let newUsersList = [];
+        
+        for (const userObj of chat.users) {
+           const uId = userObj._id ? userObj._id.toString() : userObj.toString();
+           const isUserAdmin = chat.groupAdmin?.toString() === uId || chat.admins?.some(a => a.toString() === uId);
+           if (bots.includes(uId) || isUserAdmin || activeUserIds.includes(uId)) {
+              newUsersList.push(userObj);
+           } else {
+              removedCount++;
+              io.to(chat._id.toString()).emit('user_left_group', { chatId: chat._id, userId: uId });
+              await User.findByIdAndUpdate(uId, { $pull: { activeChats: chat._id } });
+           }
+        }
+        
+        if (removedCount > 0) {
+           chat.users = newUsersList;
+           await chat.save();
+           const reply = activeBotStr === 'mars' 
+              ? `Purged ${removedCount} inactive member(s). Good riddance.`
+              : `🧹 Removed ${removedCount} member(s) who were inactive for over ${days} days.`;
+           return this.sendCustomMessage(chat, io, activeBotId, reply);
+        } else {
+           const reply = activeBotStr === 'mars' 
+              ? `Everyone seems to be active. For now.` 
+              : `No inactive members found in the last ${days} days!`;
+           return this.sendCustomMessage(chat, io, activeBotId, reply);
+        }
+      }
+
+      // Alias removal fallback
+      const aliasToRemove = args.join(' ');
       const aliasesObj = await AliasManager.loadGroupSettings(chat._id);
       if (aliasesObj[aliasToRemove]) {
         await AliasManager.removeAlias(chat._id, aliasToRemove);
@@ -236,15 +343,25 @@ class BotManager {
         
         const topUsers = await Message.aggregate([
           { $match: { chat: chat._id, sender: { $nin: bots } } },
-          { $group: { _id: '$sender', count: { $sum: 1 } } },
+          { $group: { _id: '$sender', count: { $sum: 1 }, lastActive: { $max: '$createdAt' } } },
           { $sort: { count: -1 } },
           { $limit: 5 }
         ]);
         await User.populate(topUsers, { path: '_id', select: 'displayName username' });
         
+        const formatRelTime = (d) => {
+          if (!d) return 'unknown';
+          const mins = Math.floor((Date.now() - new Date(d)) / 60000);
+          if (mins < 1) return 'just now';
+          if (mins < 60) return `${mins}m ago`;
+          const hrs = Math.floor(mins / 60);
+          if (hrs < 24) return `${hrs}h ago`;
+          return `${Math.floor(hrs / 24)}d ago`;
+        };
+
         let lbText = `📊 **Group Activity**\n\nTotal Messages: ${totalMsgs}\nLast 24 Hours: ${recentMsgs}\n\n🏆 **Top Members** 🏆\n`;
         topUsers.forEach((u, i) => {
-          if (u._id) lbText += `${i + 1}. ${u._id.displayName || u._id.username} - ${u.count} msgs\n`;
+          if (u._id) lbText += `${i + 1}. ${u._id.displayName || u._id.username} - ${u.count} msgs (${formatRelTime(u.lastActive)})\n`;
         });
         return this.sendCustomMessage(chat, io, activeBotId, lbText.trim() + `\n\nKeep the chat alive! 🚀`);
     }

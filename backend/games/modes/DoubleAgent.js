@@ -26,7 +26,7 @@ class DoubleAgentGame {
     GameManager.startGame(groupId, this);
     this.sessions.set(groupId, gameState);
 
-    await this.sendBotMessage(chat, io, `🕵️ **DOUBLE AGENT LOBBY OPEN!**\n\nThere is a traitor among us. Type **"/join"** to enter the game.\n\nGame starts in 30 seconds...`);
+    await this.sendBotMessage(chat, io, `🕵️ **DOUBLE AGENT LOBBY OPEN!**\n\nThere is a traitor among us. Type **"join"** to enter the game.\n\nGame starts in 30 seconds...`);
 
     gameState.lobbyTimer = setTimeout(() => this.beginGameplay(groupId, chat, io), 30000);
   }
@@ -50,7 +50,7 @@ class DoubleAgentGame {
         return true;
       }
 
-      if (text === '/join') {
+      if (text === 'join') {
         if (!state.players.has(senderId)) {
           state.players.set(senderId, {
             name: message.sender.displayName || message.sender.username,
@@ -73,8 +73,8 @@ class DoubleAgentGame {
       }
 
       // Handle voting / accused
-      if (text.startsWith('/accuse ')) {
-        const targetName = text.replace('/accuse ', '').trim();
+      if (text.startsWith('accuse ')) {
+        const targetName = text.replace('accuse ', '').trim();
         await this.sendBotMessage(chat, io, `⚖️ **VOTING INITIATED!**\n\n**${message.sender.displayName || message.sender.username}** has accused **${targetName}** of being the Double Agent!\n\n*(Voting mechanics coming soon!)*`);
         return true;
       }
@@ -117,7 +117,7 @@ class DoubleAgentGame {
       }
     }
 
-    await this.sendBotMessage(chat, io, `🕵️ **THE GAME HAS BEGUN!**\n\nThere is **1 Double Agent** hidden among you. Check your app for your secret role.\n\nTalk amongst yourselves. Type **"/accuse [name]"** if you think you know who it is.`);
+    await this.sendBotMessage(chat, io, `🕵️ **THE GAME HAS BEGUN!**\n\nThere is **1 Double Agent** hidden among you. Check your app for your secret role.\n\nTalk amongst yourselves. Type **"accuse [name]"** if you think you know who it is.`);
   }
 
   async sendBotMessage(chat, io, content) {

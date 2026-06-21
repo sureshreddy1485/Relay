@@ -125,3 +125,9 @@ Rules:
 * App crashes immediately on opening (in APK):
   This usually means a native package was added but not compiled, OR an environment variable (`EXPO_PUBLIC_...`) is missing in `eas.json`. Check `eas.json`!
  node scripts/clearBroadcasts.js
+
+ cd frontend
+npx eas update --branch production --message "Added Group Preview and Notification Fixes" --clear-cache
+npx eas update --branch preview --message "Added Group Preview and Notification Fixes" --clear-cache
+
+

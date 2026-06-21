@@ -33,7 +33,7 @@ class AssassinationGame {
     GameManager.startGame(groupId, this);
     this.sessions.set(groupId, gameState);
 
-    await this.sendBotMessage(chat, io, `🎯 **ASSASSINATION LOBBY OPEN!**\n\nTrust no one. Type **"/join"** to enter the game.\n\nGame starts in 30 seconds...`);
+    await this.sendBotMessage(chat, io, `🎯 **ASSASSINATION LOBBY OPEN!**\n\nTrust no one. Type **"join"** to enter the game.\n\nGame starts in 30 seconds...`);
 
     // Start game after 30 seconds
     gameState.lobbyTimer = setTimeout(() => this.beginGameplay(groupId, chat, io), 30000);
@@ -58,7 +58,7 @@ class AssassinationGame {
         return true;
       }
 
-      if (text === '/join') {
+      if (text === 'join') {
         if (!state.players.has(senderId)) {
           state.players.set(senderId, {
             name: message.sender.displayName || message.sender.username,

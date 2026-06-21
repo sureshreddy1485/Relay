@@ -28,7 +28,7 @@ class MafiaGame {
     GameManager.startGame(groupId, this);
     this.sessions.set(groupId, gameState);
 
-    await this.sendBotMessage(chat, io, `🐺 **MAFIA / WEREWOLF LOBBY OPEN!**\n\nThe village is under attack. Type **"/join"** to enter the game. (Minimum 4 players)\n\nGame starts in 45 seconds...`);
+    await this.sendBotMessage(chat, io, `🐺 **MAFIA / WEREWOLF LOBBY OPEN!**\n\nThe village is under attack. Type **"join"** to enter the game. (Minimum 4 players)\n\nGame starts in 45 seconds...`);
 
     gameState.lobbyTimer = setTimeout(() => this.beginGameplay(groupId, chat, io), 45000);
   }
@@ -52,7 +52,7 @@ class MafiaGame {
         return true;
       }
 
-      if (text === '/join') {
+      if (text === 'join') {
         if (!state.players.has(senderId)) {
           state.players.set(senderId, {
             name: message.sender.displayName || message.sender.username,
@@ -77,14 +77,14 @@ class MafiaGame {
         return true;
       }
 
-      if (state.status === 'day' && text.startsWith('/vote ')) {
+      if (state.status === 'day' && text.startsWith('vote ')) {
         const player = state.players.get(senderId);
         if (!player || !player.isAlive) {
           await this.sendBotMessage(chat, io, `👻 Dead people can't vote, ${player ? player.name : 'stranger'}!`);
           return true;
         }
 
-        const targetName = text.replace('/vote ', '').trim().toLowerCase();
+        const targetName = text.replace('vote ', '').trim().toLowerCase();
         
         // Find target
         let target = null;
@@ -224,7 +224,7 @@ class MafiaGame {
 
     if (await this.checkWin(groupId, chat, io)) return;
 
-    await this.sendBotMessage(chat, io, `🗣️ **DISCUSSION PHASE**\n\nDiscuss who you think the Mafia is!\nType **/vote [name]** to vote to eliminate someone.`);
+    await this.sendBotMessage(chat, io, `🗣️ **DISCUSSION PHASE**\n\nDiscuss who you think the Mafia is!\nType **vote [name]** to vote to eliminate someone.`);
   }
 
   async executePlayer(groupId, chat, io, targetId) {
