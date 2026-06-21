@@ -187,21 +187,21 @@ class BotManager {
             break;
           case 'games':
             helpText = activeBotStr === 'mars'
-              ? "**🎮 Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n*(Want the rules? Type `help <game>` — e.g. `help mafia`. Don't make me repeat myself.)*"
-              : "**🎮 Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n*(For a deep dive or rules, type `help <game>` — e.g. `help riddle`)*";
+              ? "**🎮 Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n💡 **Tip: Want the rules? Type `help <game>` — e.g. `help mafia`. Don't make me repeat myself.**"
+              : "**🎮 Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n💡 **Tip: For a deep dive or rules, type `help <game>` — e.g. `help riddle`**";
             break;
           case 'ai':
-            helpText = "**🤖 AI & Smart Tools**\n(Mica Only)\n\n• summarize <text>\n• Just type any math expression (e.g. `20/2`)!\n\n*(For more details, type `help <tool>` — e.g. `help summarize`)*";
+            helpText = "**🤖 AI & Smart Tools**\n(Mica Only)\n\n• summarize <text>\n• Just type any math expression (e.g. `20/2`)!\n\n💡 **Tip: For more details, type `help <tool>` — e.g. `help summarize`**";
             break;
           case 'stats':
             helpText = activeBotStr === 'mars'
-              ? "**📈 Stats & Leaderboards**\n\n• score\n\n*(I don't do activity or global leaderboards. Type `help score` if you really want to see who's losing.)*"
-              : "**📈 Stats & Leaderboards**\n\n• score\n• activity (Mica only)\n• leaderboard (Mica only)\n\n*(For a deep dive, type `help <command>` — e.g. `help score`)*";
+              ? "**📈 Stats & Leaderboards**\n\n• score\n\n💡 **Tip: I don't do activity or global leaderboards. Type `help score` if you really want to see who's losing.**"
+              : "**📈 Stats & Leaderboards**\n\n• score\n• activity (Mica only)\n• leaderboard (Mica only)\n\n💡 **Tip: For a deep dive, type `help <command>` — e.g. `help score`**";
             break;
           case 'admin':
             helpText = activeBotStr === 'mars'
-              ? "**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n\n*(Type `help <command>` for details. Try `help remove` if you want to kick dead weight.)*"
-              : "**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n\n*(For a deep dive, type `help <command>` — e.g. `help aliases`)*";
+              ? "**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n\n💡 **Tip: Type `help <command>` for details. Try `help remove` if you want to kick dead weight.**"
+              : "**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n\n💡 **Tip: For a deep dive, type `help <command>` — e.g. `help aliases`**";
             break;
           default:
             helpText = `I don't have a help page for '${helpTarget}'. Try asking about a specific category like 'help games' or a specific game like 'help scramble'.`;
@@ -209,8 +209,8 @@ class BotManager {
         return this.sendCustomMessage(chat, io, activeBotId, helpText);
       } else {
         const reply = activeBotStr === 'mars' 
-          ? `**🔥 Mars Operations 🔥**\nI'm not your average assistant. Here's what I can do. Pick a category if you dare:\n\n• **games**\n• **stats**\n• **admin**\n\n*(Type \`help <category>\` — like \`help games\`... if you can type that fast.)*`
-          : `**✨ System Intelligence ✨**\nHere are the categories of commands I support:\n\n• **games**\n• **ai**\n• **stats**\n• **admin**\n\n*(To explore a category, type \`help <category>\` — e.g. \`help games\`)*`;
+          ? `**🔥 Mars Operations 🔥**\nI'm not your average assistant. Here's what I can do. Pick a category if you dare:\n\n• **games**\n• **stats**\n• **admin**\n\n💡 **Tip: Type \`help <category>\` — like \`help games\`... if you can type that fast.**`
+          : `**✨ System Intelligence ✨**\nHere are the categories of commands I support:\n\n• **games**\n• **ai**\n• **stats**\n• **admin**\n\n💡 **Tip: To explore a category, type \`help <category>\` — e.g. \`help games\`**`;
         return this.sendCustomMessage(chat, io, activeBotId, reply);
       }
     }
