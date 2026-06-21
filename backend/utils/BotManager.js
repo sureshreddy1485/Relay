@@ -186,6 +186,10 @@ class BotManager {
           case 'reset':
             helpText = "**Utility: Reset** 🛑\nStops the currently running game in the group.";
             break;
+          case 'swap':
+          case 'switch':
+            helpText = "**Utility: Swap Bots** 🤖\nType `!swap` or `switch to mars` / `switch to mica` to instantly change the active bot for this group. (Admins only)";
+            break;
           case 'games':
             helpText = activeBotStr === 'mars'
               ? "**🎮 Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n💡 **Tip: Want the rules? Type `help <game>` — e.g. `help mafia`. Don't make me repeat myself.**"
@@ -201,8 +205,8 @@ class BotManager {
             break;
           case 'admin':
             helpText = activeBotStr === 'mars'
-              ? "**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n\n💡 **Tip: Type `help <command>` for details. Try `help remove` if you want to kick dead weight.**"
-              : "**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n\n💡 **Tip: For a deep dive, type `help <command>` — e.g. `help aliases`**";
+              ? "**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n• swap (Switch bots)\n\n💡 **Tip: Type `help <command>` for details. Try `help remove` if you want to kick dead weight.**"
+              : "**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n• swap (Switch bots)\n\n💡 **Tip: For a deep dive, type `help <command>` — e.g. `help aliases`**";
             break;
           default:
             helpText = `I don't have a help page for '${helpTarget}'. Try asking about a specific category like 'help games' or a specific game like 'help scramble'.`;
