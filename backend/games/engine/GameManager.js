@@ -27,7 +27,7 @@ class GameManager {
     return false; // Not handled
   }
 
-  async incrementScore(groupId, userId, points = 1) {
+  async incrementScore(groupId, userId, points = 2) {
     const GroupGameSettings = require('../../models/GroupGameSettings');
     const settings = await GroupGameSettings.findOneAndUpdate(
       { groupId },
