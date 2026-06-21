@@ -7,6 +7,7 @@ const Groq = require('groq-sdk');
 const AliasManager = require('../games/engine/AliasManager');
 const GameManager = require('../games/engine/GameManager');
 const CommandRegistry = require('../games/engine/CommandRegistry');
+const math = require('mathjs');
 
 class BotManager {
   constructor() {
@@ -254,8 +255,8 @@ class BotManager {
        try {
            const mathExpr = cleanCommandText.replace(/\s+/g, '');
            if (/[+\-*/]/.test(mathExpr) && /[0-9]/.test(mathExpr)) {
-               const result = new Function('return ' + mathExpr)();
-               if (isFinite(result)) {
+               const result = math.evaluate(mathExpr);
+               if (typeof result === 'number' && isFinite(result)) {
                    let formattedResult = Number.isInteger(result) ? result.toFixed(1) : parseFloat(result.toFixed(4)).toString();
                    return this.sendCustomMessage(chat, io, activeBotId, `${formattedResult}`);
                }
