@@ -171,23 +171,23 @@ class BotManager {
             break;
           case 'games':
             helpText = activeBotStr === 'mars'
-              ? "**🎮 Mars Operations**\n• breach (Hack a 4-digit PIN)\n• suspect (Solve a crime scene)\n\n💡 **Tip: Don't ask me for rules. Figure it out.**"
-              : "**🎮 Mica's Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n💡 **Tip: For a deep dive or rules, type `help <game>` — e.g. `help riddle`**";
+              ? `**🎮 Mars Operations**\n• breach (Hack a 4-digit PIN)\n• suspect (Solve a crime scene)\n\n💡 **Tip: Don't ask me for rules. Figure it out.**`
+              : `**🎮 Mica's Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n💡 **Tip: For a deep dive or rules, type \`${activeBotStr} help <game>\` — e.g. \`${activeBotStr} help riddle\`**`;
             break;
           case 'ai':
             helpText = activeBotStr === 'mars'
-              ? "**🤖 AI & Smart Tools**\n\n• summarize <text>\n• Math expressions (e.g. `20/2`)\n\n💡 **Tip: Type `help summarize` if you really need instructions.**"
-              : "**🤖 AI & Smart Tools**\n\n• summarize <text>\n• Just type any math expression (e.g. `20/2`)!\n\n💡 **Tip: For more details, type `help <tool>` — e.g. `help summarize`**";
+              ? `**🤖 AI & Smart Tools**\n\n• summarize <text>\n• Math expressions (e.g. \`20/2\`)\n\n💡 **Tip: Type \`${activeBotStr} help summarize\` if you really need instructions.**`
+              : `**🤖 AI & Smart Tools**\n\n• summarize <text>\n• Just type any math expression (e.g. \`20/2\`)!\n\n💡 **Tip: For more details, type \`${activeBotStr} help <tool>\` — e.g. \`${activeBotStr} help summarize\`**`;
             break;
           case 'stats':
             helpText = activeBotStr === 'mars'
-              ? "**📈 Stats & Leaderboards**\n\n• score\n\n💡 **Tip: I don't do activity or global leaderboards. Type `help score` if you really want to see who's losing.**"
-              : "**📈 Stats & Leaderboards**\n\n• score\n• activity (Mica only)\n• leaderboard (Mica only)\n\n💡 **Tip: For a deep dive, type `help <command>` — e.g. `help score`**";
+              ? `**📈 Stats & Leaderboards**\n\n• score\n\n💡 **Tip: I don't do activity or global leaderboards. Type \`${activeBotStr} help score\` if you really want to see who's losing.**`
+              : `**📈 Stats & Leaderboards**\n\n• score\n• activity (Mica only)\n• leaderboard (Mica only)\n\n💡 **Tip: For a deep dive, type \`${activeBotStr} help <command>\` — e.g. \`${activeBotStr} help score\`**`;
             break;
           case 'admin':
             helpText = activeBotStr === 'mars'
-              ? "**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n• swap (Switch bots)\n\n💡 **Tip: Type `help <command>` for details. Try `help remove` if you want to kick dead weight.**"
-              : "**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n• swap (Switch bots)\n\n💡 **Tip: For a deep dive, type `help <command>` — e.g. `help aliases`**";
+              ? `**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n• swap (Switch bots)\n\n💡 **Tip: Type \`${activeBotStr} help <command>\` for details. Try \`${activeBotStr} help remove\` if you want to kick dead weight.**`
+              : `**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n• swap (Switch bots)\n\n💡 **Tip: For a deep dive, type \`${activeBotStr} help <command>\` — e.g. \`${activeBotStr} help aliases\`**`;
             break;
           default:
             helpText = `I don't have a help page for '${helpTarget}'. Try asking about a specific category like 'help games' or a specific game like 'help scramble'.`;
@@ -195,8 +195,8 @@ class BotManager {
         return this.sendCustomMessage(chat, io, activeBotId, helpText);
       } else {
         const reply = activeBotStr === 'mars' 
-          ? `**🔥 Mars Operations 🔥**\nI'm not your average assistant. Here's what I can do. Pick a category if you dare:\n\n• **games**\n• **ai**\n• **stats**\n• **admin**\n\n💡 **Tip: Type \`help <category>\` — like \`help games\`... if you can type that fast.**`
-          : `**✨ System Intelligence ✨**\nHere are the categories of commands I support:\n\n• **games**\n• **ai**\n• **stats**\n• **admin**\n\n💡 **Tip: To explore a category, type \`help <category>\` — e.g. \`help games\`**`;
+          ? `**🔥 Mars Operations 🔥**\nI'm not your average assistant. Here's what I can do. Pick a category if you dare:\n\n• **games**\n• **ai**\n• **stats**\n• **admin**\n\n💡 **Tip: Type \`${activeBotStr} help <category>\` — like \`${activeBotStr} help games\`... if you can type that fast.**`
+          : `**✨ System Intelligence ✨**\nHere are the categories of commands I support:\n\n• **games**\n• **ai**\n• **stats**\n• **admin**\n\n💡 **Tip: To explore a category, type \`${activeBotStr} help <category>\` — e.g. \`${activeBotStr} help games\`**`;
         return this.sendCustomMessage(chat, io, activeBotId, reply);
       }
     }
@@ -250,7 +250,14 @@ class BotManager {
                if (typeof result === 'number' && isFinite(result)) {
                    let formattedResult = Number.isInteger(result) ? result.toFixed(1) : parseFloat(result.toFixed(4)).toString();
                    if (activeBotStr === 'mars') {
-                     return this.sendCustomMessage(chat, io, activeBotId, `${formattedResult}. You couldn't do that yourself?`);
+                     const mathDialogues = [
+                       `${formattedResult}. You couldn't do that yourself?`,
+                       `You really needed my processing power for this? It's ${formattedResult}.`,
+                       `${formattedResult}. Next time use a calculator.`,
+                       `I'm a highly advanced AI, not a TI-84. The answer is ${formattedResult}.`
+                     ];
+                     const msg = mathDialogues[Math.floor(Math.random() * mathDialogues.length)];
+                     return this.sendCustomMessage(chat, io, activeBotId, msg);
                    }
                    return this.sendCustomMessage(chat, io, activeBotId, `${formattedResult}`);
                }
