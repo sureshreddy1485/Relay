@@ -95,7 +95,7 @@ class EmojiGuessGame {
       content = content.replace('🚨 **CASE FILE OPENED', '🎮 **NEW GAME');
       content = content.replace('Try not to disappoint me.', 'First to answer correctly wins!');
       content = content.replace('Finally. Someone in this group has a functioning brain.', '🎉 **CORRECT!**');
-      content = content.replace(/Wow\. You all gave up\..*Embarrassing\./, '🏳️ **GAME OVER!**');
+      content = content.replace(/Wow\. You all gave up\. (The [a-z]+ was \*\*.+?\*\*)\. Embarrassing\./, '🏳️ **GAME OVER!** $1!');
     }
 
     const activeBotId = await botManager.getActiveBotId(chat._id);

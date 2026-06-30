@@ -26,97 +26,72 @@ class BotManager {
     const senderId = (message.sender._id || message.sender).toString();
     if (senderId === micaId.toString() || senderId === marsId.toString()) return;
 
-    // Get Active Bot for Group
-    let settings = await GroupGameSettings.findOne({ groupId: chat._id });
-    if (!settings) {
-      settings = await GroupGameSettings.create({ groupId: chat._id, activeBot: 'mica', backupBot: 'mars' });
+    let text = (message.content || '').trim();
+    let lowerText = text.toLowerCase();
+    
+    // Determine active bot based on mention
+    let activeBotStr = null;
+    let activeBotId = null;
+
+    const mentionsMica = lowerText.includes('mica');
+    const mentionsMars = lowerText.includes('mars');
+
+    if (mentionsMica && !mentionsMars) {
+      activeBotStr = 'mica';
+      activeBotId = micaId;
+    } else if (mentionsMars && !mentionsMica) {
+      activeBotStr = 'mars';
+      activeBotId = marsId;
+    } else if (mentionsMica && mentionsMars) {
+      // Tie breaker: whoever was mentioned first
+      if (lowerText.indexOf('mica') < lowerText.indexOf('mars')) {
+        activeBotStr = 'mica';
+        activeBotId = micaId;
+      } else {
+        activeBotStr = 'mars';
+        activeBotId = marsId;
+      }
     }
 
-    const activeBotStr = settings.activeBot || 'mica';
-    const activeBotId = activeBotStr === 'mars' ? marsId : micaId;
-
-    let text = (message.content || '').trim();
-    let cleanCommandText = text.toLowerCase().replace(/^(?:@?mica\s+|@?mars\s+)/i, '').trim();
-    
     const isGroupAdmin = chat.isGroupChat && ((chat.groupAdmin && chat.groupAdmin.toString() === senderId) || (chat.admins && chat.admins.some(a => a.toString() === senderId)));
 
-    // Switch logic
-    if (text.toLowerCase() === '!swap') {
-      if (chat.isGroupChat && !isGroupAdmin) {
-        return this.sendCustomMessage(chat, io, activeBotId, "Only group admins can swap bots.");
-      }
-      if (GameManager.hasActiveGame(chat._id)) {
-        return this.sendCustomMessage(chat, io, activeBotId, "An activity is currently active! Please finish it before swapping bots.");
-      }
-      
-      const newActive = activeBotStr === 'mars' ? 'mica' : 'mars';
-      settings.activeBot = newActive;
-      settings.backupBot = activeBotStr;
-      await settings.save();
-      
-      const newBotId = newActive === 'mars' ? marsId : micaId;
-      const swapMessage = newActive === 'mars' 
-        ? "Mica is taking a break. Mars is now active. Try not to annoy me."
-        : "Mars is gone. Mica is here! Let's have some fun! ✨";
-        
-      return this.sendCustomMessage(chat, io, newBotId, swapMessage);
-    }
-
-    if (cleanCommandText === 'switch to mars' || cleanCommandText === 'bring mars back') {
-      if (chat.isGroupChat && !isGroupAdmin) {
-        return this.sendCustomMessage(chat, io, activeBotId, "Only group admins can switch bots.");
-      }
-      if (activeBotStr === 'mars') {
-        return this.sendCustomMessage(chat, io, activeBotId, "I'm already here. Pay attention.");
-      }
-      if (GameManager.hasActiveGame(chat._id)) {
-        return this.sendCustomMessage(chat, io, activeBotId, "An activity is currently active! Please finish it before switching bots, or use 'force switch to mars'.");
-      }
-      settings.activeBot = 'mars';
-      settings.backupBot = 'mica';
-      await settings.save();
-      return this.sendCustomMessage(chat, io, marsId, "Mica is taking a break. Mars is now active.");
-    }
-
-    if (cleanCommandText === 'switch to mica' || cleanCommandText === 'bring mica back') {
-      if (chat.isGroupChat && !isGroupAdmin) {
-        return this.sendCustomMessage(chat, io, activeBotId, "Only group admins can switch bots.");
-      }
-      if (activeBotStr === 'mica') {
-        return this.sendCustomMessage(chat, io, activeBotId, "I'm already the active bot!");
-      }
-      if (GameManager.hasActiveGame(chat._id)) {
-        return this.sendCustomMessage(chat, io, activeBotId, "An activity is currently active! Please finish it before switching bots, or use 'force switch to mica'.");
-      }
-      settings.activeBot = 'mica';
-      settings.backupBot = 'mars';
-      await settings.save();
-      return this.sendCustomMessage(chat, io, micaId, "Mars is unavailable. Mica has taken over.");
+    // General help without targeting a specific bot
+    if (!activeBotStr && (lowerText === 'help' || lowerText === '!help')) {
+        const generalHelp = `**🤖 Relay Bot System 🤖**\n\nBoth Mica and Mars are active in this group simultaneously! To use a command or talk to a bot, you must mention their name.\n\n**Examples:**\n• \`mica help\` - See Mica's games and tools\n• \`mars help\` - See Mars's unique operations\n• \`mica calculate 5 * 5\`\n• \`mars summarize <text>\`\n\nHave fun!`;
+        return this.sendCustomMessage(chat, io, micaId, generalHelp);
     }
     
-    if (cleanCommandText === 'force switch to mars') {
-      if (chat.isGroupChat && !isGroupAdmin) {
-        return this.sendCustomMessage(chat, io, activeBotId, "Only group admins can force switch bots.");
+    // Default to mica for non-bot-specific game routing if no bot is mentioned
+    const routingBotId = activeBotId || micaId;
+    const routingBotStr = activeBotStr || 'mica';
+
+    // GAME ROUTING (Always check this even if no bot is mentioned)
+    if (GameManager.hasActiveGame(chat._id)) {
+      if (lowerText === 'reset' || (activeBotStr && lowerText.replace(new RegExp(`@?${activeBotStr}\\s*`, 'gi'), '').trim() === 'reset')) {
+        const game = GameManager.getActiveGame(chat._id);
+        if (game && typeof game.handleMessage === 'function') {
+           message.content = 'reset';
+           await game.handleMessage(message, chat, io);
+        } else {
+           GameManager.endGame(chat._id);
+           this.sendCustomMessage(chat, io, routingBotId, routingBotStr === 'mars' ? "Fine. I killed the game. Are you happy now?" : "🏳️ **Game forcibly purged from memory.**");
+        }
+        return;
       }
-      settings.activeBot = 'mars';
-      settings.backupBot = 'mica';
-      await settings.save();
-      return this.sendCustomMessage(chat, io, marsId, "Force switch executed. Mars is now active.");
-    }
-    
-    if (cleanCommandText === 'force switch to mica') {
-      if (chat.isGroupChat && !isGroupAdmin) {
-        return this.sendCustomMessage(chat, io, activeBotId, "Only group admins can force switch bots.");
+
+      const handled = await GameManager.routeToActiveGame(message, chat, io);
+      if (handled) return; 
+
+      const activeGame = GameManager.getActiveGame(chat._id);
+      if (activeGame && ['ScrambleGame', 'GuessWordGame', 'RiddlesGame', 'EmojiGuessGame', 'BreachGame', 'SuspectGame'].includes(activeGame.constructor.name)) {
+         return; // suppress chatter during word games
       }
-      settings.activeBot = 'mica';
-      settings.backupBot = 'mars';
-      await settings.save();
-      return this.sendCustomMessage(chat, io, micaId, "Force switch executed. Mica is now active.");
     }
 
-    if (cleanCommandText === 'who is active?') {
-      return this.sendCustomMessage(chat, io, activeBotId, `I am currently the active bot (${activeBotStr === 'mars' ? 'Mars' : 'Mica'}).`);
-    }
+    // From this point on, you MUST mention a bot.
+    if (!activeBotStr) return;
+
+    let cleanCommandText = lowerText.replace(new RegExp(`@?${activeBotStr}\\s*`, 'gi'), '').trim();
 
     // Process aliases
     if (CommandRegistry.isAliasCommand(text)) {
@@ -167,11 +142,15 @@ class BotManager {
             helpText = "**Utility: Remove** 🗑️\nUse `remove <alias_name>` to delete a custom alias from the group.\nUse `remove inactive <days>` (e.g. `remove inactive 30`) to kick members who haven't sent a message in that many days (Admins only).";
             break;
           case 'summarize':
-            helpText = "**Utility: Summarize** 📝\n(Mica Only) Use `summarize <text>` to have Mica automatically provide a concise summary of the given text.";
+            helpText = activeBotStr === 'mars' 
+              ? "**Utility: Summarize** 📝\nUse `summarize <text>` and I'll shorten it for you, since apparently you can't read long messages."
+              : "**Utility: Summarize** 📝\nUse `summarize <text>` to have Mica automatically provide a concise summary of the given text.";
             break;
           case 'calculate':
           case 'calc':
-            helpText = "**Utility: Math** 🧮\n(Mica Only) Send any simple math expression (like `20/2` or `5 * (10 + 2)`) and Mica will automatically calculate the result.";
+            helpText = activeBotStr === 'mars'
+              ? "**Utility: Math** 🧮\nSend a math expression (like `20/2` or `5 * (10 + 2)`). I'll calculate it, even though it's beneath me."
+              : "**Utility: Math** 🧮\nSend any simple math expression (like `20/2` or `5 * (10 + 2)`) and Mica will automatically calculate the result.";
             break;
           case 'score':
           case 'scores':
@@ -192,11 +171,13 @@ class BotManager {
             break;
           case 'games':
             helpText = activeBotStr === 'mars'
-              ? "**🎮 Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n💡 **Tip: Want the rules? Type `help <game>` — e.g. `help mafia`. Don't make me repeat myself.**"
-              : "**🎮 Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n💡 **Tip: For a deep dive or rules, type `help <game>` — e.g. `help riddle`**";
+              ? "**🎮 Mars Operations**\n• breach (Hack a 4-digit PIN)\n• suspect (Solve a crime scene)\n\n💡 **Tip: Don't ask me for rules. Figure it out.**"
+              : "**🎮 Mica's Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n💡 **Tip: For a deep dive or rules, type `help <game>` — e.g. `help riddle`**";
             break;
           case 'ai':
-            helpText = "**🤖 AI & Smart Tools**\n(Mica Only)\n\n• summarize <text>\n• Just type any math expression (e.g. `20/2`)!\n\n💡 **Tip: For more details, type `help <tool>` — e.g. `help summarize`**";
+            helpText = activeBotStr === 'mars'
+              ? "**🤖 AI & Smart Tools**\n\n• summarize <text>\n• Math expressions (e.g. `20/2`)\n\n💡 **Tip: Type `help summarize` if you really need instructions.**"
+              : "**🤖 AI & Smart Tools**\n\n• summarize <text>\n• Just type any math expression (e.g. `20/2`)!\n\n💡 **Tip: For more details, type `help <tool>` — e.g. `help summarize`**";
             break;
           case 'stats':
             helpText = activeBotStr === 'mars'
@@ -214,7 +195,7 @@ class BotManager {
         return this.sendCustomMessage(chat, io, activeBotId, helpText);
       } else {
         const reply = activeBotStr === 'mars' 
-          ? `**🔥 Mars Operations 🔥**\nI'm not your average assistant. Here's what I can do. Pick a category if you dare:\n\n• **games**\n• **stats**\n• **admin**\n\n💡 **Tip: Type \`help <category>\` — like \`help games\`... if you can type that fast.**`
+          ? `**🔥 Mars Operations 🔥**\nI'm not your average assistant. Here's what I can do. Pick a category if you dare:\n\n• **games**\n• **ai**\n• **stats**\n• **admin**\n\n💡 **Tip: Type \`help <category>\` — like \`help games\`... if you can type that fast.**`
           : `**✨ System Intelligence ✨**\nHere are the categories of commands I support:\n\n• **games**\n• **ai**\n• **stats**\n• **admin**\n\n💡 **Tip: To explore a category, type \`help <category>\` — e.g. \`help games\`**`;
         return this.sendCustomMessage(chat, io, activeBotId, reply);
       }
@@ -233,18 +214,24 @@ class BotManager {
     }
 
     // AI Summarize
-    if (cleanCommandText.startsWith('summarize ') && activeBotStr === 'mica') {
+    if (cleanCommandText.startsWith('summarize ')) {
        const textToSummarize = cleanCommandText.replace('summarize ', '').trim();
        if (!textToSummarize) return this.sendCustomMessage(chat, io, activeBotId, "Please provide some text to summarize. (e.g. `summarize This is a long story...`)");
 
        try {
-           const micaGroq = new Groq({ apiKey: process.env.MICA_GROQ_API_KEY });
-           const completion = await micaGroq.chat.completions.create({
+           const apiKey = activeBotStr === 'mars' ? process.env.MARS_GROQ_API_KEY : process.env.MICA_GROQ_API_KEY;
+           const model = activeBotStr === 'mars' ? 'qwen3.6-27b' : 'gpt-oss-120b';
+           const systemPrompt = activeBotStr === 'mars'
+             ? 'You are Mars, a sarcastic, slightly arrogant assistant. Summarize the text provided by the user, but add a slightly mocking tone about how long-winded they are. Keep it short.'
+             : 'You are Mica, a smart, concise AI assistant. Provide a brief summary of the text provided by the user. Keep it short and to the point.';
+             
+           const botGroq = new Groq({ apiKey });
+           const completion = await botGroq.chat.completions.create({
                messages: [
-                 { role: 'system', content: 'You are Mica, a smart, concise AI assistant. Provide a brief summary of the text provided by the user. Keep it short and to the point.' },
+                 { role: 'system', content: systemPrompt },
                  { role: 'user', content: textToSummarize }
                ],
-               model: 'gpt-oss-120b',
+               model: model,
            });
            const summary = completion.choices[0]?.message?.content || "Sorry, I couldn't summarize that.";
            return this.sendCustomMessage(chat, io, activeBotId, `📝 **Summary:**\n${summary}`);
@@ -255,13 +242,16 @@ class BotManager {
     }
 
     // Math calculation (implicit or explicit)
-    if (activeBotStr === 'mica' && /^[0-9+\-*/().\s]+$/.test(cleanCommandText)) {
+    if (/^[0-9+\-*/().\s]+$/.test(cleanCommandText)) {
        try {
            const mathExpr = cleanCommandText.replace(/\s+/g, '');
            if (/[+\-*/]/.test(mathExpr) && /[0-9]/.test(mathExpr)) {
                const result = math.evaluate(mathExpr);
                if (typeof result === 'number' && isFinite(result)) {
                    let formattedResult = Number.isInteger(result) ? result.toFixed(1) : parseFloat(result.toFixed(4)).toString();
+                   if (activeBotStr === 'mars') {
+                     return this.sendCustomMessage(chat, io, activeBotId, `${formattedResult}. You couldn't do that yourself?`);
+                   }
                    return this.sendCustomMessage(chat, io, activeBotId, `${formattedResult}`);
                }
            }
@@ -412,34 +402,29 @@ class BotManager {
         'werewolf': '../games/modes/Mafia'
       };
 
+      const marsGameEngineMap = {
+        'breach': '../games/modes/Breach',
+        'suspect': '../games/modes/Suspect'
+      };
+
       if (gameEngineMap[lowerCmd]) {
+        if (activeBotStr === 'mars') {
+           return this.sendCustomMessage(chat, io, activeBotId, "I don't play those silly games. Ask Mica.");
+        }
         const GameClass = require(gameEngineMap[lowerCmd]);
+        return GameClass.start(chat, message.sender, io, activeBotId);
+      }
+
+      if (marsGameEngineMap[lowerCmd]) {
+        if (activeBotStr === 'mica') {
+           return this.sendCustomMessage(chat, io, activeBotId, "I don't know how to run that operation! Ask Mars! ✨");
+        }
+        const GameClass = require(marsGameEngineMap[lowerCmd]);
         return GameClass.start(chat, message.sender, io, activeBotId);
       }
     }
 
-    // GAME ROUTING
-    if (GameManager.hasActiveGame(chat._id)) {
-      if (resolvedCommand === 'reset') {
-        const game = GameManager.getActiveGame(chat._id);
-        if (game && typeof game.handleMessage === 'function') {
-           message.content = 'reset';
-           await game.handleMessage(message, chat, io);
-        } else {
-           GameManager.endGame(chat._id);
-           this.sendCustomMessage(chat, io, activeBotId, activeBotStr === 'mars' ? "Fine. I killed the game. Are you happy now?" : "🏳️ **Game forcibly purged from memory.**");
-        }
-        return;
-      }
 
-      const handled = await GameManager.routeToActiveGame(message, chat, io);
-      if (handled) return; 
-
-      const activeGame = GameManager.getActiveGame(chat._id);
-      if (activeGame && ['ScrambleGame', 'GuessWordGame', 'RiddlesGame', 'EmojiGuessGame'].includes(activeGame.constructor.name)) {
-         return; // suppress chatter during word games
-      }
-    }
 
     // AI CHAT
     const isBotInGroup = chat.users?.some(u => {
@@ -449,7 +434,7 @@ class BotManager {
     
     if (!isBotInGroup) return;
 
-    const isMentioned = cleanCommandText.includes(activeBotStr);
+    const isMentioned = text.toLowerCase().includes(activeBotStr);
     const isMicaGreeting = /\b(hi|hello|hey|sup)\b/.test(cleanCommandText) && isMentioned;
     const isChaotic = message.content && message.content === message.content.toUpperCase() && message.content.length > 10;
     const shouldRandomlyRoast = Math.random() < 0.05 && isChaotic && activeBotStr === 'mars'; 
