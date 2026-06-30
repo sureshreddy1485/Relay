@@ -244,7 +244,7 @@ class BotManager {
                  { role: 'system', content: 'You are Mica, a smart, concise AI assistant. Provide a brief summary of the text provided by the user. Keep it short and to the point.' },
                  { role: 'user', content: textToSummarize }
                ],
-               model: 'llama3-8b-8192',
+               model: 'gpt-oss-120b',
            });
            const summary = completion.choices[0]?.message?.content || "Sorry, I couldn't summarize that.";
            return this.sendCustomMessage(chat, io, activeBotId, `📝 **Summary:**\n${summary}`);
@@ -644,7 +644,7 @@ class BotManager {
           { role: "system", content: systemPrompt },
           { role: "user", content: `${senderName} says: ${cleanContent}` }
         ],
-        model: "llama-3.1-8b-instant",
+        model: botStr === 'mars' ? 'qwen3.6-27b' : 'gpt-oss-120b',
         temperature: 0.8,
         max_tokens: 150,
       });
@@ -652,10 +652,7 @@ class BotManager {
       replyContent = chatCompletion.choices[0]?.message?.content || "I have no words.";
     } catch (err) {
         console.error(`Groq AI error (${botStr}):`, err);
-        if (botStr === 'mars') {
-          const genericReplies = ["Interesting...", "That seems suspicious.", "Bold move."];
-          replyContent = genericReplies[Math.floor(Math.random() * genericReplies.length)];
-        }
+        replyContent = "I'm having a bit of a technical hiccup. Ask me again in a moment?";
     }
 
     await this.sendCustomMessage(chat, io, botId, replyContent);

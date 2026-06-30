@@ -189,12 +189,16 @@ const createGroupChat = asyncHandler(async (req, res) => {
     throw new Error('Group name is required');
   }
 
-  const { getMicaBotId } = require('../utils/botHelper');
+  const { getMicaBotId, getMarsBotId } = require('../utils/botHelper');
   const micaBotId = getMicaBotId();
+  const marsBotId = getMarsBotId();
   
   const allUsers = [...new Set([...parsedUsers, req.user._id.toString()])];
   if (micaBotId && !allUsers.includes(micaBotId.toString())) {
     allUsers.push(micaBotId.toString());
+  }
+  if (marsBotId && !allUsers.includes(marsBotId.toString())) {
+    allUsers.push(marsBotId.toString());
   }
 
   if (allUsers.length > 51) {

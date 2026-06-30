@@ -169,10 +169,12 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
     return res.status(200).json({ success: true, message: 'Friend request auto-accepted!' });
   }
 
+  if (!targetUser.friendRequests) targetUser.friendRequests = [];
   targetUser.friendRequests.push(req.user._id);
   await targetUser.save();
 
   const sender = await User.findById(req.user._id);
+  if (!sender.sentRequests) sender.sentRequests = [];
   sender.sentRequests.push(targetUser._id);
   await sender.save();
 
@@ -203,6 +205,23 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
     }
   }
 
+  const admin = require('firebase-admin');
+  if (admin.apps.length > 0 && targetUser.fcmToken) {
+    try {
+      await admin.messaging().send({
+        token: targetUser.fcmToken,
+        data: {
+          type: 'friend_request',
+          title: 'New Friend Request',
+          body: `${sender.displayName || sender.username} sent you a friend request`,
+        },
+        android: { priority: 'high', ttl: 86400 * 1000 }
+      });
+    } catch (err) {
+      console.error('FCM push error:', err);
+    }
+  }
+
   res.status(200).json({ success: true, message: 'Friend request sent' });
 });
 
@@ -218,13 +237,19 @@ const acceptFriendRequest = asyncHandler(async (req, res) => {
     res.status(400); throw new Error('No pending request from this user');
   }
 
+  if (!user.friendRequests) user.friendRequests = [];
   user.friendRequests = user.friendRequests.filter(id => id.toString() !== requester._id.toString());
+  
+  if (!user.friends) user.friends = [];
   if (!user.friends.includes(requester._id)) {
     user.friends.push(requester._id);
   }
   await user.save();
 
+  if (!requester.sentRequests) requester.sentRequests = [];
   requester.sentRequests = requester.sentRequests.filter(id => id.toString() !== user._id.toString());
+  
+  if (!requester.friends) requester.friends = [];
   if (!requester.friends.includes(user._id)) {
     requester.friends.push(user._id);
   }
@@ -264,6 +289,39 @@ const acceptFriendRequest = asyncHandler(async (req, res) => {
       },
       chat: fullChat,
     });
+  }
+
+  // Send push notification for friend request accepted
+  if (requester.pushToken && Expo.isExpoPushToken(requester.pushToken)) {
+    try {
+      await expo.sendPushNotificationsAsync([{
+        to: requester.pushToken,
+        channelId: 'relay-messages-v4',
+        sound: 'relay_notification_sound.mp3',
+        title: 'Friend Request Accepted',
+        body: `${user.displayName || user.username} accepted your friend request`,
+        data: { type: 'friend_request_accepted' }
+      }]);
+    } catch (err) {
+      console.error('Push error:', err);
+    }
+  }
+
+  const admin = require('firebase-admin');
+  if (admin.apps.length > 0 && requester.fcmToken) {
+    try {
+      await admin.messaging().send({
+        token: requester.fcmToken,
+        data: {
+          type: 'friend_request_accepted',
+          title: 'Friend Request Accepted',
+          body: `${user.displayName || user.username} accepted your friend request`,
+        },
+        android: { priority: 'high', ttl: 86400 * 1000 }
+      });
+    } catch (err) {
+      console.error('FCM push error:', err);
+    }
   }
 
   res.status(200).json({ success: true, message: 'Friend request accepted', chat: fullChat });

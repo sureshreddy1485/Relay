@@ -59,47 +59,21 @@ function CamDot() {
 
 // Bouncing dots typing indicator bubble
 function TypingBubble({ username }) {
-  const dot1 = useRef(new Animated.Value(0)).current;
-  const dot2 = useRef(new Animated.Value(0)).current;
-  const dot3 = useRef(new Animated.Value(0)).current;
+  const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    let active = true;
-    const animate = () => {
-      if (!active) return;
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(dot1, { toValue: -5, duration: 250, useNativeDriver: false }),
-          Animated.sequence([
-            Animated.delay(120),
-            Animated.timing(dot2, { toValue: -5, duration: 250, useNativeDriver: false }),
-          ]),
-          Animated.sequence([
-            Animated.delay(240),
-            Animated.timing(dot3, { toValue: -5, duration: 250, useNativeDriver: false }),
-          ]),
-        ]),
-        Animated.parallel([
-          Animated.timing(dot1, { toValue: 0, duration: 250, useNativeDriver: false }),
-          Animated.sequence([
-            Animated.delay(120),
-            Animated.timing(dot2, { toValue: 0, duration: 250, useNativeDriver: false }),
-          ]),
-          Animated.sequence([
-            Animated.delay(240),
-            Animated.timing(dot3, { toValue: 0, duration: 250, useNativeDriver: false }),
-          ]),
-        ]),
-        Animated.delay(150),
-      ]).start(() => {
-        if (active) animate();
-      });
-    };
-    animate();
-    return () => {
-      active = false;
-    };
-  }, []);
+    Animated.loop(
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [anim]);
+
+  const dot1 = anim.interpolate({ inputRange: [0, 0.2, 0.4, 1], outputRange: [0, -5, 0, 0] });
+  const dot2 = anim.interpolate({ inputRange: [0.2, 0.4, 0.6, 1], outputRange: [0, -5, 0, 0] });
+  const dot3 = anim.interpolate({ inputRange: [0.4, 0.6, 0.8, 1], outputRange: [0, -5, 0, 0] });
 
   return (
     <View style={styles.typingContainer}>
@@ -164,6 +138,8 @@ export default function ChatRoomScreen({ route, navigation }) {
   const [forwardSelectedChats, setForwardSelectedChats] = useState(new Set());
   const flatRef      = useRef(null);
   const typingTimeout = useRef(null);
+  const lastTypingEmit = useRef(0);
+  const isSendingRef = useRef(false);
 
   const toggleSelectMessage = (id) => {
     setSelectedMessages(prev => {
@@ -458,7 +434,13 @@ export default function ChatRoomScreen({ route, navigation }) {
   const handleTyping = (val) => {
     setText(val);
     useChatStore.getState().setDraft(chat._id, val);
-    sendTyping(chat._id, user?._id, user?.username);
+    
+    const now = Date.now();
+    if (now - lastTypingEmit.current > 1000) {
+      sendTyping(chat._id, user?._id, user?.username);
+      lastTypingEmit.current = now;
+    }
+    
     clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(() => stopTyping(chat._id, user?._id), 1500);
   };
@@ -480,8 +462,11 @@ export default function ChatRoomScreen({ route, navigation }) {
   };
 
   const sendMessage = async (mediaFile = null, pollData = null) => {
+    if (isSendingRef.current) return;
     const content = text.trim();
     if (!content && !mediaFile && !pollData) return;
+    
+    isSendingRef.current = true;
     setIsSending(true);
     setText('');
     useChatStore.getState().setDraft(chat._id, '');
@@ -571,6 +556,7 @@ export default function ChatRoomScreen({ route, navigation }) {
       useChatStore.getState().removeOptimisticMessage(chat._id, tempId);
       showAlert('Error', e.message || 'Failed to send');
     } finally {
+      isSendingRef.current = false;
       setIsSending(false);
     }
   };
