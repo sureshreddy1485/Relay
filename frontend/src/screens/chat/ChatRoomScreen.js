@@ -120,6 +120,16 @@ export default function ChatRoomScreen({ route, navigation }) {
   const clearUnread = useChatStore(s => s.clearUnread);
   const insets = useSafeAreaInsets();
 
+  const [kbHeight, setKbHeight] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const showSub = Keyboard.addListener('keyboardDidShow', (e) => setKbHeight(e.endCoordinates.height));
+      const hideSub = Keyboard.addListener('keyboardDidHide', () => setKbHeight(0));
+      return () => { showSub.remove(); hideSub.remove(); };
+    }
+  }, []);
+
   const [text, setText]               = useState('');
   const [replyTo, setReplyTo]         = useState(null);
   const [isSending, setIsSending]     = useState(false);
@@ -1064,9 +1074,10 @@ export default function ChatRoomScreen({ route, navigation }) {
       {/* ── Messages + input ──────────────────────────────────────────────── */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 90}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
+        <View style={{ flex: 1, paddingBottom: Platform.OS === 'android' ? kbHeight : 0 }}>
         <FlatList
           ref={flatRef}
           data={displayMessages}
@@ -1384,6 +1395,7 @@ export default function ChatRoomScreen({ route, navigation }) {
             />
           </View>
         )}
+        </View>
       </KeyboardAvoidingView>
 
       {/* User info bottom sheet */}

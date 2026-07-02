@@ -282,7 +282,7 @@ export default function App() {
                     try {
                       await Updates.reloadAsync();
                     } catch (e) {}
-                  }, 500);
+                  }, 1500);
                 }}
                 style={{ backgroundColor: Colors.primary || '#06B6D4', paddingVertical: 16, borderRadius: 16, alignItems: 'center', shadowColor: Colors.primary || '#06B6D4', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
               >
