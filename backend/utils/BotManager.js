@@ -89,12 +89,20 @@ class BotManager {
 
     // Process aliases
     if (CommandRegistry.isAliasCommand(text)) {
-      const [cmdPart, aliasPart] = text.split(/==?/).map(s => s.trim().toLowerCase());
+      const [part1, part2] = text.split(/==?/).map(s => s.trim().toLowerCase());
+      let cmdPart = part1, aliasPart = part2;
+      
+      if (!CommandRegistry.isValidGameCommand(cmdPart) && CommandRegistry.isValidGameCommand(part2)) {
+        cmdPart = part2;
+        aliasPart = part1;
+      }
+
       if (CommandRegistry.isValidGameCommand(cmdPart) && aliasPart) {
-        if (!activeBotStr) return; // Only process alias creation if targeted
         await AliasManager.setAlias(chat._id, aliasPart, cmdPart);
-        const reply = activeBotStr === 'mars' ? `Interesting choice. '${aliasPart}' now triggers '${cmdPart}'.` : `Done! '${aliasPart}' will now trigger '${cmdPart}'.`;
-        return this.sendCustomMessage(chat, io, activeBotId, reply);
+        const reply = (activeBotStr === 'mars') 
+          ? `Interesting choice. '${aliasPart}' now triggers '${cmdPart}'.` 
+          : `Done! '${aliasPart}' will now trigger '${cmdPart}'.`;
+        return this.sendCustomMessage(chat, io, routingBotId, reply);
       }
     }
 

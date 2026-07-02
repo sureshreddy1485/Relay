@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, Image, StatusBar, Alert,
-  ActivityIndicator, Pressable, Animated, ScrollView, Modal, LayoutAnimation, Keyboard,
+  ActivityIndicator, Pressable, Animated, ScrollView, Modal, LayoutAnimation, Keyboard, BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -140,6 +140,19 @@ export default function ChatRoomScreen({ route, navigation }) {
   const typingTimeout = useRef(null);
   const lastTypingEmit = useRef(0);
   const isSendingRef = useRef(false);
+
+  useEffect(() => {
+    const backAction = () => {
+      if (showEmoji) {
+        setShowEmoji(false);
+        setTimeout(() => inputRef.current?.focus(), 100);
+        return true;
+      }
+      return false;
+    };
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    return () => backHandler.remove();
+  }, [showEmoji]);
 
   const toggleSelectMessage = (id) => {
     setSelectedMessages(prev => {
@@ -1051,8 +1064,8 @@ export default function ChatRoomScreen({ route, navigation }) {
       {/* ── Messages + input ──────────────────────────────────────────────── */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 90}
       >
         <FlatList
           ref={flatRef}
@@ -1340,6 +1353,12 @@ export default function ChatRoomScreen({ route, navigation }) {
         {/* Inline Emoji Keyboard (replaces system keyboard without covering input) */}
         {!isRelayBotChat && showEmoji && (
           <View style={{ height: 320, backgroundColor: '#1A1A24' }}>
+            <View style={styles.emojiHeader}>
+              <TouchableOpacity onPress={() => { setShowEmoji(false); setTimeout(() => inputRef.current?.focus(), 100); }} style={{ padding: 5 }}>
+                <Ionicons name="arrow-back" size={24} color={Colors.primary} />
+              </TouchableOpacity>
+              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold', marginLeft: 15 }}>Emojis</Text>
+            </View>
             <EmojiKeyboard 
               onEmojiSelected={(emoji) => {
                 setText(prev => prev + emoji.emoji);
@@ -1760,6 +1779,15 @@ const styles = StyleSheet.create({
   attachLabel: { fontSize: 12, color: Colors.dark.textSecondary, fontWeight: '600' },
 
   // ── Input bar ─────────────────────────────────────────────────────────────
+  emojiHeader: {
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 16, 
+    paddingTop: 10, 
+    paddingBottom: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
   inputBar: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingHorizontal: 12, paddingTop: 10,

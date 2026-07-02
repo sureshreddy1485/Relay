@@ -73,7 +73,12 @@ class SuspectGame {
     clues.sort(() => 0.5 - Math.random());
     clues.unshift(firstClue);
 
-    return { suspects, clues, culprit };
+    const explanation = `Here is what actually happened: **${culprit.name}** used ${weapon} at ${location}. ` +
+                        `We knew it wasn't ${innocent1.name} because they had an alibi. ` +
+                        `And ${innocent2.name} couldn't have done it either due to lack of means. ` +
+                        `The final proof was found linking ${culprit.name} directly to the scene!`;
+
+    return { suspects, clues, culprit, explanation };
   }
 
   async start(chat, sender, io, botId) {
@@ -86,6 +91,7 @@ class SuspectGame {
       suspects: caseData.suspects,
       clues: caseData.clues,
       culprit: caseData.culprit,
+      explanation: caseData.explanation,
       currentClueIndex: 0,
       startedAt: Date.now(),
       botId: botId
@@ -136,7 +142,7 @@ class SuspectGame {
       GameManager.endGame(groupId);
       this.sessions.delete(groupId);
       GameSession.findOneAndUpdate({ groupId: chat._id, status: 'active' }, { status: 'finished' }).catch(console.error);
-      await this.sendBotMessage(chat, io, state.botId, `🏳️ Case closed unsolved. The killer was **${state.culprit.name} (${state.culprit.role})**. Pathetic.`);
+      await this.sendBotMessage(chat, io, state.botId, `🏳️ Case closed unsolved. The killer was **${state.culprit.name} (${state.culprit.role})**.\n\n${state.explanation}`);
       return true;
     }
 
@@ -158,7 +164,7 @@ class SuspectGame {
       
       const newScore = await GameManager.incrementScore(groupId, message.sender._id || message.sender, 5);
 
-      await this.sendBotMessage(chat, io, state.botId, `🚨 **CASE SOLVED!**\n\n${winnerName} correctly identified the killer: **${state.culprit.name} (${state.culprit.role})**!\n\nScore: ${newScore} pts. You might actually be useful.`);
+      await this.sendBotMessage(chat, io, state.botId, `🚨 **CASE SOLVED!**\n\n${winnerName} correctly identified the killer: **${state.culprit.name} (${state.culprit.role})**!\n\n${state.explanation}\n\nScore: ${newScore} pts. Nice detective work.`);
       return true;
     } else if (isInnocent) {
       // Wrong guess
@@ -169,7 +175,7 @@ class SuspectGame {
       
       GameSession.findOneAndUpdate({ groupId: chat._id, status: 'active' }, { status: 'finished' }).catch(console.error);
       
-      await this.sendBotMessage(chat, io, state.botId, `❌ **WRONG SUSPECT!**\n\nYou arrested an innocent person. The real killer was **${state.culprit.name} (${state.culprit.role})**. Don't quit your day job.`);
+      await this.sendBotMessage(chat, io, state.botId, `❌ **WRONG SUSPECT!**\n\nYou arrested an innocent person. The real killer was **${state.culprit.name} (${state.culprit.role})**.\n\n${state.explanation}`);
       return true;
     }
 

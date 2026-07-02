@@ -20,8 +20,7 @@ class AssassinationGame {
       gameType: 'assassination',
       status: 'lobby',
       players: new Map(), // userId -> { name, targetId, triggerWord, isAlive }
-      startedAt: Date.now()
-    };
+      startedAt: Date.now(), botId: botId || await require('../../utils/BotManager').getActiveBotId(chat._id) };
 
     // Add the person who started it
     gameState.players.set(sender._id.toString(), {
@@ -114,10 +113,7 @@ class AssassinationGame {
                 attacker.triggerWord = ASSASSINATION_TRIGGERS[Math.floor(Math.random() * ASSASSINATION_TRIGGERS.length)];
                 
                 // Send Private DM via Socket
-                io.to(attacker.userId).emit('private_mission_assigned', {
-                  title: 'NEW TARGET ACQUIRED',
-                  body: `Your new target is ${newTarget.name}. Trick them into saying "${attacker.triggerWord}".`
-                });
+                await this.sendPrivateDM(attacker.userId, io, state.botId, `🎯 **NEW TARGET ACQUIRED**\nYour new target is ${newTarget.name}. Trick them into saying "${attacker.triggerWord}".`);
               }
             }
             return true;
@@ -156,10 +152,7 @@ class AssassinationGame {
       currentPlayer.triggerWord = trigger;
 
       // SEND PRIVATE SOCKET.IO EMIT TO THIS USER
-      io.to(currentPlayer.userId).emit('private_mission_assigned', {
-        title: 'MISSION BRIEFING',
-        body: `Your target is ${targetPlayer.name}. Trick them into typing the exact word "${trigger}" in the group chat without blowing your cover.`
-      });
+      await this.sendPrivateDM(currentPlayer.userId, io, state.botId, `🎯 **MISSION BRIEFING**\nYour target is ${targetPlayer.name}. Trick them into typing the exact word "${trigger}" in the group chat without blowing your cover.`);
     }
 
     await this.sendBotMessage(chat, io, `🎯 **THE ASSASSINATION RING IS ACTIVE!**\n\nThere are ${playersArray.length} killers among you. Check your app for your private target and secret trigger word. Trust no one.`);
