@@ -12,28 +12,41 @@ class SuspectGame {
   }
 
   generateCase() {
-    const { generate } = require('random-words');
-
-    // Generate random capitalized names
-    const genName = () => {
-      const w = generate({ minLength: 4, maxLength: 8 });
-      return w.charAt(0).toUpperCase() + w.slice(1);
-    };
-    
-    // Generate random roles (e.g., "The Writer")
-    const genRole = () => {
-      const w = generate({ minLength: 4, maxLength: 9 });
-      return "The " + w.charAt(0).toUpperCase() + w.slice(1);
-    };
-
-    const suspects = [
-      { id: 1, name: genName(), role: genRole() },
-      { id: 2, name: genName(), role: genRole() },
-      { id: 3, name: genName(), role: genRole() }
+    const NAMES = [
+      "Victor", "Gloria", "Desmond", "Elara", "Titus", "Sylvia", "Ronan", "Cassidy", "Malik", "Lena", 
+      "Axel", "Fiona", "Jasper", "Chloe", "Dominic", "Serena", "Marcus", "Isla", "Julian", "Hazel",
+      "Arthur", "Vivian", "Silas", "Cora", "Elias", "Stella", "Felix", "Ruby", "Oliver", "Penelope"
+    ];
+    const ROLES = [
+      "The Butler", "The Business Partner", "The Ex-Spouse", "The Bitter Rival", "The Personal Assistant", 
+      "The Nosy Neighbor", "The Bodyguard", "The Secret Heir", "The Investigative Journalist", 
+      "The Hacker", "The Private Chef", "The Chauffeur", "The Lawyer", "The Doctor", "The Accountant",
+      "The Gardener", "The Sibling", "The Investor", "The Art Dealer", "The Politician"
+    ];
+    const WEAPONS = [
+      "a poisoned glass of wine", "a heavy steel wrench", "a sharp kitchen knife", "a rare venomous snake", 
+      "a hacked pacemaker", "an antique cavalry sword", "a rigged chandelier", "a faulty elevator cable", 
+      "a cut brake line", "a silenced pistol", "a golf club", "a dose of lethal medication", 
+      "a heavy brass candlestick", "a poisonous dart", "a strangling wire", "an explosive package"
+    ];
+    const LOCATIONS = [
+      "the penthouse suite", "the abandoned warehouse", "the moving luxury train", "the private yacht", 
+      "the VIP casino lounge", "the botanical greenhouse", "the rooftop garden", "the secret basement", 
+      "the underground parking garage", "the remote cabin", "the locked study room", "the crowded ballroom",
+      "the tech startup office", "the art gallery", "the hospital wing", "the private jet"
     ];
 
-    const weapon = "a " + generate();
-    const location = "the " + generate();
+    const shuffledNames = [...NAMES].sort(() => 0.5 - Math.random());
+    const shuffledRoles = [...ROLES].sort(() => 0.5 - Math.random());
+    
+    const suspects = [
+      { id: 1, name: shuffledNames[0], role: shuffledRoles[0] },
+      { id: 2, name: shuffledNames[1], role: shuffledRoles[1] },
+      { id: 3, name: shuffledNames[2], role: shuffledRoles[2] }
+    ];
+
+    const weapon = WEAPONS[Math.floor(Math.random() * WEAPONS.length)];
+    const location = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
 
     const culpritIndex = Math.floor(Math.random() * 3);
     const culprit = suspects[culpritIndex];
@@ -42,58 +55,58 @@ class SuspectGame {
 
     const clues = [];
 
-    clues.push(`The victim was found in ${location}, killed by ${weapon}.`);
+    clues.push(`The victim was found dead in ${location}, killed by ${weapon}.`);
 
     const alibiIndex = Math.floor(Math.random() * 3);
     const alibiTypes = [
-      `Cameras show ${innocent1.name} (${innocent1.role}) was far away at the time.`,
-      `Lots of people saw ${innocent1.name} (${innocent1.role}) streaming live on video when it happened.`,
-      `The victim's smart watch recorded the exact time of death, and ${innocent1.name} (${innocent1.role}) was on a flight then.`
+      `Security cameras show ${innocent1.name} (${innocent1.role}) was miles away at the time.`,
+      `Several witnesses saw ${innocent1.name} (${innocent1.role}) streaming live on video when it happened.`,
+      `The victim's smart watch recorded the exact time of death, and ${innocent1.name} (${innocent1.role}) was on a flight at that exact moment.`
     ];
     clues.push(alibiTypes[alibiIndex]);
     const innocent1Reason = [
       "were seen on camera far away",
-      "were live streaming at the time",
-      "were on a flight when it happened"
+      "were broadcasting a live video at the time",
+      "were on a flight when the victim died"
     ][alibiIndex];
 
     const redHerringIndex = Math.floor(Math.random() * 3);
     const redHerring = [
-      `${innocent2.name} (${innocent2.role}) hated the victim, but was not strong enough to use ${weapon}.`,
-      `A mean letter from ${innocent2.name} (${innocent2.role}) was found, but they are terrified of blood.`,
-      `${innocent2.name} (${innocent2.role}) owes the victim money, but their footprints were definitely not at ${location}.`
+      `${innocent2.name} (${innocent2.role}) hated the victim, but clearly did not have the physical strength to use ${weapon}.`,
+      `An angry letter from ${innocent2.name} (${innocent2.role}) was found, but they are terrified of blood.`,
+      `${innocent2.name} (${innocent2.role}) owed the victim a lot of money, but their footprints were absolutely nowhere near ${location}.`
     ];
     clues.push(redHerring[redHerringIndex]);
     const innocent2Reason = [
-      "were not strong enough",
-      "are terrified of blood",
-      "never left any footprints at the scene"
+      "were not strong enough to commit the act",
+      "are terrified of blood and violence",
+      "never left any evidence or footprints at the scene"
     ][redHerringIndex];
 
     const culpritClueIndex = Math.floor(Math.random() * 3);
     const culpritClue = [
-      `A receipt for the exact same ${weapon} was found in the trash of ${culprit.name} (${culprit.role}).`,
-      `A piece of clothing matching what ${culprit.name} (${culprit.role}) wears was caught on a door at ${location}.`,
-      `Bank records show ${culprit.name} (${culprit.role}) just got a huge payout from this death.`
+      `A receipt matching the purchase of ${weapon} was found in the trash of ${culprit.name} (${culprit.role}).`,
+      `A piece of clothing identical to what ${culprit.name} (${culprit.role}) wears was caught on a door at ${location}.`,
+      `Bank records show ${culprit.name} (${culprit.role}) just received a massive financial payout directly tied to this death.`
     ];
     clues.push(culpritClue[culpritClueIndex]);
     const culpritReason1 = [
       `they bought the ${weapon}`,
-      "their clothing was left at the scene",
-      "they were paid for the hit"
+      "their ripped clothing was left at the scene",
+      "they were paid a huge sum for the victim's death"
     ][culpritClueIndex];
 
     const finalClueIndex = Math.floor(Math.random() * 3);
     const finalClue = [
-      `When asked, ${culprit.name} (${culprit.role}) lied about knowing where ${location} was.`,
-      `The victim's last text message read: "I'm meeting with ${culprit.role} now."`,
-      `Only ${culprit.name} (${culprit.role}) had the keys to get into ${location}.`
+      `When asked, ${culprit.name} (${culprit.role}) lied about knowing exactly where ${location} was.`,
+      `The victim's final text message read: "I'm meeting with ${culprit.role} right now."`,
+      `Only ${culprit.name} (${culprit.role}) had the secure access keys needed to enter ${location}.`
     ];
     clues.push(finalClue[finalClueIndex]);
     const culpritReason2 = [
-      "lied about the location",
+      "lied about knowing the location",
       "were the last person to meet the victim",
-      "were the only one with keys"
+      "were the only one with the keys to get inside"
     ][finalClueIndex];
 
     const firstClue = clues.shift();
