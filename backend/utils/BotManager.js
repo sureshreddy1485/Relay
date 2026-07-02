@@ -787,7 +787,7 @@ class BotManager {
                   }),
                   chat: JSON.stringify({ isGroupChat: chat.isGroupChat, chatName: chat.chatName }),
                   title: chat.isGroupChat ? (chat.chatName || 'Group Chat') : (message.sender.displayName || message.sender.username),
-                  body: content.replace(/[*_~`]/g, ''),
+                  body: `[${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }).toUpperCase()}] ${content.replace(/[*_~`]/g, '')}`,
                   imageUrl: message.mediaUrl || '',
                 },
                 android: {

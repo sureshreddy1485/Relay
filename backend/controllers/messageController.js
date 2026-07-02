@@ -188,6 +188,11 @@ const sendMessage = asyncHandler(async (req, res) => {
           let pushBody = content || `Sent a ${messageType}`;
           if (isEncrypted) pushBody = '🔒 Encrypted Message';
           pushBody = pushBody.replace(/[*_~`]/g, '');
+          
+          const timeOpts = { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' };
+          const timeStr = new Date().toLocaleTimeString('en-IN', timeOpts).toUpperCase();
+          pushBody = `[${timeStr}] ${pushBody}`;
+          
           const title = chat.isGroupChat ? chat.chatName : (req.user.displayName || req.user.username);
           
           let pushSent = false;
