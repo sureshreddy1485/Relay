@@ -12,29 +12,7 @@ class SuspectGame {
   }
 
   generateCase() {
-    const NAMES = [
-      "Victor", "Gloria", "Desmond", "Elara", "Titus", "Sylvia", "Ronan", "Cassidy", "Malik", "Lena", 
-      "Axel", "Fiona", "Jasper", "Chloe", "Dominic", "Serena", "Marcus", "Isla", "Julian", "Hazel",
-      "Arthur", "Vivian", "Silas", "Cora", "Elias", "Stella", "Felix", "Ruby", "Oliver", "Penelope"
-    ];
-    const ROLES = [
-      "The Butler", "The Business Partner", "The Ex-Spouse", "The Bitter Rival", "The Personal Assistant", 
-      "The Nosy Neighbor", "The Bodyguard", "The Secret Heir", "The Investigative Journalist", 
-      "The Hacker", "The Private Chef", "The Chauffeur", "The Lawyer", "The Doctor", "The Accountant",
-      "The Gardener", "The Sibling", "The Investor", "The Art Dealer", "The Politician"
-    ];
-    const WEAPONS = [
-      "a poisoned glass of wine", "a heavy steel wrench", "a sharp kitchen knife", "a rare venomous snake", 
-      "a hacked pacemaker", "an antique cavalry sword", "a rigged chandelier", "a faulty elevator cable", 
-      "a cut brake line", "a silenced pistol", "a golf club", "a dose of lethal medication", 
-      "a heavy brass candlestick", "a poisonous dart", "a strangling wire", "an explosive package"
-    ];
-    const LOCATIONS = [
-      "the penthouse suite", "the abandoned warehouse", "the moving luxury train", "the private yacht", 
-      "the VIP casino lounge", "the botanical greenhouse", "the rooftop garden", "the secret basement", 
-      "the underground parking garage", "the remote cabin", "the locked study room", "the crowded ballroom",
-      "the tech startup office", "the art gallery", "the hospital wing", "the private jet"
-    ];
+    const { NAMES, ROLES, WEAPONS, LOCATIONS } = require('./SuspectData');
 
     const shuffledNames = [...NAMES].sort(() => 0.5 - Math.random());
     const shuffledRoles = [...ROLES].sort(() => 0.5 - Math.random());
