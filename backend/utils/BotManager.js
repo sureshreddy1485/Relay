@@ -105,6 +105,9 @@ class BotManager {
     }
 
     const isStandaloneHelp = resolvedCommand === 'help' || resolvedCommand.startsWith('help ');
+    const isGameCommand = CommandRegistry.isValidGameCommand(resolvedCommand);
+    const standaloneCommands = ['score', 'scores', 'activity', 'leaderboard', 'aliases', 'reset', 'swap', 'switch'];
+    const isStandaloneUtility = standaloneCommands.includes(resolvedCommand);
     
     let effectiveBotStr = activeBotStr;
     let effectiveBotId = activeBotId;
@@ -113,10 +116,21 @@ class BotManager {
       if (isStandaloneHelp) {
         effectiveBotStr = 'mica';
         effectiveBotId = micaId;
+      } else if (isGameCommand || isStandaloneUtility) {
+        if (['breach', 'suspect'].includes(resolvedCommand)) {
+           effectiveBotStr = 'mars';
+           effectiveBotId = marsId;
+        } else {
+           effectiveBotStr = 'mica';
+           effectiveBotId = micaId;
+        }
       } else {
         return; 
       }
     }
+
+    activeBotStr = effectiveBotStr;
+    activeBotId = effectiveBotId;
 
     if (resolvedCommand === 'help' || resolvedCommand.startsWith('help ')) {
       const helpTarget = resolvedCommand.replace('help', '').trim().toLowerCase();

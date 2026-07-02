@@ -192,14 +192,9 @@ export default function TabNavigator() {
         component={SettingsScreen}
         listeners={{
           tabPress: (e) => {
-            e.preventDefault();
             const now = Date.now();
             if (now - lastSettingsPressRef.current < 400) {
               // Double tap detected
-              if (settingsTapTimeoutRef.current) {
-                clearTimeout(settingsTapTimeoutRef.current);
-                settingsTapTimeoutRef.current = null;
-              }
               const { user: currentUser, savedAccounts, switchAccount } = useAuthStore.getState();
               if (currentUser && Array.isArray(savedAccounts)) {
                 const validAccounts = savedAccounts.filter(a => a?.user?._id);
@@ -209,10 +204,6 @@ export default function TabNavigator() {
                   navigation.navigate('Chats');
                 }
               }
-            } else {
-              settingsTapTimeoutRef.current = setTimeout(() => {
-                navigation.navigate('Settings');
-              }, 250);
             }
             lastSettingsPressRef.current = now;
           },
