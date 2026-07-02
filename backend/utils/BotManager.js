@@ -100,14 +100,19 @@ class BotManager {
 
     let resolvedCommand = await AliasManager.resolve(chat._id, cleanCommandText) || cleanCommandText;
 
-    if (['games', 'ai', 'stats', 'admin', 'play', 'ask', 'rank', 'manage'].includes(resolvedCommand)) {
+    if (['games', 'ai', 'stats', 'admin'].includes(resolvedCommand)) {
       resolvedCommand = 'help ' + resolvedCommand;
+    }
+    if (['play', 'ask', 'rank', 'manage'].includes(resolvedCommand)) {
+      resolvedCommand = 'guide ' + resolvedCommand;
     }
 
     const isStandaloneHelp = resolvedCommand === 'help' || resolvedCommand.startsWith('help ');
+    const isStandaloneGuide = resolvedCommand === 'guide' || resolvedCommand.startsWith('guide ');
     const isGameCommand = CommandRegistry.isValidGameCommand(resolvedCommand);
-    const standaloneCommands = ['score', 'scores', 'activity', 'leaderboard', 'aliases', 'reset', 'swap', 'switch'];
-    const isStandaloneUtility = standaloneCommands.includes(resolvedCommand);
+    const standaloneCommands = ['score', 'scores', 'activity', 'leaderboard', 'aliases', 'reset', 'remove'];
+    const isStandaloneUtility = standaloneCommands.includes(resolvedCommand.split(' ')[0]) || resolvedCommand.startsWith('summarize ') || resolvedCommand.startsWith('calc ') || resolvedCommand.startsWith('calculate ');
+    const isMath = /^[0-9+\-*/().\s]+$/.test(resolvedCommand.replace(/\s+/g, ''));
     
     let effectiveBotStr = activeBotStr;
     let effectiveBotId = activeBotId;
@@ -116,8 +121,12 @@ class BotManager {
       if (isStandaloneHelp) {
         effectiveBotStr = 'mica';
         effectiveBotId = micaId;
-      } else if (isGameCommand || isStandaloneUtility) {
-        if (['breach', 'suspect'].includes(resolvedCommand)) {
+      } else if (isStandaloneGuide) {
+        effectiveBotStr = 'mars';
+        effectiveBotId = marsId;
+      } else if (isGameCommand || isStandaloneUtility || isMath) {
+        const baseCmd = resolvedCommand.split(' ')[0];
+        if (['breach', 'suspect', 'play', 'ask', 'rank', 'manage', 'guide'].includes(baseCmd)) {
            effectiveBotStr = 'mars';
            effectiveBotId = marsId;
         } else {
@@ -140,34 +149,27 @@ class BotManager {
         switch (helpTarget) {
           case 'riddle':
             helpText = "**Game: Riddle** 🧠\nI will give you a riddle. The first person to type the correct answer in the chat wins points. If you get stuck, anyone can type 'reset' to give up.";
-            effectiveBotId = micaId;
             break;
           case 'guess':
           case 'guessword':
             helpText = "**Game: Guess the Word** 🔤\nI will pick a random 5-letter word. You and your friends have to guess it. I will tell you how many letters match your guess. Keep guessing until someone gets it! Type 'reset' to end the game early.";
-            effectiveBotId = micaId;
             break;
           case 'emojiguess':
             helpText = "**Game: Emoji Guess** 🎬\nI will describe a movie, book, or phrase using ONLY emojis. The first person to guess what it means wins! Type 'reset' to skip.";
-            effectiveBotId = micaId;
             break;
           case 'scramble':
           case 'jumble':
             helpText = "**Game: Scramble** 🌪️\nI will take a word and scramble its letters. The capital letter indicates the first letter of the actual word. Unscramble it and type the answer to win points! Type 'reset' to surrender.";
-            effectiveBotId = micaId;
             break;
           case 'doubleagent':
             helpText = "**Game: Double Agent** 🕵️\nA social deduction game. I will secretly DM everyone their roles. One person is the Double Agent, everyone else is an operative. Operatives get a secret word, the Double Agent gets a similar but different word. You must find out who the Double Agent is by taking turns saying one related word. Vote them out before they blend in!";
-            effectiveBotId = micaId;
             break;
           case 'mafia':
           case 'werewolf':
             helpText = "**Game: Mafia** 🕴️\nA game of deception! I will secretly assign roles (Mafia, Doctor, Detective, Villager) via DMs. During the 'Night', the Mafia chooses someone to eliminate, the Doctor protects, and the Detective investigates. During the 'Day', the group discusses and votes to lynch a suspect. Can the village survive?";
-            effectiveBotId = micaId;
             break;
           case 'assassination':
             helpText = "**Game: Assassination** 🎯\nEveryone in the group is assigned a secret target via DM. Your goal is to figure out who is targeting you and who your target is. You eliminate your target by sending a specific phrase in the chat. The last person standing wins!";
-            effectiveBotId = micaId;
             break;
           case 'aliases':
             helpText = "**Utility: Aliases** 🔗\nShows a list of all custom command aliases created for this group. You can create an alias by typing `command = my_alias` (e.g., `scramble = jumble`).";
@@ -188,58 +190,82 @@ class BotManager {
             break;
           case 'activity':
             helpText = "**Utility: Activity** 📊\n(Mica Only) Shows the message activity statistics for this group and lists the most active members.";
-            effectiveBotId = micaId;
             break;
           case 'leaderboard':
             helpText = "**Utility: Leaderboard** 🌍\n(Mica Only) Shows the global leaderboard of the most active groups across all of Relay.";
-            effectiveBotId = micaId;
             break;
           case 'reset':
             helpText = "**Utility: Reset** 🛑\nStops the currently running game in the group.";
             break;
-          case 'swap':
-          case 'switch':
-            helpText = "**Utility: Swap Bots** 🤖\nType `!swap` or `switch to mars` / `switch to mica` to instantly change the active bot for this group. (Admins only)";
-            break;
           case 'games':
             helpText = `**🎮 Mica's Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n💡 **Tip: For a deep dive or rules, type \`help <game>\` — e.g. \`help riddle\`**`;
-            effectiveBotId = micaId;
-            break;
-          case 'play':
-            helpText = `**🎮 Mars Operations**\n• breach (Hack a 4-digit PIN)\n• suspect (Solve a crime scene)\n\n💡 **Tip: Don't ask me for rules. Figure it out.**`;
-            effectiveBotId = marsId;
             break;
           case 'ai':
             helpText = `**🤖 Mica's AI & Smart Tools**\n\n• summarize <text>\n• Just type any math expression (e.g. \`20/2\`)!\n\n💡 **Tip: For more details, type \`help <tool>\` — e.g. \`help summarize\`**`;
-            effectiveBotId = micaId;
-            break;
-          case 'ask':
-            helpText = `**🤖 Mars's AI & Smart Tools**\n\n• summarize <text>\n• Math expressions (e.g. \`20/2\`)\n\n💡 **Tip: Type \`help summarize\` if you really need instructions.**`;
-            effectiveBotId = marsId;
             break;
           case 'stats':
             helpText = `**📈 Mica's Stats & Leaderboards**\n\n• score\n• activity\n• leaderboard\n\n💡 **Tip: For a deep dive, type \`help <command>\` — e.g. \`help score\`**`;
-            effectiveBotId = micaId;
-            break;
-          case 'rank':
-            helpText = `**📈 Mars's Stats & Leaderboards**\n\n• score\n\n💡 **Tip: I don't do activity or global leaderboards. Type \`help score\` if you really want to see who's losing.**`;
-            effectiveBotId = marsId;
             break;
           case 'admin':
-            helpText = `**🛠️ Mica's Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n• swap (Switch bots)\n\n💡 **Tip: For a deep dive, type \`help <command>\` — e.g. \`help aliases\`**`;
-            effectiveBotId = micaId;
-            break;
-          case 'manage':
-            helpText = `**🛠️ Mars's Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n• swap (Switch bots)\n\n💡 **Tip: Type \`help <command>\` for details. Try \`help remove\` if you want to kick dead weight.**`;
-            effectiveBotId = marsId;
+            helpText = `**🛠️ Mica's Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n\n💡 **Tip: For a deep dive, type \`help <command>\` — e.g. \`help aliases\`**`;
             break;
           default:
-            helpText = `I don't have a help page for '${helpTarget}'. Try asking about a specific category like 'help games' or a specific game like 'help scramble'.`;
+            helpText = `I don't have a help page for '${helpTarget}'. Try asking about a specific category like 'help games'.`;
         }
-        return this.sendCustomMessage(chat, io, effectiveBotId, helpText);
+        return this.sendCustomMessage(chat, io, micaId, helpText);
       } else {
-        const reply = `**🤖 System Commands 🤖**\n\n**Mica's Categories:**\n• games\n• ai\n• stats\n• admin\n\n**Mars's Categories:**\n• play\n• ask\n• rank\n• manage\n\n💡 *Tip: Type \`help <category>\` (e.g. \`help games\` or \`help play\`) for details!*`;
+        const reply = `**🤖 Mica's Commands 🤖**\n\n**Categories:**\n• games\n• ai\n• stats\n• admin\n\n💡 *Tip: Type \`help <category>\` (e.g. \`help games\`) for details!*`;
         return this.sendCustomMessage(chat, io, micaId, reply);
+      }
+    }
+
+    if (resolvedCommand === 'guide' || resolvedCommand.startsWith('guide ')) {
+      const helpTarget = resolvedCommand.replace('guide', '').trim().toLowerCase();
+      
+      if (helpTarget) {
+        let helpText = '';
+        switch (helpTarget) {
+          case 'breach':
+            helpText = "**Game: Breach** 💻\nHack a 4-digit PIN before you get locked out. Feedback is + for correct digit and position, - for correct digit wrong position. 10 tries.";
+            break;
+          case 'suspect':
+            helpText = "**Game: Suspect** 🕵️‍♂️\nSolve a crime scene puzzle. You get clues about the suspect, weapon, and location. Make a deduction.";
+            break;
+          case 'play':
+            helpText = `**🎮 Mars Operations**\n• breach (Hack a 4-digit PIN)\n• suspect (Solve a crime scene)\n\n💡 **Tip: Don't ask me for rules. Figure it out.**`;
+            break;
+          case 'ask':
+            helpText = `**🤖 Mars's AI & Smart Tools**\n\n• summarize <text>\n• Math expressions (e.g. \`20/2\`)\n\n💡 **Tip: Type \`guide summarize\` if you really need instructions.**`;
+            break;
+          case 'rank':
+            helpText = `**📈 Mars's Stats & Leaderboards**\n\n• score\n\n💡 **Tip: I don't do activity or global leaderboards. Type \`guide score\` if you really want to see who's losing.**`;
+            break;
+          case 'manage':
+            helpText = `**🛠️ Mars's Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n\n💡 **Tip: Type \`guide <command>\` for details. Try \`guide remove\` if you want to kick dead weight.**`;
+            break;
+          case 'aliases':
+            helpText = "**Utility: Aliases** 🔗\nShows a list of aliases. Create one by typing `command = my_alias`.";
+            break;
+          case 'remove':
+            helpText = "**Utility: Remove** 🗑️\nUse `remove <alias_name>` to delete an alias.\nUse `remove inactive <days>` to kick dead weight.";
+            break;
+          case 'summarize':
+            helpText = "**Utility: Summarize** 📝\nUse `summarize <text>` to have me summarize it. Try not to bore me.";
+            break;
+          case 'score':
+          case 'scores':
+            helpText = "**Utility: Score** 🏆\nShows the leaderboard. Type it to see who's losing.";
+            break;
+          case 'reset':
+            helpText = "**Utility: Reset** 🛑\nStops the currently running operation.";
+            break;
+          default:
+            helpText = `I don't have a guide page for '${helpTarget}'. You're on your own.`;
+        }
+        return this.sendCustomMessage(chat, io, marsId, helpText);
+      } else {
+        const reply = `**🤖 Mars's Commands 🤖**\n\n**Operations:**\n• play\n• ask\n• rank\n• manage\n\n💡 *Tip: Type \`guide <category>\` (e.g. \`guide play\`) for details!*`;
+        return this.sendCustomMessage(chat, io, marsId, reply);
       }
     }
 
