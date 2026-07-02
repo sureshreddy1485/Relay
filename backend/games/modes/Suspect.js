@@ -12,22 +12,28 @@ class SuspectGame {
   }
 
   generateCase() {
-    const NAMES = ["Victor", "Gloria", "Desmond", "Elara", "Titus", "Sylvia", "Ronan", "Cassidy", "Malik", "Lena", "Axel", "Fiona", "Jasper"];
-    const ROLES = ["The Butler", "The Business Partner", "The Ex", "The Rival", "The Assistant", "The Neighbor", "The Bodyguard", "The Heir", "The Journalist", "The Hacker", "The Chef"];
-    const WEAPONS = ["a poisoned drink", "a heavy wrench", "a sharp knife", "a rare snake", "a hacked robot", "an antique sword", "a falling piano", "a faulty elevator", "a rigged car brake", "a laser trap"];
-    const LOCATIONS = ["the penthouse suite", "the abandoned warehouse", "the moving train", "the underwater lab", "the VIP lounge", "the botanical garden", "the rooftop garden", "the secret basement", "the casino floor"];
+    const { generate } = require('random-words');
 
-    const shuffledNames = [...NAMES].sort(() => 0.5 - Math.random());
-    const shuffledRoles = [...ROLES].sort(() => 0.5 - Math.random());
+    // Generate random capitalized names
+    const genName = () => {
+      const w = generate({ minLength: 4, maxLength: 8 });
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    };
     
+    // Generate random roles (e.g., "The Writer")
+    const genRole = () => {
+      const w = generate({ minLength: 4, maxLength: 9 });
+      return "The " + w.charAt(0).toUpperCase() + w.slice(1);
+    };
+
     const suspects = [
-      { id: 1, name: shuffledNames[0], role: shuffledRoles[0] },
-      { id: 2, name: shuffledNames[1], role: shuffledRoles[1] },
-      { id: 3, name: shuffledNames[2], role: shuffledRoles[2] }
+      { id: 1, name: genName(), role: genRole() },
+      { id: 2, name: genName(), role: genRole() },
+      { id: 3, name: genName(), role: genRole() }
     ];
 
-    const weapon = WEAPONS[Math.floor(Math.random() * WEAPONS.length)];
-    const location = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+    const weapon = "a " + generate();
+    const location = "the " + generate();
 
     const culpritIndex = Math.floor(Math.random() * 3);
     const culprit = suspects[culpritIndex];
@@ -42,7 +48,7 @@ class SuspectGame {
     const alibiTypes = [
       `Cameras show ${innocent1.name} (${innocent1.role}) was far away at the time.`,
       `Lots of people saw ${innocent1.name} (${innocent1.role}) streaming live on video when it happened.`,
-      `The victim's smart watch recorded the exact time of death, and ${innocent1.name} (${innocent1.role}) was on a plane then.`
+      `The victim's smart watch recorded the exact time of death, and ${innocent1.name} (${innocent1.role}) was on a flight then.`
     ];
     clues.push(alibiTypes[alibiIndex]);
     const innocent1Reason = [
@@ -53,7 +59,7 @@ class SuspectGame {
 
     const redHerringIndex = Math.floor(Math.random() * 3);
     const redHerring = [
-      `${innocent2.name} (${innocent2.role}) hated the victim, but was too weak to use ${weapon}.`,
+      `${innocent2.name} (${innocent2.role}) hated the victim, but was not strong enough to use ${weapon}.`,
       `A mean letter from ${innocent2.name} (${innocent2.role}) was found, but they are terrified of blood.`,
       `${innocent2.name} (${innocent2.role}) owes the victim money, but their footprints were definitely not at ${location}.`
     ];
