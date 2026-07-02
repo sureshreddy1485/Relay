@@ -814,16 +814,14 @@ class BotManager {
     }
   }
 
-  // Called by games to know which bot to respond as
+  // Called by games to know which bot to respond as.
+  // Legacy games (Mica exclusive) use this, so it always returns Mica.
   async getActiveBotId(groupId) {
-    const settings = await GroupGameSettings.findOne({ groupId });
-    const botStr = settings ? settings.activeBot : 'mica';
-    return botStr === 'mars' ? getMarsBotId() : getMicaBotId();
+    return getMicaBotId();
   }
 
   async getActiveBotStr(groupId) {
-    const settings = await GroupGameSettings.findOne({ groupId });
-    return settings ? (settings.activeBot || 'mica') : 'mica';
+    return 'mica';
   }
 
   async onUserJoinedGroup(chat, newUserId, io) {
