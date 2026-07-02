@@ -87,6 +87,7 @@ export default function App() {
         const update = await Updates.checkForUpdateAsync();
         if (update.isAvailable && isMounted) {
           await Updates.fetchUpdateAsync();
+          global.isUpdateReadyToApply = true;
           setUpdateAvailable(true);
         }
       } catch (e) {

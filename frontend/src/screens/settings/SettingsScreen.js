@@ -315,6 +315,24 @@ export default function SettingsScreen({ navigation }) {
       showAlert('Development Mode', 'OTA updates work in your built APK, not in Expo Go.');
       return;
     }
+
+    if (global.isUpdateReadyToApply) {
+      showAlert(
+        '🚀 Update Ready',
+        'An update has already been downloaded. Restart the app to apply it now!',
+        [
+          { text: 'Later', style: 'cancel' },
+          {
+            text: 'Restart Now',
+            onPress: async () => {
+              try { await Updates.reloadAsync(); } catch (e) {}
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     setCheckingUpdate(true);
     try {
       // Race between the check and a 5-second timeout
@@ -335,6 +353,7 @@ export default function SettingsScreen({ navigation }) {
               text: 'Restart Now',
               onPress: async () => {
                 await Updates.fetchUpdateAsync();
+                global.isUpdateReadyToApply = true;
                 await Updates.reloadAsync();
               },
             },

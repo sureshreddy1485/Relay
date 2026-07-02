@@ -55,12 +55,6 @@ class BotManager {
 
     const isGroupAdmin = chat.isGroupChat && ((chat.groupAdmin && chat.groupAdmin.toString() === senderId) || (chat.admins && chat.admins.some(a => a.toString() === senderId)));
 
-    // General help without targeting a specific bot
-    if (!activeBotStr && (lowerText === 'help' || lowerText === '!help')) {
-        const generalHelp = `**🤖 Relay Bot System 🤖**\n\nBoth Mica and Mars are active in this group simultaneously! To use a command or talk to a bot, you must mention their name.\n\n**Examples:**\n• \`mica help\` - See Mica's games and tools\n• \`mars help\` - See Mars's unique operations\n• \`mica calculate 5 * 5\`\n• \`mars summarize <text>\`\n\nHave fun!`;
-        return this.sendCustomMessage(chat, io, micaId, generalHelp);
-    }
-    
     // Default to mica for non-bot-specific game routing if no bot is mentioned
     const routingBotId = activeBotId || micaId;
     const routingBotStr = activeBotStr || 'mica';
@@ -88,22 +82,41 @@ class BotManager {
       }
     }
 
-    // From this point on, you MUST mention a bot.
-    if (!activeBotStr) return;
-
-    let cleanCommandText = lowerText.replace(new RegExp(`@?${activeBotStr}\\s*`, 'gi'), '').trim();
+    let cleanCommandText = lowerText;
+    if (activeBotStr) {
+      cleanCommandText = lowerText.replace(new RegExp(`@?${activeBotStr}\\s*`, 'gi'), '').trim();
+    }
 
     // Process aliases
     if (CommandRegistry.isAliasCommand(text)) {
       const [cmdPart, aliasPart] = text.split(/==?/).map(s => s.trim().toLowerCase());
       if (CommandRegistry.isValidGameCommand(cmdPart) && aliasPart) {
+        if (!activeBotStr) return; // Only process alias creation if targeted
         await AliasManager.setAlias(chat._id, aliasPart, cmdPart);
         const reply = activeBotStr === 'mars' ? `Interesting choice. '${aliasPart}' now triggers '${cmdPart}'.` : `Done! '${aliasPart}' will now trigger '${cmdPart}'.`;
         return this.sendCustomMessage(chat, io, activeBotId, reply);
       }
     }
 
-    const resolvedCommand = await AliasManager.resolve(chat._id, cleanCommandText) || cleanCommandText;
+    let resolvedCommand = await AliasManager.resolve(chat._id, cleanCommandText) || cleanCommandText;
+
+    if (['games', 'ai', 'stats', 'admin', 'play', 'ask', 'rank', 'manage'].includes(resolvedCommand)) {
+      resolvedCommand = 'help ' + resolvedCommand;
+    }
+
+    const isStandaloneHelp = resolvedCommand === 'help' || resolvedCommand.startsWith('help ');
+    
+    let effectiveBotStr = activeBotStr;
+    let effectiveBotId = activeBotId;
+
+    if (!effectiveBotStr) {
+      if (isStandaloneHelp) {
+        effectiveBotStr = 'mica';
+        effectiveBotId = micaId;
+      } else {
+        return; 
+      }
+    }
 
     if (resolvedCommand === 'help' || resolvedCommand.startsWith('help ')) {
       const helpTarget = resolvedCommand.replace('help', '').trim().toLowerCase();
@@ -113,27 +126,34 @@ class BotManager {
         switch (helpTarget) {
           case 'riddle':
             helpText = "**Game: Riddle** 🧠\nI will give you a riddle. The first person to type the correct answer in the chat wins points. If you get stuck, anyone can type 'reset' to give up.";
+            effectiveBotId = micaId;
             break;
           case 'guess':
           case 'guessword':
             helpText = "**Game: Guess the Word** 🔤\nI will pick a random 5-letter word. You and your friends have to guess it. I will tell you how many letters match your guess. Keep guessing until someone gets it! Type 'reset' to end the game early.";
+            effectiveBotId = micaId;
             break;
           case 'emojiguess':
             helpText = "**Game: Emoji Guess** 🎬\nI will describe a movie, book, or phrase using ONLY emojis. The first person to guess what it means wins! Type 'reset' to skip.";
+            effectiveBotId = micaId;
             break;
           case 'scramble':
           case 'jumble':
             helpText = "**Game: Scramble** 🌪️\nI will take a word and scramble its letters. The capital letter indicates the first letter of the actual word. Unscramble it and type the answer to win points! Type 'reset' to surrender.";
+            effectiveBotId = micaId;
             break;
           case 'doubleagent':
             helpText = "**Game: Double Agent** 🕵️\nA social deduction game. I will secretly DM everyone their roles. One person is the Double Agent, everyone else is an operative. Operatives get a secret word, the Double Agent gets a similar but different word. You must find out who the Double Agent is by taking turns saying one related word. Vote them out before they blend in!";
+            effectiveBotId = micaId;
             break;
           case 'mafia':
           case 'werewolf':
             helpText = "**Game: Mafia** 🕴️\nA game of deception! I will secretly assign roles (Mafia, Doctor, Detective, Villager) via DMs. During the 'Night', the Mafia chooses someone to eliminate, the Doctor protects, and the Detective investigates. During the 'Day', the group discusses and votes to lynch a suspect. Can the village survive?";
+            effectiveBotId = micaId;
             break;
           case 'assassination':
             helpText = "**Game: Assassination** 🎯\nEveryone in the group is assigned a secret target via DM. Your goal is to figure out who is targeting you and who your target is. You eliminate your target by sending a specific phrase in the chat. The last person standing wins!";
+            effectiveBotId = micaId;
             break;
           case 'aliases':
             helpText = "**Utility: Aliases** 🔗\nShows a list of all custom command aliases created for this group. You can create an alias by typing `command = my_alias` (e.g., `scramble = jumble`).";
@@ -142,15 +162,11 @@ class BotManager {
             helpText = "**Utility: Remove** 🗑️\nUse `remove <alias_name>` to delete a custom alias from the group.\nUse `remove inactive <days>` (e.g. `remove inactive 30`) to kick members who haven't sent a message in that many days (Admins only).";
             break;
           case 'summarize':
-            helpText = activeBotStr === 'mars' 
-              ? "**Utility: Summarize** 📝\nUse `summarize <text>` and I'll shorten it for you, since apparently you can't read long messages."
-              : "**Utility: Summarize** 📝\nUse `summarize <text>` to have Mica automatically provide a concise summary of the given text.";
+            helpText = "**Utility: Summarize** 📝\nUse `summarize <text>` to have the AI automatically provide a concise summary of the given text.";
             break;
           case 'calculate':
           case 'calc':
-            helpText = activeBotStr === 'mars'
-              ? "**Utility: Math** 🧮\nSend a math expression (like `20/2` or `5 * (10 + 2)`). I'll calculate it, even though it's beneath me."
-              : "**Utility: Math** 🧮\nSend any simple math expression (like `20/2` or `5 * (10 + 2)`) and Mica will automatically calculate the result.";
+            helpText = "**Utility: Math** 🧮\nSend any simple math expression (like `20/2` or `5 * (10 + 2)`) and the AI will calculate the result.";
             break;
           case 'score':
           case 'scores':
@@ -158,9 +174,11 @@ class BotManager {
             break;
           case 'activity':
             helpText = "**Utility: Activity** 📊\n(Mica Only) Shows the message activity statistics for this group and lists the most active members.";
+            effectiveBotId = micaId;
             break;
           case 'leaderboard':
             helpText = "**Utility: Leaderboard** 🌍\n(Mica Only) Shows the global leaderboard of the most active groups across all of Relay.";
+            effectiveBotId = micaId;
             break;
           case 'reset':
             helpText = "**Utility: Reset** 🛑\nStops the currently running game in the group.";
@@ -170,34 +188,44 @@ class BotManager {
             helpText = "**Utility: Swap Bots** 🤖\nType `!swap` or `switch to mars` / `switch to mica` to instantly change the active bot for this group. (Admins only)";
             break;
           case 'games':
-            helpText = activeBotStr === 'mars'
-              ? `**🎮 Mars Operations**\n• breach (Hack a 4-digit PIN)\n• suspect (Solve a crime scene)\n\n💡 **Tip: Don't ask me for rules. Figure it out.**`
-              : `**🎮 Mica's Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n💡 **Tip: For a deep dive or rules, type \`${activeBotStr} help <game>\` — e.g. \`${activeBotStr} help riddle\`**`;
+            helpText = `**🎮 Mica's Games**\n• riddle\n• guess\n• emojiguess\n• scramble (or jumble)\n• doubleagent\n• mafia\n• assassination\n\n💡 **Tip: For a deep dive or rules, type \`help <game>\` — e.g. \`help riddle\`**`;
+            effectiveBotId = micaId;
+            break;
+          case 'play':
+            helpText = `**🎮 Mars Operations**\n• breach (Hack a 4-digit PIN)\n• suspect (Solve a crime scene)\n\n💡 **Tip: Don't ask me for rules. Figure it out.**`;
+            effectiveBotId = marsId;
             break;
           case 'ai':
-            helpText = activeBotStr === 'mars'
-              ? `**🤖 AI & Smart Tools**\n\n• summarize <text>\n• Math expressions (e.g. \`20/2\`)\n\n💡 **Tip: Type \`${activeBotStr} help summarize\` if you really need instructions.**`
-              : `**🤖 AI & Smart Tools**\n\n• summarize <text>\n• Just type any math expression (e.g. \`20/2\`)!\n\n💡 **Tip: For more details, type \`${activeBotStr} help <tool>\` — e.g. \`${activeBotStr} help summarize\`**`;
+            helpText = `**🤖 Mica's AI & Smart Tools**\n\n• summarize <text>\n• Just type any math expression (e.g. \`20/2\`)!\n\n💡 **Tip: For more details, type \`help <tool>\` — e.g. \`help summarize\`**`;
+            effectiveBotId = micaId;
+            break;
+          case 'ask':
+            helpText = `**🤖 Mars's AI & Smart Tools**\n\n• summarize <text>\n• Math expressions (e.g. \`20/2\`)\n\n💡 **Tip: Type \`help summarize\` if you really need instructions.**`;
+            effectiveBotId = marsId;
             break;
           case 'stats':
-            helpText = activeBotStr === 'mars'
-              ? `**📈 Stats & Leaderboards**\n\n• score\n\n💡 **Tip: I don't do activity or global leaderboards. Type \`${activeBotStr} help score\` if you really want to see who's losing.**`
-              : `**📈 Stats & Leaderboards**\n\n• score\n• activity (Mica only)\n• leaderboard (Mica only)\n\n💡 **Tip: For a deep dive, type \`${activeBotStr} help <command>\` — e.g. \`${activeBotStr} help score\`**`;
+            helpText = `**📈 Mica's Stats & Leaderboards**\n\n• score\n• activity\n• leaderboard\n\n💡 **Tip: For a deep dive, type \`help <command>\` — e.g. \`help score\`**`;
+            effectiveBotId = micaId;
+            break;
+          case 'rank':
+            helpText = `**📈 Mars's Stats & Leaderboards**\n\n• score\n\n💡 **Tip: I don't do activity or global leaderboards. Type \`help score\` if you really want to see who's losing.**`;
+            effectiveBotId = marsId;
             break;
           case 'admin':
-            helpText = activeBotStr === 'mars'
-              ? `**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n• swap (Switch bots)\n\n💡 **Tip: Type \`${activeBotStr} help <command>\` for details. Try \`${activeBotStr} help remove\` if you want to kick dead weight.**`
-              : `**🛠️ Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n• swap (Switch bots)\n\n💡 **Tip: For a deep dive, type \`${activeBotStr} help <command>\` — e.g. \`${activeBotStr} help aliases\`**`;
+            helpText = `**🛠️ Mica's Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n• swap (Switch bots)\n\n💡 **Tip: For a deep dive, type \`help <command>\` — e.g. \`help aliases\`**`;
+            effectiveBotId = micaId;
+            break;
+          case 'manage':
+            helpText = `**🛠️ Mars's Group Management**\n\n• aliases\n• remove <alias>\n• remove inactive <days>\n• reset\n• swap (Switch bots)\n\n💡 **Tip: Type \`help <command>\` for details. Try \`help remove\` if you want to kick dead weight.**`;
+            effectiveBotId = marsId;
             break;
           default:
             helpText = `I don't have a help page for '${helpTarget}'. Try asking about a specific category like 'help games' or a specific game like 'help scramble'.`;
         }
-        return this.sendCustomMessage(chat, io, activeBotId, helpText);
+        return this.sendCustomMessage(chat, io, effectiveBotId, helpText);
       } else {
-        const reply = activeBotStr === 'mars' 
-          ? `**🔥 Mars Operations 🔥**\nI'm not your average assistant. Here's what I can do. Pick a category if you dare:\n\n• **games**\n• **ai**\n• **stats**\n• **admin**\n\n💡 **Tip: Type \`${activeBotStr} help <category>\` — like \`${activeBotStr} help games\`... if you can type that fast.**`
-          : `**✨ System Intelligence ✨**\nHere are the categories of commands I support:\n\n• **games**\n• **ai**\n• **stats**\n• **admin**\n\n💡 **Tip: To explore a category, type \`${activeBotStr} help <category>\` — e.g. \`${activeBotStr} help games\`**`;
-        return this.sendCustomMessage(chat, io, activeBotId, reply);
+        const reply = `**🤖 System Commands 🤖**\n\n**Mica's Categories:**\n• games\n• ai\n• stats\n• admin\n\n**Mars's Categories:**\n• play\n• ask\n• rank\n• manage\n\n💡 *Tip: Type \`help <category>\` (e.g. \`help games\` or \`help play\`) for details!*`;
+        return this.sendCustomMessage(chat, io, micaId, reply);
       }
     }
 
