@@ -12,7 +12,11 @@ class SuspectGame {
   }
 
   generateCase() {
-    // Pick 3 unique names and roles
+    const NAMES = ["Victor", "Gloria", "Desmond", "Elara", "Titus", "Sylvia", "Ronan", "Cassidy", "Malik", "Lena", "Axel", "Fiona", "Jasper"];
+    const ROLES = ["The Butler", "The Business Partner", "The Ex", "The Rival", "The Assistant", "The Neighbor", "The Bodyguard", "The Heir", "The Journalist", "The Hacker", "The Chef"];
+    const WEAPONS = ["a poisoned drink", "a heavy wrench", "a sharp knife", "a rare snake", "a hacked robot", "an antique sword", "a falling piano", "a faulty elevator", "a rigged car brake", "a laser trap"];
+    const LOCATIONS = ["the penthouse suite", "the abandoned warehouse", "the moving train", "the underwater lab", "the VIP lounge", "the botanical garden", "the rooftop garden", "the secret basement", "the casino floor"];
+
     const shuffledNames = [...NAMES].sort(() => 0.5 - Math.random());
     const shuffledRoles = [...ROLES].sort(() => 0.5 - Math.random());
     
@@ -30,53 +34,69 @@ class SuspectGame {
     const innocent1 = suspects[(culpritIndex + 1) % 3];
     const innocent2 = suspects[(culpritIndex + 2) % 3];
 
-    // Generate clues pointing to the culprit and clearing innocents
     const clues = [];
 
-    // Clue 1: The Scene
     clues.push(`The victim was found in ${location}, killed by ${weapon}.`);
 
-    // Clue 2: Alibi for Innocent 1
+    const alibiIndex = Math.floor(Math.random() * 3);
     const alibiTypes = [
-      `Security footage confirms ${innocent1.name} (${innocent1.role}) was miles away at the time.`,
-      `Multiple witnesses saw ${innocent1.name} (${innocent1.role}) streaming live when the murder happened.`,
-      `The victim's smart watch recorded the exact time of death. ${innocent1.name} (${innocent1.role}) has a rock-solid alibi.`
+      `Cameras show ${innocent1.name} (${innocent1.role}) was far away at the time.`,
+      `Lots of people saw ${innocent1.name} (${innocent1.role}) streaming live on video when it happened.`,
+      `The victim's smart watch recorded the exact time of death, and ${innocent1.name} (${innocent1.role}) was on a plane then.`
     ];
-    clues.push(alibiTypes[Math.floor(Math.random() * alibiTypes.length)]);
+    clues.push(alibiTypes[alibiIndex]);
+    const innocent1Reason = [
+      "were seen on camera far away",
+      "were live streaming at the time",
+      "were on a flight when it happened"
+    ][alibiIndex];
 
-    // Clue 3: Motive for Innocent 2, but physical impossibility
+    const redHerringIndex = Math.floor(Math.random() * 3);
     const redHerring = [
-      `${innocent2.name} (${innocent2.role}) hated the victim, but lacks the physical strength or access to use ${weapon}.`,
-      `A threatening letter from ${innocent2.name} (${innocent2.role}) was found, but they are terrified of blood.`,
-      `${innocent2.name} (${innocent2.role}) owes the victim money, but their fingerprints were explicitly NOT found at ${location}.`
+      `${innocent2.name} (${innocent2.role}) hated the victim, but was too weak to use ${weapon}.`,
+      `A mean letter from ${innocent2.name} (${innocent2.role}) was found, but they are terrified of blood.`,
+      `${innocent2.name} (${innocent2.role}) owes the victim money, but their footprints were definitely not at ${location}.`
     ];
-    clues.push(redHerring[Math.floor(Math.random() * redHerring.length)]);
+    clues.push(redHerring[redHerringIndex]);
+    const innocent2Reason = [
+      "were not strong enough",
+      "are terrified of blood",
+      "never left any footprints at the scene"
+    ][redHerringIndex];
 
-    // Clue 4: Pointing to the culprit
+    const culpritClueIndex = Math.floor(Math.random() * 3);
     const culpritClue = [
       `A receipt for the exact same ${weapon} was found in the trash of ${culprit.name} (${culprit.role}).`,
-      `A piece of fabric matching the clothes of ${culprit.name} (${culprit.role}) was caught on a nail in ${location}.`,
-      `Financial records show ${culprit.name} (${culprit.role}) just inherited a massive sum triggered by this death.`
+      `A piece of clothing matching what ${culprit.name} (${culprit.role}) wears was caught on a door at ${location}.`,
+      `Bank records show ${culprit.name} (${culprit.role}) just got a huge payout from this death.`
     ];
-    clues.push(culpritClue[Math.floor(Math.random() * culpritClue.length)]);
+    clues.push(culpritClue[culpritClueIndex]);
+    const culpritReason1 = [
+      `they bought the ${weapon}`,
+      "their clothing was left at the scene",
+      "they were paid for the hit"
+    ][culpritClueIndex];
 
-    // Clue 5: Final nail
+    const finalClueIndex = Math.floor(Math.random() * 3);
     const finalClue = [
-      `When questioned, ${culprit.name} (${culprit.role}) lied about knowing where ${location} was.`,
+      `When asked, ${culprit.name} (${culprit.role}) lied about knowing where ${location} was.`,
       `The victim's last text message read: "I'm meeting with ${culprit.role} now."`,
-      `Only ${culprit.name} (${culprit.role}) had the access codes to bypass the security at ${location}.`
+      `Only ${culprit.name} (${culprit.role}) had the keys to get into ${location}.`
     ];
-    clues.push(finalClue[Math.floor(Math.random() * finalClue.length)]);
+    clues.push(finalClue[finalClueIndex]);
+    const culpritReason2 = [
+      "lied about the location",
+      "were the last person to meet the victim",
+      "were the only one with keys"
+    ][finalClueIndex];
 
-    // Shuffle clues 2-5 so it's not always in the same order
     const firstClue = clues.shift();
     clues.sort(() => 0.5 - Math.random());
     clues.unshift(firstClue);
 
-    const explanation = `Here is what actually happened: **${culprit.name}** used ${weapon} at ${location}. ` +
-                        `We knew it wasn't ${innocent1.name} because they had an alibi. ` +
-                        `And ${innocent2.name} couldn't have done it either due to lack of means. ` +
-                        `The final proof was found linking ${culprit.name} directly to the scene!`;
+    const explanation = `Here is what actually happened: **${culprit.name}** did it because ${culpritReason1} and they ${culpritReason2}. ` +
+                        `We knew it wasn't ${innocent1.name} because they ${innocent1Reason}. ` +
+                        `And ${innocent2.name} couldn't have done it since they ${innocent2Reason}.`;
 
     return { suspects, clues, culprit, explanation };
   }

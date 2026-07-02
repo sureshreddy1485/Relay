@@ -2,10 +2,7 @@ const GameManager = require('../engine/GameManager');
 const GameSession = require('../../models/GameSession');
 const { getMarsBotId } = require('../../utils/botHelper');
 
-const ASSASSINATION_TRIGGERS = [
-  "water", "dog", "food", "sleep", "crazy", 
-  "game", "lol", "yes", "what", "how", "why"
-];
+const { generate } = require('random-words');
 
 class AssassinationGame {
   constructor() {
@@ -110,7 +107,7 @@ class AssassinationGame {
               const newTarget = alivePlayers.find(p => p.userId !== attackerId);
               if (newTarget) {
                 attacker.targetId = newTarget.userId;
-                attacker.triggerWord = ASSASSINATION_TRIGGERS[Math.floor(Math.random() * ASSASSINATION_TRIGGERS.length)];
+                attacker.triggerWord = generate({ minLength: 4, maxLength: 6 });
                 
                 // Send Private DM via Socket
                 await this.sendPrivateDM(attacker.userId, io, state.botId, `🎯 **NEW TARGET ACQUIRED**\nYour new target is ${newTarget.name}. Trick them into saying "${attacker.triggerWord}".`);
@@ -146,7 +143,7 @@ class AssassinationGame {
       const currentPlayer = shuffled[i];
       const targetPlayer = shuffled[(i + 1) % shuffled.length]; // Next player in ring
       
-      const trigger = ASSASSINATION_TRIGGERS[Math.floor(Math.random() * ASSASSINATION_TRIGGERS.length)];
+      const trigger = generate({ minLength: 4, maxLength: 6 });
       
       currentPlayer.targetId = targetPlayer.userId;
       currentPlayer.triggerWord = trigger;
