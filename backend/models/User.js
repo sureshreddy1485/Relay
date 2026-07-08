@@ -34,7 +34,10 @@ const userSchema = new mongoose.Schema(
     lastPasswordChange: { type: Date, default: Date.now },
     securityKey: {
       type: String,
-      required: [true, 'Security key is required'],
+      select: false,
+    },
+    recoveryKey: {
+      type: String,
       select: false,
     },
     displayName: {

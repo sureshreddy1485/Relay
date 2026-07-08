@@ -93,6 +93,9 @@ export default function SettingsScreen({ navigation }) {
   const [appThemeSheetVisible, setAppThemeSheetVisible] = useState(false);
   const [currentAppTheme, setCurrentAppTheme] = useState('relay');
 
+  const [recoveryPasswordModal, setRecoveryPasswordModal] = useState(false);
+  const [recoveryPassword, setRecoveryPassword] = useState('');
+
   React.useEffect(() => {
     AsyncStorage.getItem('app_theme').then(t => {
       if (t) setCurrentAppTheme(t);
@@ -483,6 +486,16 @@ export default function SettingsScreen({ navigation }) {
             onPress={() => navigation.navigate('ChangePassword')}
           />
           <SettingRow
+            icon="key-outline"
+            label="Generate Recovery Key"
+            iconBg="#10B98120"
+            iconColor="#10B981"
+            onPress={() => {
+              setRecoveryPassword('');
+              setRecoveryPasswordModal(true);
+            }}
+          />
+          <SettingRow
             icon="desktop-outline"
             label="Connected Devices"
             iconBg="#F59E0B20"
@@ -735,6 +748,53 @@ export default function SettingsScreen({ navigation }) {
               resizeMode="contain"
             />
           ) : null}
+        </View>
+      </Modal>
+
+      {/* ── Generate Recovery Key Password Modal ────────────────────────── */}
+      <Modal visible={recoveryPasswordModal} transparent animationType="fade" onRequestClose={() => setRecoveryPasswordModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: Colors.dark.card, borderRadius: 20, padding: 24, width: '100%', borderWidth: 1, borderColor: Colors.dark.border }}>
+            <Text style={{ color: '#FFF', fontSize: 20, fontWeight: '700', marginBottom: 8 }}>Verify Password</Text>
+            <Text style={{ color: Colors.dark.muted, fontSize: 14, marginBottom: 20 }}>
+              Generating a new recovery key will permanently invalidate your previous recovery key.
+              Please enter your password to continue.
+            </Text>
+            
+            <View style={{ backgroundColor: Colors.dark.input, borderRadius: 12, borderWidth: 1, borderColor: Colors.dark.border, paddingHorizontal: 14, marginBottom: 24 }}>
+              <TextInput
+                style={{ color: Colors.dark.text, fontSize: 16, paddingVertical: 14 }}
+                placeholder="Enter password"
+                placeholderTextColor={Colors.dark.muted}
+                secureTextEntry
+                value={recoveryPassword}
+                onChangeText={setRecoveryPassword}
+                autoFocus
+              />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity 
+                style={{ flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: Colors.dark.border, alignItems: 'center' }}
+                onPress={() => setRecoveryPasswordModal(false)}
+              >
+                <Text style={{ color: Colors.dark.muted, fontSize: 16, fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={{ flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: Colors.primary, alignItems: 'center' }}
+                onPress={() => {
+                  if (!recoveryPassword.trim()) {
+                    showAlert('Error', 'Please enter your password');
+                    return;
+                  }
+                  setRecoveryPasswordModal(false);
+                  navigation.navigate('RecoveryKey', { password: recoveryPassword, isMigration: true });
+                }}
+              >
+                <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '600' }}>Continue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
 

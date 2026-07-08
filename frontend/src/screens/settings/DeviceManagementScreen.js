@@ -12,10 +12,10 @@ export default function DeviceManagementScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [logoutId, setLogoutId] = useState(null);
   
-  // Security PIN Modal State
+  // Password Modal State
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [targetDevice, setTargetDevice] = useState(null);
-  const [securityKey, setSecurityKey] = useState('');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     fetchDevices();
@@ -50,7 +50,7 @@ export default function DeviceManagementScreen({ navigation }) {
           style: 'destructive',
           onPress: () => {
             setTargetDevice(deviceId);
-            setSecurityKey('');
+            setPassword('');
             setPinModalVisible(true);
           }
         }
@@ -59,15 +59,15 @@ export default function DeviceManagementScreen({ navigation }) {
   };
 
   const executeLogout = async () => {
-    if (!securityKey.trim()) {
-      showAlert('Error', 'Please enter your Security PIN');
+    if (!password.trim()) {
+      showAlert('Error', 'Please enter your password');
       return;
     }
     
     setPinModalVisible(false);
     setLogoutId(targetDevice);
     try {
-      await api.delete(`/auth/devices/${targetDevice}`, { data: { securityKey } });
+      await api.delete(`/auth/devices/${targetDevice}`, { data: { password } });
       setDevices(prev => prev.filter(d => d.deviceId !== targetDevice));
       showAlert('Success', 'Device has been logged out.');
     } catch (e) {
@@ -75,7 +75,7 @@ export default function DeviceManagementScreen({ navigation }) {
     } finally {
       setLogoutId(null);
       setTargetDevice(null);
-      setSecurityKey('');
+      setPassword('');
     }
   };
 
@@ -139,17 +139,16 @@ export default function DeviceManagementScreen({ navigation }) {
       <Modal visible={pinModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.pinModal}>
-            <Text style={styles.modalTitle}>Enter Security PIN</Text>
-            <Text style={styles.modalDesc}>Please enter your security PIN to authorize this action.</Text>
+            <Text style={styles.modalTitle}>Enter Password</Text>
+            <Text style={styles.modalDesc}>Please enter your password to authorize this action.</Text>
             
             <TextInput
               style={styles.pinInput}
-              placeholder="Enter PIN"
+              placeholder="Enter password"
               placeholderTextColor={Colors.dark.muted}
               secureTextEntry
-              keyboardType="number-pad"
-              value={securityKey}
-              onChangeText={setSecurityKey}
+              value={password}
+              onChangeText={setPassword}
               autoFocus
             />
 
@@ -171,6 +170,7 @@ export default function DeviceManagementScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
     </View>
   );
 }

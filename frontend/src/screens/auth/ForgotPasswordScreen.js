@@ -16,7 +16,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(0);
   const [identifier, setIdentifier] = useState('');
-  const [securityKey, setSecurityKey] = useState('');
+  const [recoveryKey, setRecoveryKey] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -27,7 +27,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   const handleReset = async () => {
     setError('');
     if (!identifier.trim()) { setError('Enter your email or username'); return; }
-    if (!securityKey.trim()) { setError('Enter your security key'); return; }
+    if (!recoveryKey.trim()) { setError('Enter your recovery key'); return; }
     if (!newPassword.trim() || newPassword.length < 6) { setError('Password must be at least 6 characters'); return; }
     if (newPassword !== confirmPassword) { setError('Passwords do not match'); return; }
 
@@ -35,12 +35,12 @@ export default function ForgotPasswordScreen({ navigation }) {
     try {
       await api.post('/auth/forgot-password', {
         identifier: identifier.trim(),
-        securityKey: securityKey.trim(),
+        recoveryKey: recoveryKey.trim(),
         newPassword,
       });
       setStep(3);
     } catch (err) {
-      setError(err.response?.data?.message || 'Reset failed. Check your security key.');
+      setError(err.response?.data?.message || 'Reset failed. Check your recovery key.');
     } finally {
       setIsLoading(false);
     }
@@ -80,7 +80,7 @@ export default function ForgotPasswordScreen({ navigation }) {
               <Ionicons name="shield-checkmark" size={32} color="#FFF" />
             </LinearGradient>
             <Text style={styles.title}>Reset Password</Text>
-            <Text style={styles.subtitle}>Enter your security key to reset your password</Text>
+            <Text style={styles.subtitle}>Enter your recovery key to reset your password</Text>
           </View>
 
           {error ? (
@@ -94,7 +94,7 @@ export default function ForgotPasswordScreen({ navigation }) {
           <View style={styles.infoBox}>
             <Ionicons name="information-circle-outline" size={20} color={Colors.primary} />
             <Text style={styles.infoText}>
-              You'll need the Security Key you set during registration to reset your password.
+              You'll need the Recovery Key given during registration to reset your password.
             </Text>
           </View>
 
@@ -114,15 +114,15 @@ export default function ForgotPasswordScreen({ navigation }) {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Security Key</Text>
+            <Text style={styles.label}>Recovery Key</Text>
             <View style={styles.inputWrap}>
               <Ionicons name="shield-outline" size={20} color={Colors.accentGreen} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { flex: 1 }]}
-                placeholder="Enter your security key"
+                placeholder="Enter your recovery key"
                 placeholderTextColor={Colors.dark.muted}
-                value={securityKey}
-                onChangeText={setSecurityKey}
+                value={recoveryKey}
+                onChangeText={setRecoveryKey}
                 secureTextEntry={!showKey}
                 autoCapitalize="none"
               />

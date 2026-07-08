@@ -5,7 +5,7 @@ const Chat = require('../models/Chat');
 const Message = require('../models/Message');
 const BotManager = require('../utils/BotManager');
 const { getMicaBotId, getRelayBotId } = require('../utils/botHelper');
-const { encryptSecurityKey, verifySecurityKey } = require('../utils/securityKey');
+const { generateRecoveryKey, hashRecoveryKey, verifyRecoveryKey } = require('../utils/recoveryKey');
 const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
 
 const crypto = require('crypto');
@@ -18,9 +18,9 @@ const generateToken = (id, sessionId) =>
 // @route POST /api/auth/signup
 // @access Public
 const signup = asyncHandler(async (req, res) => {
-  const { username, email, password, securityKey, displayName } = req.body;
+  const { username, email, password, displayName } = req.body;
 
-  if (!username || !email || !password || !securityKey) {
+  if (!username || !email || !password) {
     res.status(400);
     throw new Error('Please provide all required fields');
   }
@@ -48,13 +48,8 @@ const signup = asyncHandler(async (req, res) => {
     throw new Error('Email is already registered');
   }
 
-  const encryptedSecurityKey = encryptSecurityKey(securityKey);
-
-  let profilePicture = '';
-  if (req.file) {
-    const result = await uploadToCloudinary(req.file.buffer, 'profiles', 'image');
-    profilePicture = result.secure_url;
-  }
+  const plainRecoveryKey = generateRecoveryKey();
+  const hashedRecoveryKey = await hashRecoveryKey(plainRecoveryKey);
 
   const sessionId = crypto.randomBytes(16).toString('hex');
   const deviceName = req.body.deviceName || 'Unknown Device';
@@ -63,7 +58,7 @@ const signup = asyncHandler(async (req, res) => {
     username: username.toLowerCase(),
     email: email.toLowerCase(),
     password,
-    securityKey: encryptedSecurityKey,
+    recoveryKey: hashedRecoveryKey,
     displayName: displayName || username,
     profilePicture,
     devices: [{ deviceId: sessionId, deviceName, lastActive: Date.now() }]
@@ -72,6 +67,7 @@ const signup = asyncHandler(async (req, res) => {
   res.status(201).json({
     success: true,
     token: generateToken(user._id, sessionId),
+    recoveryKey: plainRecoveryKey,
     user: {
       _id: user._id,
       username: user.username,
@@ -88,11 +84,11 @@ const signup = asyncHandler(async (req, res) => {
 // @route POST /api/auth/login
 // @access Public
 const login = asyncHandler(async (req, res) => {
-  const { identifier, password, securityKey } = req.body; // identifier = email OR username
+  const { identifier, password } = req.body; // identifier = email OR username
 
-  if (!identifier || !password || !securityKey) {
+  if (!identifier || !password) {
     res.status(400);
-    throw new Error('Please provide identifier, password, and security key');
+    throw new Error('Please provide identifier and password');
   }
 
   const isEmail = identifier.includes('@');
@@ -100,7 +96,7 @@ const login = asyncHandler(async (req, res) => {
     ? { email: identifier.toLowerCase() }
     : { username: identifier.toLowerCase() };
 
-  const user = await User.findOne(query).select('+password +securityKey');
+  const user = await User.findOne(query).select('+password +securityKey +recoveryKey');
   if (!user) {
     res.status(404);
     throw new Error('User not found');
@@ -112,10 +108,9 @@ const login = asyncHandler(async (req, res) => {
     throw new Error('Invalid credentials');
   }
 
-  const isKeyValid = verifySecurityKey(securityKey, user.securityKey);
-  if (!isKeyValid) {
-    res.status(401);
-    throw new Error('Invalid security key');
+  let requiresMigration = false;
+  if (!user.recoveryKey && user.securityKey) {
+    requiresMigration = true;
   }
 
   const sessionId = req.body.deviceId || crypto.randomBytes(16).toString('hex');
@@ -192,6 +187,7 @@ const login = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     token: generateToken(user._id, sessionId),
+    requiresMigration,
     user: {
       _id: user._id,
       username: user.username,
@@ -209,9 +205,9 @@ const login = asyncHandler(async (req, res) => {
 // @route POST /api/auth/forgot-password
 // @access Public
 const forgotPassword = asyncHandler(async (req, res) => {
-  const { identifier, securityKey, newPassword } = req.body;
+  const { identifier, recoveryKey, newPassword } = req.body;
 
-  if (!identifier || !securityKey || !newPassword) {
+  if (!identifier || !recoveryKey || !newPassword) {
     res.status(400);
     throw new Error('Please provide all required fields');
   }
@@ -221,7 +217,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
     ? { email: identifier.toLowerCase() }
     : { username: identifier.toLowerCase() };
 
-  const user = await User.findOne(query).select('+securityKey +lastPasswordChange');
+  const user = await User.findOne(query).select('+recoveryKey +lastPasswordChange');
   if (!user) {
     res.status(404);
     throw new Error('User not found');
@@ -233,10 +229,10 @@ const forgotPassword = asyncHandler(async (req, res) => {
     throw new Error('Password can only be changed once every 14 days.');
   }
 
-  const isValid = verifySecurityKey(securityKey, user.securityKey);
+  const isValid = await verifyRecoveryKey(recoveryKey, user.recoveryKey);
   if (!isValid) {
     res.status(401);
-    throw new Error('Invalid security key');
+    throw new Error('Invalid recovery key');
   }
 
   user.password = newPassword;
@@ -251,14 +247,14 @@ const forgotPassword = asyncHandler(async (req, res) => {
 // @route PUT /api/auth/change-password
 // @access Private
 const changePassword = asyncHandler(async (req, res) => {
-  const { currentPassword, newPassword, securityKey } = req.body;
+  const { currentPassword, newPassword } = req.body;
 
-  if (!currentPassword || !newPassword || !securityKey) {
+  if (!currentPassword || !newPassword) {
     res.status(400);
     throw new Error('Please provide all required fields');
   }
 
-  const user = await User.findById(req.user._id).select('+password +securityKey +lastPasswordChange');
+  const user = await User.findById(req.user._id).select('+password +lastPasswordChange');
 
   const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
   if (user.lastPasswordChange && (Date.now() - new Date(user.lastPasswordChange).getTime() < TWO_WEEKS_MS)) {
@@ -270,12 +266,6 @@ const changePassword = asyncHandler(async (req, res) => {
   if (!isMatch) {
     res.status(401);
     throw new Error('Current password is incorrect');
-  }
-
-  const isKeyValid = verifySecurityKey(securityKey, user.securityKey);
-  if (!isKeyValid) {
-    res.status(401);
-    throw new Error('Invalid security key');
   }
 
   user.password = newPassword;
@@ -337,18 +327,18 @@ const getDevices = asyncHandler(async (req, res) => {
 // @access Private
 const logoutDevice = asyncHandler(async (req, res) => {
   const { deviceId } = req.params;
-  const { securityKey } = req.body; // or query, but usually body is fine if client supports it
+  const { password } = req.body;
 
-  if (!securityKey) {
+  if (!password) {
     res.status(400);
-    throw new Error('Security PIN is required to terminate a session');
+    throw new Error('Password is required to terminate a session');
   }
 
-  const user = await User.findById(req.user._id).select('+securityKey');
-  const isValid = verifySecurityKey(securityKey, user.securityKey);
-  if (!isValid) {
+  const user = await User.findById(req.user._id).select('+password');
+  const isMatch = await user.matchPassword(password);
+  if (!isMatch) {
     res.status(401);
-    throw new Error('Invalid security PIN');
+    throw new Error('Invalid password');
   }
 
   user.devices = user.devices.filter(d => d.deviceId !== deviceId);
@@ -356,4 +346,39 @@ const logoutDevice = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Device logged out' });
 });
 
-module.exports = { signup, login, forgotPassword, changePassword, getMe, logout, getDevices, logoutDevice };
+// @desc  Generate new recovery key
+// @route POST /api/auth/generate-recovery-key
+// @access Private
+const generateNewRecoveryKey = asyncHandler(async (req, res) => {
+  const { currentPassword } = req.body;
+
+  if (!currentPassword) {
+    res.status(400);
+    throw new Error('Please provide current password');
+  }
+
+  const user = await User.findById(req.user._id).select('+password +securityKey');
+  const isMatch = await user.matchPassword(currentPassword);
+  if (!isMatch) {
+    res.status(401);
+    throw new Error('Current password is incorrect');
+  }
+
+  const plainRecoveryKey = generateRecoveryKey();
+  const hashedRecoveryKey = await hashRecoveryKey(plainRecoveryKey);
+
+  user.recoveryKey = hashedRecoveryKey;
+  
+  // Remove old security key permanently
+  user.securityKey = undefined;
+  
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    recoveryKey: plainRecoveryKey,
+    message: 'New recovery key generated successfully',
+  });
+});
+
+module.exports = { signup, login, forgotPassword, changePassword, getMe, logout, getDevices, logoutDevice, generateNewRecoveryKey };

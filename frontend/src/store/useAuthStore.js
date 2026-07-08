@@ -122,7 +122,7 @@ const useAuthStore = create((set, get) => ({
       setAuthHeader(data.token);
       set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
       await get()._saveAccountToStore(data.user, data.token);
-      return { success: true };
+      return { success: true, recoveryKey: data.recoveryKey };
     } catch (err) {
       const message = err.response?.data?.message || 'Signup failed';
       set({ error: message, isLoading: false });
@@ -130,7 +130,7 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  login: async (identifier, password, securityKey) => {
+  login: async (identifier, password) => {
     set({ isLoading: true, error: null });
     try {
       const deviceName = Device.isDevice ? `${Device.osName} ${Device.modelName}` : `${Platform.OS} Simulator`;
@@ -139,13 +139,15 @@ const useAuthStore = create((set, get) => ({
         deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2);
         await AsyncStorage.setItem('relay_device_id', deviceId);
       }
-      const { data } = await api.post('/auth/login', { identifier, password, securityKey, deviceName, deviceId });
+      const { data } = await api.post('/auth/login', { identifier, password, deviceName, deviceId });
+      
       await AsyncStorage.setItem('relay_token', data.token);
       await AsyncStorage.setItem('relay_user', JSON.stringify(data.user));
       setAuthHeader(data.token);
       set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
       await get()._saveAccountToStore(data.user, data.token);
-      return { success: true };
+      
+      return { success: true, requiresMigration: !!data.requiresMigration };
     } catch (err) {
       const message = err.response?.data?.message || 'Login failed';
       set({ error: message, isLoading: false });

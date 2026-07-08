@@ -11,15 +11,15 @@ import api from '../../services/api';
 
 export default function ChangePasswordScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '', securityKey: '' });
-  const [show, setShow] = useState({ curr: false, new: false, key: false });
+  const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [show, setShow] = useState({ curr: false, new: false });
   const [isLoading, setIsLoading] = useState(false);
 
   const update = (key, val) => setForm(f => ({ ...f, [key]: val }));
   const toggleShow = (key) => setShow(s => ({ ...s, [key]: !s[key] }));
 
   const handleChange = async () => {
-    if (!form.currentPassword || !form.newPassword || !form.securityKey) {
+    if (!form.currentPassword || !form.newPassword) {
       Alert.alert('Error', 'All fields are required'); return;
     }
     if (form.newPassword !== form.confirmPassword) {
@@ -34,7 +34,6 @@ export default function ChangePasswordScreen({ navigation }) {
       await api.put('/auth/change-password', {
         currentPassword: form.currentPassword,
         newPassword: form.newPassword,
-        securityKey: form.securityKey,
       });
       Alert.alert('Success', 'Password changed successfully!', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (e) {
@@ -48,7 +47,6 @@ export default function ChangePasswordScreen({ navigation }) {
     { key: 'currentPassword', label: 'Current Password', showKey: 'curr', placeholder: 'Enter current password' },
     { key: 'newPassword', label: 'New Password', showKey: 'new', placeholder: 'Minimum 6 characters' },
     { key: 'confirmPassword', label: 'Confirm New Password', showKey: 'new', placeholder: 'Re-enter new password' },
-    { key: 'securityKey', label: 'Security Key', showKey: 'key', placeholder: 'Enter your security key', isKey: true },
   ];
 
   return (
@@ -62,10 +60,6 @@ export default function ChangePasswordScreen({ navigation }) {
         <View style={{ width: 36 }} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
-        <View style={styles.infoBox}>
-            <Ionicons name="shield-checkmark" size={20} color={Colors.accentGreen} />
-            <Text style={styles.infoText}>Your security key is required to change your password. This ensures only you can modify your account.</Text>
-          </View>
 
           {fields.map(({ key, label, showKey, placeholder, isKey }) => (
             <View key={key} style={styles.inputGroup}>

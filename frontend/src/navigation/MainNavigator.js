@@ -18,6 +18,7 @@ import ProfileScreen from '../screens/settings/ProfileScreen';
 import StoriesScreen from '../screens/stories/StoriesScreen';
 import StoryViewerScreen from '../screens/stories/StoryViewerScreen';
 import CommunitiesScreen from '../screens/communities/CommunitiesScreen';
+import RecoveryKeyScreen from '../screens/auth/RecoveryKeyScreen';
 import { Colors } from '../theme/colors';
 
 const Stack = createNativeStackNavigator();
@@ -51,6 +52,7 @@ export default function MainNavigator() {
       <Stack.Screen name="Stories" component={StoriesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="StoryViewer" component={StoryViewerScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Communities" component={CommunitiesScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="RecoveryKey" component={RecoveryKeyScreen} options={{ headerShown: false, gestureEnabled: false }} />
     </Stack.Navigator>
   );
 }

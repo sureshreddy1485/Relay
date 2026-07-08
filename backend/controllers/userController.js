@@ -149,7 +149,7 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       const fullChat = await Chat.findById(chat._id)
-        .populate('users', '-password -securityKey')
+        .populate('users', '-password -recoveryKey')
         .populate({
           path: 'latestMessage',
           populate: { path: 'sender', select: 'username displayName profilePicture' },
@@ -270,7 +270,7 @@ const acceptFriendRequest = asyncHandler(async (req, res) => {
   }
 
   const fullChat = await Chat.findById(chat._id)
-    .populate('users', '-password -securityKey')
+    .populate('users', '-password -recoveryKey')
     .populate({
       path: 'latestMessage',
       populate: { path: 'sender', select: 'username displayName profilePicture' },
@@ -593,7 +593,7 @@ const toggleGroupDMPrivacy = asyncHandler(async (req, res) => {
   if (io) {
     const Chat = require('../models/Chat');
     const fullChat = await Chat.findById(groupId)
-      .populate('users', '-password -securityKey')
+      .populate('users', '-password -recoveryKey')
       .populate('groupAdmin admins', 'username displayName profilePicture');
     if (fullChat) {
       fullChat.users.forEach((u) => {

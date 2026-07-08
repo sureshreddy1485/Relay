@@ -16,9 +16,7 @@ export default function LoginScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [securityKey, setSecurityKey] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [showKey, setShowKey] = useState(false);
   const [saveLogin, setSaveLogin] = useState(false);
   const [savedAccounts, setSavedAccounts] = useState([]);
   const { login, isLoading, error, clearError } = useAuthStore();
@@ -57,9 +55,9 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     clearError();
-    if (!identifier.trim() || !password.trim() || !securityKey.trim()) return shake();
+    if (!identifier.trim() || !password.trim()) return shake();
     
-    const result = await login(identifier.trim(), password, securityKey.trim());
+    const result = await login(identifier.trim(), password);
     if (result.success) {
       const user = useAuthStore.getState().user;
       
@@ -79,6 +77,15 @@ export default function LoginScreen({ navigation }) {
       await AsyncStorage.setItem('relay_saved_logins', JSON.stringify(newAccounts));
       
       connectSocket(user._id);
+
+      if (result.requiresMigration) {
+        const { navigationRef } = require('../../navigation/RootNavigator');
+        setTimeout(() => {
+          if (navigationRef.isReady()) {
+            navigationRef.navigate('RecoveryKey', { password, isMigration: true });
+          }
+        }, 300);
+      }
     } else {
       shake();
     }
@@ -189,28 +196,6 @@ export default function LoginScreen({ navigation }) {
               </View>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Security Key</Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="key-outline" size={20} color={Colors.dark.muted} style={styles.inputIcon} />
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  placeholder="Master security key"
-                  placeholderTextColor={Colors.dark.muted}
-                  value={securityKey}
-                  onChangeText={setSecurityKey}
-                  secureTextEntry={!showKey}
-                  onFocus={() => {
-                    setTimeout(() => {
-                      scrollRef.current?.scrollToEnd({ animated: true });
-                    }, 100);
-                  }}
-                />
-                <TouchableOpacity onPress={() => setShowKey(!showKey)} style={styles.eyeBtn}>
-                  <Ionicons name={showKey ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.dark.muted} />
-                </TouchableOpacity>
-              </View>
-            </View>
 
             <View style={styles.optionsRow}>
               <View style={styles.saveLoginRow}>

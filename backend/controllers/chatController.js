@@ -21,7 +21,7 @@ const accessChat = asyncHandler(async (req, res) => {
       { users: { $elemMatch: { $eq: userId } } },
     ],
   })
-    .populate('users', '-password -securityKey')
+    .populate('users', '-password -recoveryKey')
     .populate('latestMessage');
 
   if (chat) {
@@ -104,7 +104,7 @@ const accessChat = asyncHandler(async (req, res) => {
   }
 
   const newChat = await Chat.create({ users: [req.user._id, userId], isGroupChat: false });
-  const fullChat = await Chat.findById(newChat._id).populate('users', '-password -securityKey');
+  const fullChat = await Chat.findById(newChat._id).populate('users', '-password -recoveryKey');
 
   res.status(201).json({ success: true, chat: sanitizeChat(fullChat, req.user._id) });
 });
@@ -244,7 +244,7 @@ const createGroupChat = asyncHandler(async (req, res) => {
 
   const group = await Chat.create(groupData);
   const fullGroup = await Chat.findById(group._id)
-    .populate('users', '-password -securityKey')
+    .populate('users', '-password -recoveryKey')
     .populate('groupAdmin', 'username displayName profilePicture')
     .populate('admins', 'username displayName profilePicture');
 
@@ -397,7 +397,7 @@ const updateGroup = asyncHandler(async (req, res) => {
   }
 
   const fullChat = await Chat.findById(updated._id)
-    .populate('users', '-password -securityKey')
+    .populate('users', '-password -recoveryKey')
     .populate('groupAdmin admins', 'username displayName profilePicture');
 
   // Emit chat_updated to all members so GroupInfoScreen and ChatRoomScreen auto-refresh
@@ -530,7 +530,7 @@ const addToGroup = asyncHandler(async (req, res) => {
 
   // Fully populate the updated chat to send to all members
   const updatedChat = await Chat.findById(chat._id)
-    .populate('users', '-password -securityKey')
+    .populate('users', '-password -recoveryKey')
     .populate('groupAdmin admins', 'username displayName profilePicture');
 
   if (io) {
@@ -638,7 +638,7 @@ const removeFromGroup = asyncHandler(async (req, res) => {
     });
   }
 
-  const updated = await Chat.findById(chat._id).populate('users', '-password -securityKey');
+  const updated = await Chat.findById(chat._id).populate('users', '-password -recoveryKey');
   res.status(200).json({ success: true, chat: updated });
 });
 
@@ -750,7 +750,7 @@ const transferOwnership = asyncHandler(async (req, res) => {
   const fullMsg = await Message.findById(sysMsg._id).populate('sender', 'username displayName profilePicture');
   
   const fullChat = await Chat.findById(chat._id)
-    .populate('users', '-password -securityKey')
+    .populate('users', '-password -recoveryKey')
     .populate('groupAdmin admins', 'username displayName profilePicture');
 
   const io = req.app.get('io');
@@ -968,7 +968,7 @@ const setDisappearTimer = asyncHandler(async (req, res) => {
   const fullMsg = await Message.findById(sysMsg._id).populate('sender', 'username displayName profilePicture');
   
   const fullChat = await Chat.findById(chat._id)
-    .populate('users', '-password -securityKey')
+    .populate('users', '-password -recoveryKey')
     .populate('groupAdmin admins', 'username displayName profilePicture');
   
   const io = req.app.get('io');
@@ -1190,7 +1190,7 @@ const acceptJoinRequest = asyncHandler(async (req, res) => {
   const fullMsg = await Message.findById(sysMsg._id).populate('sender', 'username displayName profilePicture');
 
   const fullChat = await Chat.findById(chat._id)
-    .populate('users', '-password -securityKey')
+    .populate('users', '-password -recoveryKey')
     .populate('groupAdmin admins', 'username displayName profilePicture')
     .populate('joinRequests', 'username displayName profilePicture');
 
@@ -1238,7 +1238,7 @@ const declineJoinRequest = asyncHandler(async (req, res) => {
   }
 
   const fullChat = await Chat.findById(chat._id)
-    .populate('users', '-password -securityKey')
+    .populate('users', '-password -recoveryKey')
     .populate('groupAdmin admins', 'username displayName profilePicture')
     .populate('joinRequests', 'username displayName profilePicture');
 

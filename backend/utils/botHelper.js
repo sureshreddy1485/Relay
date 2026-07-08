@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Chat = require('../models/Chat');
+const { hashRecoveryKey } = require('./recoveryKey');
 
 let micaBotId = null;
 let relayBotId = null;
@@ -14,7 +15,7 @@ const initializeMicaBot = async () => {
         username: 'mica_bot',
         email: 'mica@relay.system',
         password: 'MicaSystemBotPassword123!@#',
-        securityKey: 'system_bot_key',
+        recoveryKey: await hashRecoveryKey('RELAY-MICA-BOTT-XXXX-XXXX'),
         displayName: 'Mica',
         bio: 'Relay System Assistant. Here to keep things lively!',
         profilePicture: 'https://res.cloudinary.com/dz3m8nxj3/image/upload/v1781247775/mica_profile_png.png',
@@ -60,7 +61,7 @@ const initializeRelayBot = async () => {
         username: 'relay_bot',
         email: 'relay@relay.system',
         password: 'RelaySystemBotPassword123!@#',
-        securityKey: 'system_bot_key_relay',
+        recoveryKey: await hashRecoveryKey('RELAY-RELA-BOTT-XXXX-XXXX'),
         displayName: 'Relay',
         bio: 'Relay System Services',
         profilePicture: 'https://res.cloudinary.com/dz3m8nxj3/image/upload/v1779647119/relay/profile_pictures/relay_bot.png',
@@ -104,7 +105,7 @@ const initializeMarsBot = async () => {
         username: 'mars_bot',
         email: 'mars@relay.system',
         password: 'MarsSystemBotPassword123!@#',
-        securityKey: 'system_bot_key_mars',
+        recoveryKey: await hashRecoveryKey('RELAY-MARS-BOTT-XXXX-XXXX'),
         displayName: 'Mars',
         bio: 'The smart troublemaker of the chat. I host games and judge you silently.',
         profilePicture: 'https://res.cloudinary.com/dz3m8nxj3/image/upload/v1781247775/mars_profile_png.png',

@@ -16,10 +16,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export default function SignupScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [form, setForm] = useState({
-    username: '', email: '', displayName: '', password: '', confirmPassword: '', securityKey: '',
+    username: '', email: '', displayName: '', password: '', confirmPassword: '',
   });
   const [showPass, setShowPass] = useState(false);
-  const [showKey, setShowKey] = useState(false);
   const [avatar, setAvatar] = useState(null);
   const [saveInfo, setSaveInfo] = useState(true);
   const { signup, isLoading, error, clearError } = useAuthStore();
@@ -65,8 +64,8 @@ export default function SignupScreen({ navigation }) {
 
   const handleSignup = async () => {
     clearError();
-    const { username, email, password, confirmPassword, securityKey, displayName } = form;
-    if (!username || !email || !password || !securityKey) {
+    const { username, email, password, confirmPassword, displayName } = form;
+    if (!username || !email || !password) {
       Alert.alert('Error', 'All fields are required'); return;
     }
     if (username.length < 6 || username.length > 16) {
@@ -90,13 +89,10 @@ export default function SignupScreen({ navigation }) {
     if (!passwordRegex.test(password)) {
       Alert.alert('Error', 'Password must contain at least one uppercase letter, one number, and one special character'); return;
     }
-    if (securityKey.length < 6) { Alert.alert('Error', 'Security key must be at least 6 characters'); return; }
-
     const formData = new FormData();
     formData.append('username', username.toLowerCase().trim());
     formData.append('email', email.toLowerCase().trim());
     formData.append('password', password);
-    formData.append('securityKey', securityKey);
     formData.append('displayName', displayName || username);
     if (avatar) {
       formData.append('profilePicture', { uri: avatar.uri, name: 'profile.jpg', type: 'image/jpeg' });
@@ -118,6 +114,15 @@ export default function SignupScreen({ navigation }) {
           accounts = [{ username: username.toLowerCase().trim(), email: email.toLowerCase().trim(), password }, ...accounts].slice(0, 3);
           await AsyncStorage.setItem('relay_saved_logins', JSON.stringify(accounts));
         } catch (_) {}
+      }
+
+      if (result.recoveryKey) {
+        const { navigationRef } = require('../../navigation/RootNavigator');
+        setTimeout(() => {
+          if (navigationRef.isReady()) {
+            navigationRef.navigate('RecoveryKey', { recoveryKey: result.recoveryKey, isMigration: false });
+          }
+        }, 300);
       }
     }
   };
@@ -233,29 +238,6 @@ export default function SignupScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Security Key */}
-          <View style={styles.inputGroup}
-            onLayout={(e) => { fieldYRef.current['securityKey'] = e.nativeEvent.layout.y; fieldHeightRef.current['securityKey'] = e.nativeEvent.layout.height; }}
-          >
-            <Text style={styles.label}>Security Key</Text>
-            <Text style={styles.hint}>🔐 Required for password recovery. Store it safely!</Text>
-            <View style={styles.inputWrap}>
-              <Ionicons name="shield-checkmark-outline" size={20} color={Colors.accentGreen} style={styles.inputIcon} />
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="Create a secret security key"
-                placeholderTextColor={Colors.dark.muted}
-                value={form.securityKey}
-                onChangeText={v => update('securityKey', v)}
-                secureTextEntry={!showKey}
-                autoCapitalize="none"
-                onFocus={() => scrollToField('securityKey')}
-              />
-              <TouchableOpacity onPress={() => setShowKey(!showKey)}>
-                <Ionicons name={showKey ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.dark.muted} />
-              </TouchableOpacity>
-            </View>
-          </View>
 
           {/* Save Info toggle */}
           <TouchableOpacity
