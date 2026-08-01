@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import TabNavigator from './TabNavigator';
 import ChatRoomScreen from '../screens/chat/ChatRoomScreen';
@@ -20,19 +21,25 @@ import StoryViewerScreen from '../screens/stories/StoryViewerScreen';
 import CommunitiesScreen from '../screens/communities/CommunitiesScreen';
 import RecoveryKeyScreen from '../screens/auth/RecoveryKeyScreen';
 import { Colors } from '../theme/colors';
-
 import useAuthStore from '../store/useAuthStore';
 
 const Stack = createNativeStackNavigator();
 
-export default function MainNavigator() {
-  const pendingRecoveryKey = useAuthStore(s => s.pendingRecoveryKey);
-  const migrationPassword = useAuthStore(s => s.migrationPassword);
-  const showRecovery = !!(pendingRecoveryKey || migrationPassword);
+function MainStack() {
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const key = useAuthStore.getState().pendingRecoveryKey;
+    const pw = useAuthStore.getState().migrationPassword;
+    if (key || pw) {
+      useAuthStore.getState().clearPendingRecovery();
+      navigation.navigate('RecoveryKey', { recoveryKey: key, isMigration: !!pw, password: pw });
+    }
+  }, []);
 
   return (
     <Stack.Navigator
-      initialRouteName={showRecovery ? 'RecoveryKey' : 'Tabs'}
+      initialRouteName="Tabs"
       screenOptions={{
         headerStyle: { backgroundColor: Colors.dark.card },
         headerTintColor: Colors.dark.text,
@@ -59,12 +66,11 @@ export default function MainNavigator() {
       <Stack.Screen name="Stories" component={StoriesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="StoryViewer" component={StoryViewerScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Communities" component={CommunitiesScreen} options={{ headerShown: false }} />
-      <Stack.Screen 
-        name="RecoveryKey" 
-        component={RecoveryKeyScreen} 
-        initialParams={{ recoveryKey: pendingRecoveryKey, isMigration: !!migrationPassword, password: migrationPassword }}
-        options={{ headerShown: false, gestureEnabled: false }} 
-      />
+      <Stack.Screen name="RecoveryKey" component={RecoveryKeyScreen} options={{ headerShown: false, gestureEnabled: false }} />
     </Stack.Navigator>
   );
+}
+
+export default function MainNavigator() {
+  return <MainStack />;
 }
