@@ -1,5 +1,4 @@
-import React, { useEffect } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import TabNavigator from './TabNavigator';
 import ChatRoomScreen from '../screens/chat/ChatRoomScreen';
@@ -21,22 +20,10 @@ import StoryViewerScreen from '../screens/stories/StoryViewerScreen';
 import CommunitiesScreen from '../screens/communities/CommunitiesScreen';
 import RecoveryKeyScreen from '../screens/auth/RecoveryKeyScreen';
 import { Colors } from '../theme/colors';
-import useAuthStore from '../store/useAuthStore';
 
 const Stack = createNativeStackNavigator();
 
-function MainStack() {
-  const navigation = useNavigation();
-
-  useEffect(() => {
-    const key = useAuthStore.getState().pendingRecoveryKey;
-    const pw = useAuthStore.getState().migrationPassword;
-    if (key || pw) {
-      useAuthStore.getState().clearPendingRecovery();
-      navigation.navigate('RecoveryKey', { recoveryKey: key, isMigration: !!pw, password: pw });
-    }
-  }, []);
-
+export default function MainNavigator() {
   return (
     <Stack.Navigator
       initialRouteName="Tabs"
@@ -69,8 +56,4 @@ function MainStack() {
       <Stack.Screen name="RecoveryKey" component={RecoveryKeyScreen} options={{ headerShown: false, gestureEnabled: false }} />
     </Stack.Navigator>
   );
-}
-
-export default function MainNavigator() {
-  return <MainStack />;
 }
