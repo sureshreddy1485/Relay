@@ -397,7 +397,7 @@ export default function SettingsScreen({ navigation }) {
             filename,
             'application/json'
           );
-          await FileSystem.writeAsStringAsync(uri, backupData, { encoding: FileSystem.EncodingType.UTF8 });
+          await FileSystem.writeAsStringAsync(uri, backupData);
           showAlert('Success', 'Backup saved locally in the selected folder!');
         } else {
           showAlert('Permission Denied', 'Unable to save backup locally.');

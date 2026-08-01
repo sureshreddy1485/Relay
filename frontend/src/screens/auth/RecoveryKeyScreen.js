@@ -64,14 +64,15 @@ Do not share this key with anyone.
 
     const fileUri = `${FileSystem.documentDirectory}relay-recovery-key.txt`;
     try {
-      await FileSystem.writeAsStringAsync(fileUri, fileContents, { encoding: FileSystem.EncodingType.UTF8 });
+      await FileSystem.writeAsStringAsync(fileUri, fileContents);
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, { dialogTitle: 'Save Recovery Key' });
+        await Sharing.shareAsync(fileUri, { dialogTitle: 'Save Recovery Key', mimeType: 'text/plain', UTI: 'public.plain-text' });
       } else {
         showAlert('Error', 'Sharing is not available on this device');
       }
     } catch (err) {
-      showAlert('Error', 'Failed to save recovery key file');
+      console.error('Save recovery key error:', err);
+      showAlert('Error', err.message || 'Failed to save recovery key file');
     }
   };
 
