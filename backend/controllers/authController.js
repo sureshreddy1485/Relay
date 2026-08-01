@@ -52,6 +52,7 @@ const signup = asyncHandler(async (req, res) => {
   const hashedRecoveryKey = await hashRecoveryKey(plainRecoveryKey);
 
   const sessionId = crypto.randomBytes(16).toString('hex');
+  const deviceName = req.body.deviceName || 'Unknown Device';
   let profilePicture = req.body.profilePicture || '';
   if (req.file) {
     try {
