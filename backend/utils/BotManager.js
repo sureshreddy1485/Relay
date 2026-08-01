@@ -404,8 +404,9 @@ class BotManager {
     }
 
     if (resolvedCommand === 'score' || resolvedCommand === 'scores') {
+      const settings = await GroupGameSettings.findOne({ groupId: chat._id });
       let content = `🏆 **Group Scores** 🏆\n\n`;
-      if (!settings.scores || settings.scores.size === 0) {
+      if (!settings || !settings.scores || settings.scores.size === 0) {
         content += activeBotStr === 'mars' ? "No one has scored any points yet. Shocking." : "No one has scored any points yet!";
       } else {
         const sortedScores = Array.from(settings.scores.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
