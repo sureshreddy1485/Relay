@@ -52,8 +52,16 @@ const signup = asyncHandler(async (req, res) => {
   const hashedRecoveryKey = await hashRecoveryKey(plainRecoveryKey);
 
   const sessionId = crypto.randomBytes(16).toString('hex');
-  const deviceName = req.body.deviceName || 'Unknown Device';
-  
+  let profilePicture = req.body.profilePicture || '';
+  if (req.file) {
+    try {
+      const result = await uploadToCloudinary(req.file.buffer, 'profiles', 'image');
+      profilePicture = result.secure_url;
+    } catch (uploadErr) {
+      console.error('Failed to upload signup profile picture:', uploadErr);
+    }
+  }
+
   const user = await User.create({
     username: username.toLowerCase(),
     email: email.toLowerCase(),
