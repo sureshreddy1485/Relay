@@ -7,6 +7,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useAlert } from '../../components/CustomAlert';
 import api from '../../services/api';
+import useAuthStore from '../../store/useAuthStore';
 
 export default function RecoveryKeyScreen({ navigation, route }) {
   const { recoveryKey: initialKey, isMigration, password } = route.params || {};
@@ -26,8 +27,13 @@ export default function RecoveryKeyScreen({ navigation, route }) {
       const { data } = await api.post('/auth/generate-recovery-key', { currentPassword: password });
       setKey(data.recoveryKey);
     } catch (e) {
+      useAuthStore.getState().clearPendingRecovery();
       showAlert('Error', e.response?.data?.message || 'Failed to generate recovery key');
-      navigation.goBack(); // Fallback if migration fails
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.replace('Tabs');
+      }
     } finally {
       setLoading(false);
     }
@@ -70,6 +76,7 @@ Do not share this key with anyone.
   };
 
   const handleContinue = () => {
+    useAuthStore.getState().clearPendingRecovery();
     if (navigation.canGoBack()) {
       navigation.goBack();
     } else {

@@ -21,11 +21,18 @@ import CommunitiesScreen from '../screens/communities/CommunitiesScreen';
 import RecoveryKeyScreen from '../screens/auth/RecoveryKeyScreen';
 import { Colors } from '../theme/colors';
 
+import useAuthStore from '../store/useAuthStore';
+
 const Stack = createNativeStackNavigator();
 
 export default function MainNavigator() {
+  const pendingRecoveryKey = useAuthStore(s => s.pendingRecoveryKey);
+  const migrationPassword = useAuthStore(s => s.migrationPassword);
+  const showRecovery = !!(pendingRecoveryKey || migrationPassword);
+
   return (
     <Stack.Navigator
+      initialRouteName={showRecovery ? 'RecoveryKey' : 'Tabs'}
       screenOptions={{
         headerStyle: { backgroundColor: Colors.dark.card },
         headerTintColor: Colors.dark.text,
@@ -52,7 +59,12 @@ export default function MainNavigator() {
       <Stack.Screen name="Stories" component={StoriesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="StoryViewer" component={StoryViewerScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Communities" component={CommunitiesScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="RecoveryKey" component={RecoveryKeyScreen} options={{ headerShown: false, gestureEnabled: false }} />
+      <Stack.Screen 
+        name="RecoveryKey" 
+        component={RecoveryKeyScreen} 
+        initialParams={{ recoveryKey: pendingRecoveryKey, isMigration: !!migrationPassword, password: migrationPassword }}
+        options={{ headerShown: false, gestureEnabled: false }} 
+      />
     </Stack.Navigator>
   );
 }

@@ -115,15 +115,6 @@ export default function SignupScreen({ navigation }) {
           await AsyncStorage.setItem('relay_saved_logins', JSON.stringify(accounts));
         } catch (_) {}
       }
-
-      if (result.recoveryKey) {
-        const { navigationRef } = require('../../navigation/RootNavigator');
-        setTimeout(() => {
-          if (navigationRef.isReady()) {
-            navigationRef.navigate('RecoveryKey', { recoveryKey: result.recoveryKey, isMigration: false });
-          }
-        }, 300);
-      }
     }
   };
 

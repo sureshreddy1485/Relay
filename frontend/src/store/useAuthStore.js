@@ -11,6 +11,9 @@ const useAuthStore = create((set, get) => ({
   isLoading: false,
   error: null,
   savedAccounts: [],
+  pendingRecoveryKey: null,
+  migrationPassword: null,
+  clearPendingRecovery: () => set({ pendingRecoveryKey: null, migrationPassword: null }),
 
   // Hydrate from storage on app start
   hydrate: async () => {
@@ -120,7 +123,7 @@ const useAuthStore = create((set, get) => ({
       await AsyncStorage.setItem('relay_token', data.token);
       await AsyncStorage.setItem('relay_user', JSON.stringify(data.user));
       setAuthHeader(data.token);
-      set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
+      set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false, pendingRecoveryKey: data.recoveryKey || null });
       await get()._saveAccountToStore(data.user, data.token);
       return { success: true, recoveryKey: data.recoveryKey };
     } catch (err) {
@@ -144,7 +147,7 @@ const useAuthStore = create((set, get) => ({
       await AsyncStorage.setItem('relay_token', data.token);
       await AsyncStorage.setItem('relay_user', JSON.stringify(data.user));
       setAuthHeader(data.token);
-      set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
+      set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false, migrationPassword: data.requiresMigration ? password : null });
       await get()._saveAccountToStore(data.user, data.token);
       
       return { success: true, requiresMigration: !!data.requiresMigration };

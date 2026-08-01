@@ -77,15 +77,6 @@ export default function LoginScreen({ navigation }) {
       await AsyncStorage.setItem('relay_saved_logins', JSON.stringify(newAccounts));
       
       connectSocket(user._id);
-
-      if (result.requiresMigration) {
-        const { navigationRef } = require('../../navigation/RootNavigator');
-        setTimeout(() => {
-          if (navigationRef.isReady()) {
-            navigationRef.navigate('RecoveryKey', { password, isMigration: true });
-          }
-        }, 300);
-      }
     } else {
       shake();
     }
