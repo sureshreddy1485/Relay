@@ -47,15 +47,6 @@ export default function TabNavigator() {
   const lastSettingsPressRef = React.useRef(0);
   const navigation = useNavigation();
 
-  React.useEffect(() => {
-    const key = useAuthStore.getState().pendingRecoveryKey;
-    const pw = useAuthStore.getState().migrationPassword;
-    if (key || pw) {
-      useAuthStore.getState().clearPendingRecovery();
-      navigation.navigate('RecoveryKey', { recoveryKey: key, isMigration: !!pw, password: pw });
-    }
-  }, []);
-
   const checkOtherAccountsUnread = React.useCallback(async () => {
     const state = useAuthStore.getState();
     const _savedAccounts = state.savedAccounts;

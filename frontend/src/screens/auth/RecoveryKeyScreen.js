@@ -78,13 +78,8 @@ Do not share this key with anyone.
 
   const handleContinue = () => {
     useAuthStore.getState().clearPendingRecovery();
-    try {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Tabs' }],
-      });
-    } catch (_) {
-      navigation.navigate('Tabs');
+    if (navigation?.canGoBack && navigation.canGoBack()) {
+      navigation.goBack();
     }
   };
 
