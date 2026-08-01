@@ -29,10 +29,10 @@ export default function RecoveryKeyScreen({ navigation, route }) {
     } catch (e) {
       useAuthStore.getState().clearPendingRecovery();
       showAlert('Error', e.response?.data?.message || 'Failed to generate recovery key');
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      } else {
-        navigation.replace('Tabs');
+      try {
+        navigation.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+      } catch (_) {
+        navigation.navigate('Tabs');
       }
     } finally {
       setLoading(false);
@@ -78,10 +78,13 @@ Do not share this key with anyone.
 
   const handleContinue = () => {
     useAuthStore.getState().clearPendingRecovery();
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      navigation.replace('Tabs'); // or wherever MainNavigator roots to
+    try {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Tabs' }],
+      });
+    } catch (_) {
+      navigation.navigate('Tabs');
     }
   };
 
