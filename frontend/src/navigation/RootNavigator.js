@@ -1,12 +1,13 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { DarkTheme } from '../theme/colors';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import RecoveryKeyScreen from '../screens/auth/RecoveryKeyScreen';
 import InAppNotification from '../components/InAppNotification';
 import useAuthStore from '../store/useAuthStore';
-import { navigationRef } from '../services/navigationService';
+
+export const navigationRef = createNavigationContainerRef();
 
 export default function RootNavigator() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
