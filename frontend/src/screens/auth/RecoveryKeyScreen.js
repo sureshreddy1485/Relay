@@ -30,9 +30,13 @@ export default function RecoveryKeyScreen({ navigation, route }) {
       useAuthStore.getState().clearPendingRecovery();
       showAlert('Error', e.response?.data?.message || 'Failed to generate recovery key');
       try {
-        navigation.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+        if (navigation?.reset) {
+          navigation.reset({ index: 0, routes: [{ name: 'Tabs' }] });
+        }
       } catch (_) {
-        navigation.navigate('Tabs');
+        if (navigation?.navigate) {
+          navigation.navigate('Tabs');
+        }
       }
     } finally {
       setLoading(false);
