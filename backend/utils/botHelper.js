@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Chat = require('../models/Chat');
+const Message = require('../models/Message');
 const { hashRecoveryKey } = require('./recoveryKey');
 
 let micaBotId = null;
@@ -87,6 +88,12 @@ const initializeRelayBot = async () => {
     );
     if (result.modifiedCount > 0) {
       console.log(`Removed Relay from ${result.modifiedCount} existing groups.`);
+    }
+
+    // Delete all existing Relay Bot messages right now
+    const deletedMsgs = await Message.deleteMany({ sender: relayBotId });
+    if (deletedMsgs.deletedCount > 0) {
+      console.log(`Purged ${deletedMsgs.deletedCount} existing Relay Bot messages.`);
     }
 
     console.log('Relay Bot initialized successfully.');

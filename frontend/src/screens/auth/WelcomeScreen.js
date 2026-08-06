@@ -5,12 +5,15 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../theme/colors';
 
+import useAuthStore from '../../store/useAuthStore';
+
 export default function WelcomeScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const logoAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    useAuthStore.getState().clearError();
     Animated.sequence([
       Animated.timing(logoAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
       Animated.parallel([

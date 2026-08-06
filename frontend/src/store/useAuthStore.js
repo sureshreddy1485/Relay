@@ -105,6 +105,14 @@ const useAuthStore = create((set, get) => ({
     return true;
   },
 
+  completeAuth: async (user, token) => {
+    await AsyncStorage.setItem('relay_token', token);
+    await AsyncStorage.setItem('relay_user', JSON.stringify(user));
+    setAuthHeader(token);
+    set({ user, token, isAuthenticated: true, pendingRecoveryKey: null, migrationPassword: null });
+    await get()._saveAccountToStore(user, token);
+  },
+
   signup: async (formData) => {
     set({ isLoading: true, error: null });
     try {
@@ -120,12 +128,8 @@ const useAuthStore = create((set, get) => ({
       const { data } = await uploadApi.post('/auth/signup', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      await AsyncStorage.setItem('relay_token', data.token);
-      await AsyncStorage.setItem('relay_user', JSON.stringify(data.user));
-      setAuthHeader(data.token);
-      set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false, pendingRecoveryKey: data.recoveryKey || null });
-      await get()._saveAccountToStore(data.user, data.token);
-      return { success: true, recoveryKey: data.recoveryKey };
+      set({ isLoading: false });
+      return { success: true, user: data.user, token: data.token, recoveryKey: data.recoveryKey };
     } catch (err) {
       const message = err.response?.data?.message || 'Signup failed';
       set({ error: message, isLoading: false });
@@ -144,19 +148,17 @@ const useAuthStore = create((set, get) => ({
       }
       const { data } = await api.post('/auth/login', { identifier, password, deviceName, deviceId });
       
-      await AsyncStorage.setItem('relay_token', data.token);
-      await AsyncStorage.setItem('relay_user', JSON.stringify(data.user));
-      setAuthHeader(data.token);
-      set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false, migrationPassword: data.requiresMigration ? password : null });
-      await get()._saveAccountToStore(data.user, data.token);
-      
-      return { success: true, requiresMigration: !!data.requiresMigration };
+      await get().completeAuth(data.user, data.token);
+      set({ isLoading: false });
+      return { success: true };
     } catch (err) {
       const message = err.response?.data?.message || 'Login failed';
       set({ error: message, isLoading: false });
       return { success: false, message };
     }
   },
+
+
 
   logout: async () => {
     try {

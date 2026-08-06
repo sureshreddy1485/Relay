@@ -754,7 +754,8 @@ const broadcastAdminUpdate = asyncHandler(async (req, res) => {
         sender: botUser._id,
         content: content,
         chat: chat._id,
-        messageType: 'text'
+        messageType: 'text',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
       });
 
       await Chat.findByIdAndUpdate(chat._id, { latestMessage: newMessage._id });
@@ -763,6 +764,44 @@ const broadcastAdminUpdate = asyncHandler(async (req, res) => {
   }
 
   res.status(200).json({ success: true, message: `Broadcast sent to ${sentCount} users.` });
+});
+
+// @route DELETE /api/messages/reset-db
+// @access Private (admin secret)
+const resetDatabaseAdmin = asyncHandler(async (req, res) => {
+  const { adminSecret } = req.body;
+  if (adminSecret !== process.env.JWT_SECRET) {
+    res.status(401); throw new Error('Unauthorized reset attempt');
+  }
+
+  const Story = require('../models/Story');
+  const GameSession = require('../models/GameSession');
+  const GroupGameSettings = require('../models/GroupGameSettings');
+  const PlayerGameStats = require('../models/PlayerGameStats');
+
+  await Message.deleteMany({});
+  await Chat.deleteMany({});
+  await Story.deleteMany({});
+  await GameSession.deleteMany({});
+  await GroupGameSettings.deleteMany({});
+  await PlayerGameStats.deleteMany({});
+
+  // Delete all regular user accounts EXCEPT Mica, Relay, and Mars (Bots are NOT erased)
+  const BOT_USERNAMES = ['mica_bot', 'relay_bot', 'mars_bot'];
+  const deletedUsers = await User.deleteMany({
+    username: { $nin: BOT_USERNAMES },
+    role: { $ne: 'system_bot' }
+  });
+
+  const { initializeMicaBot, initializeRelayBot, initializeMarsBot } = require('../utils/botHelper');
+  await initializeMicaBot();
+  await initializeRelayBot();
+  await initializeMarsBot();
+
+  res.status(200).json({
+    success: true,
+    message: `Database reset complete! Purged ${deletedUsers.deletedCount} user accounts and all chat/message history. System bots (Mica, Relay, Mars) were NOT erased and remain active.`
+  });
 });
 
 // @route DELETE /api/messages/broadcast
@@ -868,5 +907,5 @@ module.exports = {
   sendMessage, getMessages, markAsRead, markAsDelivered, deleteMessage,
   reactToMessage, forwardMessage, saveMessage, getSavedMessages,
   destructMessage, editMessage, voteOnPoll, broadcastAdminUpdate, deleteBroadcasts,
-  checkTokens, testFCMSend,
+  checkTokens, testFCMSend, resetDatabaseAdmin,
 };

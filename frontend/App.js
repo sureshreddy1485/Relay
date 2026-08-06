@@ -143,7 +143,8 @@ export default function App() {
             let attempts = 0;
             const navigateWhenReady = setInterval(() => {
               const { navigationRef } = require('./src/navigation/RootNavigator');
-              if (navigationRef && navigationRef.isReady()) {
+              const { isAuthenticated } = useAuthStore.getState();
+              if (isAuthenticated && navigationRef && navigationRef.isReady()) {
                 clearInterval(navigateWhenReady);
                 navigationRef.reset({
                   index: 1,
@@ -152,7 +153,7 @@ export default function App() {
                     { name: 'ChatRoom', params: { chatId } },
                   ],
                 });
-              } else if (attempts >= 25) { // 5 seconds max wait
+              } else if (!isAuthenticated || attempts >= 25) { // 5 seconds max wait or not authenticated
                 clearInterval(navigateWhenReady);
               }
               attempts++;
@@ -178,7 +179,8 @@ export default function App() {
             let attempts = 0;
             const navigateWhenReady = setInterval(() => {
               const { navigationRef } = require('./src/navigation/RootNavigator');
-              if (navigationRef && navigationRef.isReady()) {
+              const { isAuthenticated } = useAuthStore.getState();
+              if (isAuthenticated && navigationRef && navigationRef.isReady()) {
                 clearInterval(navigateWhenReady);
                 navigationRef.reset({
                   index: 1,
@@ -187,12 +189,13 @@ export default function App() {
                     { name: 'ChatRoom', params: { chatId } },
                   ],
                 });
-              } else if (attempts >= 25) { // 5 seconds max wait
+              } else if (!isAuthenticated || attempts >= 25) { // 5 seconds max wait or not authenticated
                 clearInterval(navigateWhenReady);
               }
               attempts++;
             }, 200);
           }
+
         } catch (e) {
           console.log('Notifee getInitialNotification failed:', e);
         }

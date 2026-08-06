@@ -47,6 +47,8 @@ export default function TabNavigator() {
   const lastSettingsPressRef = React.useRef(0);
   const navigation = useNavigation();
 
+
+
   const checkOtherAccountsUnread = React.useCallback(async () => {
     const state = useAuthStore.getState();
     const _savedAccounts = state.savedAccounts;
@@ -62,10 +64,11 @@ export default function TabNavigator() {
       if (acc.user._id === _user?._id) continue;
       try {
         const res = await api.get('/chats', { headers: { Authorization: `Bearer ${acc.token}` }, ignore401: true });
-        if (res.data.chats.some(c => c.unreadCount > 0)) {
+        if (res.data?.chats && Array.isArray(res.data.chats) && res.data.chats.some(c => c.unreadCount > 0)) {
           anyUnread = true;
           break;
         }
+
       } catch (e) {
         if (e.response?.status === 401) {
           const newSaved = useAuthStore.getState().savedAccounts.filter(a => a?.user?._id !== acc?.user?._id);

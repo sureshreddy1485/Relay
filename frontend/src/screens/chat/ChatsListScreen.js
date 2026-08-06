@@ -141,8 +141,17 @@ export default function ChatsListScreen({ navigation }) {
     }
   });
 
-  const pinned = filtered.filter(c => user?.pinnedChats?.includes(c._id));
-  const normal = filtered.filter(c => !user?.pinnedChats?.includes(c._id));
+  const isPinnedChat = (chatId) => {
+    if (!user?.pinnedChats || !chatId) return false;
+    return user.pinnedChats.some(p => {
+      const pId = typeof p === 'object' ? p?._id?.toString() : p?.toString();
+      return pId === chatId.toString();
+    });
+  };
+
+  const pinned = filtered.filter(c => isPinnedChat(c._id));
+  const normal = filtered.filter(c => !isPinnedChat(c._id));
+
 
   // ── Selection helpers ───────────────────────────────────────────────────────
   const toggleSelect = (id) => {

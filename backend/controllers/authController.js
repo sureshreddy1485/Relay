@@ -246,7 +246,11 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
   user.password = newPassword;
   user.lastPasswordChange = Date.now();
-  user.devices = []; // Log out all devices on password reset
+  if (req.user && req.user.currentSessionId) {
+    user.devices = (user.devices || []).filter(d => d.deviceId === req.user.currentSessionId);
+  } else {
+    user.devices = [];
+  }
   await user.save();
 
   res.status(200).json({ success: true, message: 'Password reset successfully' });

@@ -757,7 +757,14 @@ class BotManager {
 
   async sendCustomMessage(chat, io, senderId, content, messageType = 'text', pollData = undefined) {
     try {
-      let message = await Message.create({ sender: senderId, chat: chat._id, content, messageType, pollData });
+      const msgData = { sender: senderId, chat: chat._id, content, messageType, pollData };
+      const relayBotId = getRelayBotId();
+      if (relayBotId && senderId.toString() === relayBotId.toString()) {
+        // Relay Bot update/security messages expire after 7 days automatically
+        msgData.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      }
+
+      let message = await Message.create(msgData);
       message = await Message.findById(message._id).populate('sender', 'username displayName profilePicture');
 
       if (!chat.isGroupChat && chat.disappearAfter !== 86400) {

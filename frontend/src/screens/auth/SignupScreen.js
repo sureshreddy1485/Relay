@@ -29,14 +29,18 @@ export default function SignupScreen({ navigation }) {
   const screenHeight = Dimensions.get('window').height;
 
   useEffect(() => {
+    clearError();
+    const unsubscribe = navigation.addListener('focus', () => {
+      clearError();
+    });
     const show = Keyboard.addListener('keyboardDidShow', (e) => {
       keyboardHeightRef.current = e.endCoordinates.height;
     });
     const hide = Keyboard.addListener('keyboardDidHide', () => {
       keyboardHeightRef.current = 0;
     });
-    return () => { show.remove(); hide.remove(); };
-  }, []);
+    return () => { show.remove(); hide.remove(); unsubscribe(); };
+  }, [navigation]);
 
   const scrollToField = (key) => {
     const y = fieldYRef.current[key];
@@ -50,7 +54,10 @@ export default function SignupScreen({ navigation }) {
     }
   };
 
-  const update = (key, val) => setForm(f => ({ ...f, [key]: val }));
+  const update = (key, val) => {
+    if (error) clearError();
+    setForm(f => ({ ...f, [key]: val }));
+  };
 
   const pickAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -100,9 +107,6 @@ export default function SignupScreen({ navigation }) {
 
     const result = await signup(formData);
     if (result.success) {
-      const user = useAuthStore.getState().user;
-      connectSocket(user._id);
-
       // Save credentials locally if user opted in
       if (saveInfo) {
         try {
@@ -115,6 +119,13 @@ export default function SignupScreen({ navigation }) {
           await AsyncStorage.setItem('relay_saved_logins', JSON.stringify(accounts));
         } catch (_) {}
       }
+
+      navigation.navigate('RecoveryKey', {
+        recoveryKey: result.recoveryKey,
+        pendingUser: result.user,
+        pendingToken: result.token,
+        isSignup: true
+      });
     }
   };
 
@@ -136,7 +147,7 @@ export default function SignupScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => { clearError(); navigation.goBack(); }}>
             <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
           </TouchableOpacity>
 
@@ -253,7 +264,7 @@ export default function SignupScreen({ navigation }) {
 
           <View style={styles.loginRow}>
             <Text style={styles.loginText}>Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+            <TouchableOpacity onPress={() => { clearError(); navigation.navigate('Login'); }}>
               <Text style={styles.loginLink}>Sign In</Text>
             </TouchableOpacity>
           </View>

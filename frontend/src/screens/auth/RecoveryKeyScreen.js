@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, ActivityIndicator } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useAlert } from '../../components/CustomAlert';
 import api from '../../services/api';
 import useAuthStore from '../../store/useAuthStore';
 
 export default function RecoveryKeyScreen({ navigation, route }) {
-  const { recoveryKey: initialKey, isMigration, password } = route.params || {};
+  const { recoveryKey: initialKey, isMigration, password, pendingUser, pendingToken } = route.params || {};
   const [key, setKey] = useState(initialKey || '');
   const [hasConfirmed, setHasConfirmed] = useState(false);
   const [loading, setLoading] = useState(isMigration && !initialKey);
@@ -24,19 +24,20 @@ export default function RecoveryKeyScreen({ navigation, route }) {
 
   const generateKeyForMigration = async () => {
     try {
-      const { data } = await api.post('/auth/generate-recovery-key', { currentPassword: password });
-      setKey(data.recoveryKey);
+      setLoading(true);
+      const headers = pendingToken ? { Authorization: `Bearer ${pendingToken}` } : undefined;
+      const { data } = await api.post('/auth/generate-recovery-key', { currentPassword: password }, { headers });
+      if (data?.recoveryKey) {
+        setKey(data.recoveryKey);
+      } else {
+        showAlert('Error', 'No key returned from server.');
+      }
     } catch (e) {
-      useAuthStore.getState().clearPendingRecovery();
       showAlert('Error', e.response?.data?.message || 'Failed to generate recovery key');
-      try {
-        if (navigation?.reset) {
-          navigation.reset({ index: 0, routes: [{ name: 'Tabs' }] });
-        }
-      } catch (_) {
-        if (navigation?.navigate) {
-          navigation.navigate('Tabs');
-        }
+      if (navigation?.canGoBack && navigation.canGoBack()) {
+        navigation.goBack();
+      } else if (navigation?.navigate) {
+        navigation.navigate('Tabs');
       }
     } finally {
       setLoading(false);
@@ -44,35 +45,42 @@ export default function RecoveryKeyScreen({ navigation, route }) {
   };
 
   const handleCopy = async () => {
+    if (!key) {
+      showAlert('Error', 'No recovery key available to copy');
+      return;
+    }
     await Clipboard.setStringAsync(key);
-    showAlert('Success', 'Recovery key copied successfully.');
+    showAlert('Success', 'Recovery key copied successfully to clipboard.');
   };
 
-  const handleDownload = async () => {
+  const handleDownloadTxt = async () => {
+    if (!key) {
+      showAlert('Error', 'No recovery key available to download');
+      return;
+    }
     const fileContents = `===================================
 
 Relay Recovery Key
 
-Recovery Key
-
+Recovery Key:
 ${key}
 
 Keep this key safe.
-
 If you lose it and forget your password,
 your account CANNOT be recovered.
 
 Do not share this key with anyone.
 
+Generated: ${new Date().toLocaleString()}
 ===================================`;
 
-    const fileUri = `${FileSystem.documentDirectory}relay-recovery-key.txt`;
+    const fileUri = `${FileSystem.documentDirectory}relay_recovery_codes.txt`;
     try {
       await FileSystem.writeAsStringAsync(fileUri, fileContents);
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, { dialogTitle: 'Save Recovery Key', mimeType: 'text/plain', UTI: 'public.plain-text' });
+        await Sharing.shareAsync(fileUri, { dialogTitle: 'Save Recovery Key (.txt)', mimeType: 'text/plain', UTI: 'public.plain-text' });
       } else {
-        showAlert('Error', 'Sharing is not available on this device');
+        showAlert('Success', `Saved recovery key to:\n${fileUri}`);
       }
     } catch (err) {
       console.error('Save recovery key error:', err);
@@ -80,10 +88,99 @@ Do not share this key with anyone.
     }
   };
 
-  const handleContinue = () => {
-    useAuthStore.getState().clearPendingRecovery();
-    if (navigation?.canGoBack && navigation.canGoBack()) {
-      navigation.goBack();
+  const handleDownloadPdf = async () => {
+    if (!key) {
+      showAlert('Error', 'No recovery key available to export');
+      return;
+    }
+    try {
+      const dateStr = new Date().toLocaleString();
+      const pdfContent = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<<
+  /Type /Page
+  /Parent 2 0 R
+  /Resources << /Font << /F1 4 0 R >> >>
+  /MediaBox [0 0 612 792]
+  /Contents 5 0 R
+>>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Length 340 >>
+stream
+BT
+/F1 22 Tf
+50 720 Td
+(RELAY RECOVERY KEY) Tj
+/F1 14 Tf
+0 -40 Td
+(Official Account Emergency Recovery Document) Tj
+/F1 16 Tf
+0 -40 Td
+(Recovery Key:) Tj
+/F1 18 Tf
+0 -30 Td
+(${key}) Tj
+/F1 12 Tf
+0 -60 Td
+(Keep this key safe. If you lose it and forget your password,) Tj
+0 -18 Td
+(your account CANNOT be recovered.) Tj
+0 -40 Td
+(Generated: ${dateStr}) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000244 00000 n 
+0000000318 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+700
+%%EOF`;
+
+      const fileUri = `${FileSystem.documentDirectory}relay_recovery_codes.pdf`;
+      await FileSystem.writeAsStringAsync(fileUri, pdfContent);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, { dialogTitle: 'Save Recovery Key (.pdf)', mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+      } else {
+        showAlert('Success', `Saved PDF to:\n${fileUri}`);
+      }
+    } catch (err) {
+      console.error('Save PDF error:', err);
+      showAlert('Error', err.message || 'Failed to save PDF file');
+    }
+  };
+
+  const handleContinue = async () => {
+    if (pendingUser && pendingToken) {
+      const { completeAuth } = useAuthStore.getState();
+      await completeAuth(pendingUser, pendingToken);
+      try {
+        const { connectSocket } = require('../../services/socketService');
+        connectSocket(pendingUser._id);
+      } catch (_) {}
+    } else {
+      if (navigation?.canGoBack && navigation.canGoBack()) {
+        navigation.goBack();
+      } else if (navigation?.navigate) {
+        navigation.navigate('Tabs');
+      }
     }
   };
 
@@ -95,7 +192,7 @@ Do not share this key with anyone.
           <Text style={styles.loadingText}>Generating your secure Recovery Key...</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <Text style={styles.title}>Recovery Key</Text>
           <Text style={styles.desc}>
             We've generated a unique recovery key for your account. Store it in a safe place.
@@ -105,18 +202,23 @@ Do not share this key with anyone.
           </Text>
 
           <View style={styles.keyBox}>
-            <Text style={styles.keyText}>{key}</Text>
+            <Text style={styles.keyText} selectable>{key || 'NO KEY GENERATED'}</Text>
           </View>
 
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.actionBtn} onPress={handleCopy}>
-              <Ionicons name="copy-outline" size={20} color="#FFF" />
+              <Ionicons name="copy-outline" size={18} color="#FFF" />
               <Text style={styles.actionBtnText}>Copy Key</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtn} onPress={handleDownload}>
-              <Ionicons name="download-outline" size={20} color="#FFF" />
-              <Text style={styles.actionBtnText}>Download (.txt)</Text>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleDownloadTxt}>
+              <Ionicons name="document-text-outline" size={18} color="#FFF" />
+              <Text style={styles.actionBtnText}>Save .txt</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionBtn} onPress={handleDownloadPdf}>
+              <Ionicons name="document-outline" size={18} color="#FFF" />
+              <Text style={styles.actionBtnText}>Save .pdf</Text>
             </TouchableOpacity>
           </View>
 
@@ -173,10 +275,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  keyText: { color: Colors.primary, fontSize: 20, fontWeight: '700', letterSpacing: 1 },
-  buttonRow: { flexDirection: 'row', gap: 12, marginBottom: 32 },
+  keyText: { color: Colors.primary, fontSize: 19, fontWeight: '700', letterSpacing: 1, textAlign: 'center' },
+  buttonRow: { flexDirection: 'row', gap: 8, marginBottom: 28 },
   actionBtn: {
     flex: 1,
     backgroundColor: Colors.dark.card,
@@ -187,21 +289,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
-  actionBtnText: { color: '#FFF', fontSize: 15, fontWeight: '600' },
+  actionBtnText: { color: '#FFF', fontSize: 13, fontWeight: '600' },
   warningCard: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.3)',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 32,
+    marginBottom: 28,
   },
   warningHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   warningTitle: { color: '#EF4444', fontSize: 16, fontWeight: '700' },
   warningText: { color: '#EF4444', fontSize: 14, lineHeight: 22 },
-  checkboxRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 32 },
+  checkboxRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 28 },
   checkbox: {
     width: 24, height: 24, borderRadius: 6,
     borderWidth: 2, borderColor: Colors.dark.muted,

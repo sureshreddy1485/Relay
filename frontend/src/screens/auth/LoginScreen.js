@@ -24,6 +24,10 @@ export default function LoginScreen({ navigation }) {
   const scrollRef = useRef();
 
   React.useEffect(() => {
+    clearError();
+    const unsubscribe = navigation.addListener('focus', () => {
+      clearError();
+    });
     const loadSavedCredentials = async () => {
       try {
         const savedArr = await AsyncStorage.getItem('relay_saved_logins');
@@ -42,7 +46,8 @@ export default function LoginScreen({ navigation }) {
       } catch (e) {}
     };
     loadSavedCredentials();
-  }, []);
+    return unsubscribe;
+  }, [navigation]);
 
   const shake = () => {
     Animated.sequence([
@@ -60,7 +65,6 @@ export default function LoginScreen({ navigation }) {
     const result = await login(identifier.trim(), password);
     if (result.success) {
       const user = useAuthStore.getState().user;
-      
       let newAccounts = [...savedAccounts];
       newAccounts = newAccounts.filter(a => a.identifier !== identifier.trim() && a.userId !== user._id);
       
@@ -76,7 +80,7 @@ export default function LoginScreen({ navigation }) {
       }
       await AsyncStorage.setItem('relay_saved_logins', JSON.stringify(newAccounts));
       
-      connectSocket(user._id);
+      if (user?._id) connectSocket(user._id);
     } else {
       shake();
     }
@@ -161,7 +165,7 @@ export default function LoginScreen({ navigation }) {
                   placeholder="Enter email or username"
                   placeholderTextColor={Colors.dark.muted}
                   value={identifier}
-                  onChangeText={setIdentifier}
+                  onChangeText={(v) => { if (error) clearError(); setIdentifier(v); }}
                   autoCapitalize="none"
                   autoCorrect={false}
                   keyboardType="email-address"
@@ -178,7 +182,7 @@ export default function LoginScreen({ navigation }) {
                   placeholder="Enter password"
                   placeholderTextColor={Colors.dark.muted}
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(v) => { if (error) clearError(); setPassword(v); }}
                   secureTextEntry={!showPass}
                 />
                 <TouchableOpacity onPress={() => setShowPass(!showPass)} style={styles.eyeBtn}>
@@ -199,7 +203,7 @@ export default function LoginScreen({ navigation }) {
                 />
                 <Text style={styles.saveLoginText}>Save details</Text>
               </View>
-              <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} style={styles.forgotBtn}>
+              <TouchableOpacity onPress={() => { clearError(); navigation.navigate('ForgotPassword'); }} style={styles.forgotBtn}>
                 <Text style={styles.forgotText}>Forgot Password?</Text>
               </TouchableOpacity>
             </View>
@@ -216,7 +220,7 @@ export default function LoginScreen({ navigation }) {
 
             <View style={styles.signupRow}>
               <Text style={styles.signupText}>Don't have an account? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
+              <TouchableOpacity onPress={() => { clearError(); navigation.navigate('Signup'); }}>
                 <Text style={styles.signupLink}>Sign Up</Text>
               </TouchableOpacity>
             </View>
