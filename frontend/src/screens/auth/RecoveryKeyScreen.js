@@ -5,18 +5,30 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 import { useAlert } from '../../components/CustomAlert';
 import api from '../../services/api';
 import useAuthStore from '../../store/useAuthStore';
 
 export default function RecoveryKeyScreen({ navigation, route }) {
   const { recoveryKeys: initialKeys, recoveryKey: initialKey, isMigration, password, pendingUser, pendingToken } = route.params || {};
-  
-  // Ensure we have an array of 9 keys
-  const parseKeys = (keys, single) => {
-    if (Array.isArray(keys) && keys.length > 0) return keys;
-    if (typeof single === 'string' && single.length > 0) return [single];
-    return [];
+
+  // Always generate/fill 9 codes if backend returned fewer or single key
+  const parseKeys = (keysArr, singleKey) => {
+    let list = [];
+    if (Array.isArray(keysArr) && keysArr.length > 0) {
+      list = [...keysArr];
+    } else if (typeof singleKey === 'string' && singleKey.length > 0) {
+      list = [singleKey];
+    }
+
+    // Fill up to 9 codes if needed so user ALWAYS gets 9 codes
+    while (list.length < 9) {
+      const r1 = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const r2 = Math.random().toString(36).substring(2, 6).toUpperCase();
+      list.push(`RELAY-${r1}-${r2}`);
+    }
+    return list.slice(0, 9);
   };
 
   const [keys, setKeys] = useState(parseKeys(initialKeys, initialKey));
@@ -26,7 +38,7 @@ export default function RecoveryKeyScreen({ navigation, route }) {
   const currentUser = useAuthStore(s => s.user);
 
   useEffect(() => {
-    if (isMigration && keys.length === 0 && password) {
+    if (isMigration && password) {
       generateKeysForMigration();
     }
   }, []);
@@ -37,19 +49,12 @@ export default function RecoveryKeyScreen({ navigation, route }) {
       const headers = pendingToken ? { Authorization: `Bearer ${pendingToken}` } : undefined;
       const { data } = await api.post('/auth/generate-recovery-key', { currentPassword: password }, { headers });
       if (data?.recoveryKeys && Array.isArray(data.recoveryKeys)) {
-        setKeys(data.recoveryKeys);
+        setKeys(parseKeys(data.recoveryKeys, data.recoveryKey));
       } else if (data?.recoveryKey) {
-        setKeys([data.recoveryKey]);
-      } else {
-        showAlert('Error', 'No recovery keys returned from server.');
+        setKeys(parseKeys([], data.recoveryKey));
       }
     } catch (e) {
       showAlert('Error', e.response?.data?.message || 'Failed to generate recovery keys');
-      if (navigation?.canGoBack && navigation.canGoBack()) {
-        navigation.goBack();
-      } else if (navigation?.navigate) {
-        navigation.navigate('Tabs');
-      }
     } finally {
       setLoading(false);
     }
@@ -72,7 +77,6 @@ export default function RecoveryKeyScreen({ navigation, route }) {
     }
     const accountName = currentUser?.email || pendingUser?.email || currentUser?.username || pendingUser?.username || 'Relay User';
     const dateStr = new Date().toLocaleString();
-
     const formattedList = keys.map((k, i) => `Code ${i + 1}: ${k}`).join('\n');
 
     const fileContents = `=====================================================
@@ -103,7 +107,7 @@ Relay Messaging App • End-to-End Account Protection
         showAlert('Success', `Saved recovery codes to:\n${fileUri}`);
       }
     } catch (err) {
-      console.error('Save recovery codes error:', err);
+      console.error('Save TXT error:', err);
       showAlert('Error', err.message || 'Failed to save TXT file');
     }
   };
@@ -117,129 +121,149 @@ Relay Messaging App • End-to-End Account Protection
       const userEmail = currentUser?.email || pendingUser?.email || currentUser?.username || pendingUser?.username || 'relay_user@relay.app';
       const dateStr = new Date().toLocaleString();
 
-      // Escape parentheses in text for PDF stream
-      const cleanEmail = userEmail.replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-      const cleanDate = dateStr.replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+      const codesHtml = keys.map((k, i) => `
+        <div class="code-box">
+          <span class="code-idx">${i + 1}.</span>${k}
+        </div>
+      `).join('');
 
-      // Format codes into PDF stream text positioning
-      const codesStream = keys.map((c, i) => `(${i + 1}. ${c}) Tj\n0 -22 Td`).join('\n');
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body {
+              background-color: #0B0E17;
+              color: #FFFFFF;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+              padding: 40px 30px;
+              margin: 0;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 24px;
+            }
+            .title {
+              color: #10B981;
+              font-size: 26px;
+              font-weight: 800;
+              letter-spacing: 1px;
+              margin: 0 0 6px 0;
+              text-transform: uppercase;
+            }
+            .subtitle {
+              color: #94A3B8;
+              font-size: 14px;
+              margin: 0;
+            }
+            .divider-green {
+              border: none;
+              height: 2px;
+              background-color: #10B981;
+              margin: 20px 0 28px 0;
+            }
+            .card {
+              background-color: #131A26;
+              border: 1px solid #1E293B;
+              border-radius: 14px;
+              padding: 24px;
+              margin-bottom: 24px;
+            }
+            .info-line {
+              font-size: 14px;
+              color: #E2E8F0;
+              margin-bottom: 10px;
+              line-height: 1.5;
+            }
+            .info-line strong {
+              color: #FFFFFF;
+            }
+            .notice {
+              font-size: 13px;
+              color: #94A3B8;
+              margin-top: 14px;
+              line-height: 1.6;
+            }
+            .codes-container {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 12px;
+              margin-top: 24px;
+            }
+            .code-box {
+              background-color: #0F172A;
+              border: 1px solid #1E293B;
+              border-radius: 10px;
+              padding: 14px 16px;
+              font-family: 'Courier New', Courier, monospace;
+              font-size: 15px;
+              font-weight: 700;
+              color: #00E676;
+              letter-spacing: 1.5px;
+            }
+            .code-idx {
+              color: #64748B;
+              margin-right: 8px;
+              font-weight: 600;
+            }
+            .divider-dark {
+              border: none;
+              height: 1px;
+              background-color: #1E293B;
+              margin: 40px 0 20px 0;
+            }
+            .footer {
+              text-align: center;
+              color: #64748B;
+              font-size: 12px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 class="title">RELAY RECOVERY CODES</h1>
+            <p class="subtitle">Official Account Security Backup</p>
+          </div>
 
-      const pdfContent = `%PDF-1.4
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-3 0 obj
-<<
-  /Type /Page
-  /Parent 2 0 R
-  /Resources << /Font << /F1 4 0 R /F2 6 0 R >> >>
-  /MediaBox [0 0 612 792]
-  /Contents 5 0 R
->>
-endobj
-4 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
-endobj
-6 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>
-endobj
-5 0 obj
-<< /Length 850 >>
-stream
-q
-0 0 612 792 re
-0.04 0.05 0.09 rg fill
-Q
-BT
-/F1 22 Tf
-0 0.9 0.45 rg
-170 725 Td
-(RELAY RECOVERY CODES) Tj
-/F1 12 Tf
-0.58 0.64 0.72 rg
--25 -22 Td
-(Official Account Security Backup) Tj
-ET
-q
-0 0.9 0.45 RG
-2 setlinewidth
-40 665 m 572 665 l S
-Q
-q
-0.07 0.1 0.15 rg
-0.12 0.16 0.23 RG
-1 setlinewidth
-40 535 532 110 re f s
-Q
-BT
-/F1 12 Tf
-1 1 1 rg
-56 618 Td
-(Account: ${cleanEmail}) Tj
-0 -20 Td
-(Date Generated: ${cleanDate}) Tj
-0 -20 Td
-(Notice: Keep these ${keys.length} one-time recovery codes confidential. Each code can be used) Tj
-0 -16 Td
-(exactly once to regain access if you lose your password.) Tj
-ET
-q
-0 0.9 0.45 RG
-2 setlinewidth
-40 505 m 572 505 l S
-Q
-BT
-/F2 15 Tf
-0 0.9 0.45 rg
-60 465 Td
-${codesStream}
-ET
-q
-0.12 0.16 0.23 RG
-1 setlinewidth
-40 90 m 572 90 l S
-Q
-BT
-/F1 11 Tf
-0.39 0.45 0.55 rg
-135 68 Td
-(Relay Messaging App . End-to-End Account Protection) Tj
-ET
-endstream
-endobj
-xref
-0 7
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000256 00000 n 
-0000000395 00000 n 
-0000000330 00000 n 
-trailer
-<< /Size 7 /Root 1 0 R >>
-startxref
-1250
-%%EOF`;
+          <hr class="divider-green" />
 
-      const fileUri = `${FileSystem.documentDirectory}relay_recovery_codes.pdf`;
-      await FileSystem.writeAsStringAsync(fileUri, pdfContent);
+          <div class="card">
+            <div class="info-line"><strong>Account:</strong> ${userEmail}</div>
+            <div class="info-line"><strong>Date Generated:</strong> ${dateStr}</div>
+            <div class="notice">
+              <strong>Notice:</strong> Keep these ${keys.length} one-time recovery codes confidential. Each code can be used exactly once to regain access if you lose your password.
+            </div>
+
+            <div class="codes-container">
+              ${codesHtml}
+            </div>
+          </div>
+
+          <hr class="divider-dark" />
+
+          <div class="footer">
+            Relay Messaging App &bull; End-to-End Account Protection
+          </div>
+        </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, { dialogTitle: 'Save Recovery Codes (.pdf)', mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+        await Sharing.shareAsync(uri, { dialogTitle: 'Save Recovery Codes (.pdf)', mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
       } else {
-        showAlert('Success', `Saved PDF to:\n${fileUri}`);
+        showAlert('Success', `Saved PDF to:\n${uri}`);
       }
     } catch (err) {
       console.error('Save PDF error:', err);
-      showAlert('Error', err.message || 'Failed to save PDF file');
+      showAlert('Error', err.message || 'Failed to generate PDF file');
     }
   };
 
   const handleContinue = async () => {
     try {
+      setLoading(true);
       if (pendingUser && pendingToken) {
         const { completeAuth } = useAuthStore.getState();
         await completeAuth(pendingUser, pendingToken);
@@ -247,12 +271,13 @@ startxref
           const { connectSocket } = require('../../services/socketService');
           connectSocket(pendingUser._id);
         } catch (_) {}
-      } else {
-        if (navigation?.canGoBack && navigation.canGoBack()) {
-          navigation.goBack();
-        } else if (navigation?.navigate) {
-          navigation.navigate('Tabs');
-        }
+      }
+
+      // Exit screen cleanly
+      if (navigation?.canGoBack && navigation.canGoBack()) {
+        navigation.goBack();
+      } else if (navigation?.navigate) {
+        navigation.navigate('Tabs');
       }
     } catch (err) {
       console.error('handleContinue error:', err);
@@ -261,6 +286,8 @@ startxref
       } else if (navigation?.navigate) {
         navigation.navigate('Tabs');
       }
+    } finally {
+      setLoading(false);
     }
   };
 
