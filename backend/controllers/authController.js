@@ -5,7 +5,7 @@ const Chat = require('../models/Chat');
 const Message = require('../models/Message');
 const BotManager = require('../utils/BotManager');
 const { getMicaBotId, getRelayBotId } = require('../utils/botHelper');
-const { generateRecoveryKey, hashRecoveryKey, verifyRecoveryKey } = require('../utils/recoveryKey');
+const { generateRecoveryKeys, generateRecoveryKey, hashRecoveryKeys, hashRecoveryKey, verifyRecoveryCode, verifyRecoveryKey } = require('../utils/recoveryKey');
 const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
 
 const crypto = require('crypto');
@@ -48,8 +48,8 @@ const signup = asyncHandler(async (req, res) => {
     throw new Error('Email is already registered');
   }
 
-  const plainRecoveryKey = generateRecoveryKey();
-  const hashedRecoveryKey = await hashRecoveryKey(plainRecoveryKey);
+  const plainRecoveryKeys = generateRecoveryKeys(9);
+  const hashedRecoveryKeys = await hashRecoveryKeys(plainRecoveryKeys);
 
   const sessionId = crypto.randomBytes(16).toString('hex');
   const deviceName = req.body.deviceName || 'Unknown Device';
@@ -67,16 +67,63 @@ const signup = asyncHandler(async (req, res) => {
     username: username.toLowerCase(),
     email: email.toLowerCase(),
     password,
-    recoveryKey: hashedRecoveryKey,
+    recoveryKeys: hashedRecoveryKeys,
+    recoveryKey: hashedRecoveryKeys[0]?.code || '',
     displayName: displayName || username,
     profilePicture,
     devices: [{ deviceId: sessionId, deviceName, lastActive: Date.now() }]
   });
 
+  // Send automatic Welcome Message from Relay Bot
+  let relayId = getRelayBotId();
+  if (relayId) {
+    try {
+      let chat = await Chat.create({
+        chatName: 'Relay System',
+        isGroupChat: false,
+        users: [user._id, relayId],
+        disappearAfter: 86400,
+      });
+
+      const welcomeContent = `🚀 **WELCOME TO RELAY** 🚀
+
+We are thrilled to officially welcome you to Relay — the lightning-fast, ultra-secure messaging platform! Here is a quick guide to get you started:
+
+💬 **Instant Messaging & Media**
+Chat with your friends effortlessly. Send texts, voice notes, photos, and files.
+
+👻 **Disappearing Messages**
+Privacy is our priority. Send 'View Once' media or enable disappearing messages in chat settings.
+
+🤖 **Meet Mica & Mars (AI Bots)**
+Relay features two native AI companions! Mica (@mica_bot) is helpful and friendly. Mars (@mars_bot) is sarcastic and witty. Ask them anything or play games in groups!
+
+🎮 **Play Group Games**
+Type 'help games' in any group chat to play Riddle, Scramble, Guess the Word, Emoji Guess, Mafia, Double Agent, Breach, and Suspect!
+
+🛡️ **Account Security**
+Be sure to save your 16-character Recovery Key as a .txt or .pdf file. If you ever forget your password, your Recovery Key will restore your account!
+
+Enjoy chatting on Relay! ✨`;
+
+      const io = req.app.get('io');
+      await BotManager.sendCustomMessage(
+        chat,
+        io,
+        relayId,
+        welcomeContent,
+        'text'
+      );
+    } catch (welcomeErr) {
+      console.error('Failed to send welcome message to new user:', welcomeErr);
+    }
+  }
+
   res.status(201).json({
     success: true,
     token: generateToken(user._id, sessionId),
-    recoveryKey: plainRecoveryKey,
+    recoveryKeys: plainRecoveryKeys,
+    recoveryKey: plainRecoveryKeys[0],
     user: {
       _id: user._id,
       username: user.username,
@@ -226,7 +273,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
     ? { email: identifier.toLowerCase() }
     : { username: identifier.toLowerCase() };
 
-  const user = await User.findOne(query).select('+recoveryKey +lastPasswordChange');
+  const user = await User.findOne(query).select('+recoveryKey +recoveryKeys +lastPasswordChange');
   if (!user) {
     res.status(404);
     throw new Error('User not found');
@@ -238,10 +285,14 @@ const forgotPassword = asyncHandler(async (req, res) => {
     throw new Error('Password can only be changed once every 14 days.');
   }
 
-  const isValid = await verifyRecoveryKey(recoveryKey, user.recoveryKey);
-  if (!isValid) {
+  const result = await verifyRecoveryCode(recoveryKey, user);
+  if (!result.valid) {
     res.status(401);
-    throw new Error('Invalid recovery key');
+    throw new Error('Invalid or already used recovery key');
+  }
+
+  if (result.isArray && typeof result.keyIndex === 'number') {
+    user.recoveryKeys[result.keyIndex].used = true;
   }
 
   user.password = newPassword;
@@ -377,10 +428,11 @@ const generateNewRecoveryKey = asyncHandler(async (req, res) => {
     throw new Error('Current password is incorrect');
   }
 
-  const plainRecoveryKey = generateRecoveryKey();
-  const hashedRecoveryKey = await hashRecoveryKey(plainRecoveryKey);
+  const plainRecoveryKeys = generateRecoveryKeys(9);
+  const hashedRecoveryKeys = await hashRecoveryKeys(plainRecoveryKeys);
 
-  user.recoveryKey = hashedRecoveryKey;
+  user.recoveryKeys = hashedRecoveryKeys;
+  user.recoveryKey = hashedRecoveryKeys[0]?.code || '';
   
   // Remove old security key permanently
   user.securityKey = undefined;
@@ -389,8 +441,9 @@ const generateNewRecoveryKey = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    recoveryKey: plainRecoveryKey,
-    message: 'New recovery key generated successfully',
+    recoveryKeys: plainRecoveryKeys,
+    recoveryKey: plainRecoveryKeys[0],
+    message: 'New 9 recovery keys generated successfully',
   });
 });
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { Colors } from '../../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -10,30 +10,41 @@ import api from '../../services/api';
 import useAuthStore from '../../store/useAuthStore';
 
 export default function RecoveryKeyScreen({ navigation, route }) {
-  const { recoveryKey: initialKey, isMigration, password, pendingUser, pendingToken } = route.params || {};
-  const [key, setKey] = useState(initialKey || '');
+  const { recoveryKeys: initialKeys, recoveryKey: initialKey, isMigration, password, pendingUser, pendingToken } = route.params || {};
+  
+  // Ensure we have an array of 9 keys
+  const parseKeys = (keys, single) => {
+    if (Array.isArray(keys) && keys.length > 0) return keys;
+    if (typeof single === 'string' && single.length > 0) return [single];
+    return [];
+  };
+
+  const [keys, setKeys] = useState(parseKeys(initialKeys, initialKey));
   const [hasConfirmed, setHasConfirmed] = useState(false);
-  const [loading, setLoading] = useState(isMigration && !initialKey);
+  const [loading, setLoading] = useState(isMigration && keys.length === 0);
   const { showAlert } = useAlert();
+  const currentUser = useAuthStore(s => s.user);
 
   useEffect(() => {
-    if (isMigration && !initialKey && password) {
-      generateKeyForMigration();
+    if (isMigration && keys.length === 0 && password) {
+      generateKeysForMigration();
     }
   }, []);
 
-  const generateKeyForMigration = async () => {
+  const generateKeysForMigration = async () => {
     try {
       setLoading(true);
       const headers = pendingToken ? { Authorization: `Bearer ${pendingToken}` } : undefined;
       const { data } = await api.post('/auth/generate-recovery-key', { currentPassword: password }, { headers });
-      if (data?.recoveryKey) {
-        setKey(data.recoveryKey);
+      if (data?.recoveryKeys && Array.isArray(data.recoveryKeys)) {
+        setKeys(data.recoveryKeys);
+      } else if (data?.recoveryKey) {
+        setKeys([data.recoveryKey]);
       } else {
-        showAlert('Error', 'No key returned from server.');
+        showAlert('Error', 'No recovery keys returned from server.');
       }
     } catch (e) {
-      showAlert('Error', e.response?.data?.message || 'Failed to generate recovery key');
+      showAlert('Error', e.response?.data?.message || 'Failed to generate recovery keys');
       if (navigation?.canGoBack && navigation.canGoBack()) {
         navigation.goBack();
       } else if (navigation?.navigate) {
@@ -45,56 +56,74 @@ export default function RecoveryKeyScreen({ navigation, route }) {
   };
 
   const handleCopy = async () => {
-    if (!key) {
-      showAlert('Error', 'No recovery key available to copy');
+    if (!keys || keys.length === 0) {
+      showAlert('Error', 'No recovery keys available to copy');
       return;
     }
-    await Clipboard.setStringAsync(key);
-    showAlert('Success', 'Recovery key copied successfully to clipboard.');
+    const formattedText = keys.map((k, i) => `${i + 1}. ${k}`).join('\n');
+    await Clipboard.setStringAsync(formattedText);
+    showAlert('Success', `${keys.length} Recovery Codes copied to clipboard.`);
   };
 
   const handleDownloadTxt = async () => {
-    if (!key) {
-      showAlert('Error', 'No recovery key available to download');
+    if (!keys || keys.length === 0) {
+      showAlert('Error', 'No recovery keys available to download');
       return;
     }
-    const fileContents = `===================================
+    const accountName = currentUser?.email || pendingUser?.email || currentUser?.username || pendingUser?.username || 'Relay User';
+    const dateStr = new Date().toLocaleString();
 
-Relay Recovery Key
+    const formattedList = keys.map((k, i) => `Code ${i + 1}: ${k}`).join('\n');
 
-Recovery Key:
-${key}
+    const fileContents = `=====================================================
+RELAY RECOVERY CODES
+Official Account Security Backup
+=====================================================
 
-Keep this key safe.
-If you lose it and forget your password,
-your account CANNOT be recovered.
+Account: ${accountName}
+Date Generated: ${dateStr}
 
-Do not share this key with anyone.
+Notice: Keep these ${keys.length} one-time recovery codes confidential.
+Each code can be used exactly once to regain access if you lose your password.
 
-Generated: ${new Date().toLocaleString()}
-===================================`;
+-----------------------------------------------------
+YOUR RECOVERY CODES:
+${formattedList}
+-----------------------------------------------------
+
+Relay Messaging App • End-to-End Account Protection
+=====================================================`;
 
     const fileUri = `${FileSystem.documentDirectory}relay_recovery_codes.txt`;
     try {
       await FileSystem.writeAsStringAsync(fileUri, fileContents);
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, { dialogTitle: 'Save Recovery Key (.txt)', mimeType: 'text/plain', UTI: 'public.plain-text' });
+        await Sharing.shareAsync(fileUri, { dialogTitle: 'Save Recovery Codes (.txt)', mimeType: 'text/plain', UTI: 'public.plain-text' });
       } else {
-        showAlert('Success', `Saved recovery key to:\n${fileUri}`);
+        showAlert('Success', `Saved recovery codes to:\n${fileUri}`);
       }
     } catch (err) {
-      console.error('Save recovery key error:', err);
-      showAlert('Error', err.message || 'Failed to save recovery key file');
+      console.error('Save recovery codes error:', err);
+      showAlert('Error', err.message || 'Failed to save TXT file');
     }
   };
 
   const handleDownloadPdf = async () => {
-    if (!key) {
-      showAlert('Error', 'No recovery key available to export');
+    if (!keys || keys.length === 0) {
+      showAlert('Error', 'No recovery codes available to export');
       return;
     }
     try {
+      const userEmail = currentUser?.email || pendingUser?.email || currentUser?.username || pendingUser?.username || 'relay_user@relay.app';
       const dateStr = new Date().toLocaleString();
+
+      // Escape parentheses in text for PDF stream
+      const cleanEmail = userEmail.replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+      const cleanDate = dateStr.replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+
+      // Format codes into PDF stream text positioning
+      const codesStream = keys.map((c, i) => `(${i + 1}. ${c}) Tj\n0 -22 Td`).join('\n');
+
       const pdfContent = `%PDF-1.4
 1 0 obj
 << /Type /Catalog /Pages 2 0 R >>
@@ -106,7 +135,7 @@ endobj
 <<
   /Type /Page
   /Parent 2 0 R
-  /Resources << /Font << /F1 4 0 R >> >>
+  /Resources << /Font << /F1 4 0 R /F2 6 0 R >> >>
   /MediaBox [0 0 612 792]
   /Contents 5 0 R
 >>
@@ -114,50 +143,92 @@ endobj
 4 0 obj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
 endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>
+endobj
 5 0 obj
-<< /Length 340 >>
+<< /Length 850 >>
 stream
+q
+0 0 612 792 re
+0.04 0.05 0.09 rg fill
+Q
 BT
 /F1 22 Tf
-50 720 Td
-(RELAY RECOVERY KEY) Tj
-/F1 14 Tf
-0 -40 Td
-(Official Account Emergency Recovery Document) Tj
-/F1 16 Tf
-0 -40 Td
-(Recovery Key:) Tj
-/F1 18 Tf
-0 -30 Td
-(${key}) Tj
+0 0.9 0.45 rg
+170 725 Td
+(RELAY RECOVERY CODES) Tj
 /F1 12 Tf
-0 -60 Td
-(Keep this key safe. If you lose it and forget your password,) Tj
-0 -18 Td
-(your account CANNOT be recovered.) Tj
-0 -40 Td
-(Generated: ${dateStr}) Tj
+0.58 0.64 0.72 rg
+-25 -22 Td
+(Official Account Security Backup) Tj
+ET
+q
+0 0.9 0.45 RG
+2 setlinewidth
+40 665 m 572 665 l S
+Q
+q
+0.07 0.1 0.15 rg
+0.12 0.16 0.23 RG
+1 setlinewidth
+40 535 532 110 re f s
+Q
+BT
+/F1 12 Tf
+1 1 1 rg
+56 618 Td
+(Account: ${cleanEmail}) Tj
+0 -20 Td
+(Date Generated: ${cleanDate}) Tj
+0 -20 Td
+(Notice: Keep these ${keys.length} one-time recovery codes confidential. Each code can be used) Tj
+0 -16 Td
+(exactly once to regain access if you lose your password.) Tj
+ET
+q
+0 0.9 0.45 RG
+2 setlinewidth
+40 505 m 572 505 l S
+Q
+BT
+/F2 15 Tf
+0 0.9 0.45 rg
+60 465 Td
+${codesStream}
+ET
+q
+0.12 0.16 0.23 RG
+1 setlinewidth
+40 90 m 572 90 l S
+Q
+BT
+/F1 11 Tf
+0.39 0.45 0.55 rg
+135 68 Td
+(Relay Messaging App . End-to-End Account Protection) Tj
 ET
 endstream
 endobj
 xref
-0 6
+0 7
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
 0000000115 00000 n 
-0000000244 00000 n 
-0000000318 00000 n 
+0000000256 00000 n 
+0000000395 00000 n 
+0000000330 00000 n 
 trailer
-<< /Size 6 /Root 1 0 R >>
+<< /Size 7 /Root 1 0 R >>
 startxref
-700
+1250
 %%EOF`;
 
       const fileUri = `${FileSystem.documentDirectory}relay_recovery_codes.pdf`;
       await FileSystem.writeAsStringAsync(fileUri, pdfContent);
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, { dialogTitle: 'Save Recovery Key (.pdf)', mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+        await Sharing.shareAsync(fileUri, { dialogTitle: 'Save Recovery Codes (.pdf)', mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
       } else {
         showAlert('Success', `Saved PDF to:\n${fileUri}`);
       }
@@ -168,14 +239,23 @@ startxref
   };
 
   const handleContinue = async () => {
-    if (pendingUser && pendingToken) {
-      const { completeAuth } = useAuthStore.getState();
-      await completeAuth(pendingUser, pendingToken);
-      try {
-        const { connectSocket } = require('../../services/socketService');
-        connectSocket(pendingUser._id);
-      } catch (_) {}
-    } else {
+    try {
+      if (pendingUser && pendingToken) {
+        const { completeAuth } = useAuthStore.getState();
+        await completeAuth(pendingUser, pendingToken);
+        try {
+          const { connectSocket } = require('../../services/socketService');
+          connectSocket(pendingUser._id);
+        } catch (_) {}
+      } else {
+        if (navigation?.canGoBack && navigation.canGoBack()) {
+          navigation.goBack();
+        } else if (navigation?.navigate) {
+          navigation.navigate('Tabs');
+        }
+      }
+    } catch (err) {
+      console.error('handleContinue error:', err);
       if (navigation?.canGoBack && navigation.canGoBack()) {
         navigation.goBack();
       } else if (navigation?.navigate) {
@@ -189,26 +269,31 @@ startxref
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Generating your secure Recovery Key...</Text>
+          <Text style={styles.loadingText}>Generating 9 secure Recovery Codes...</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={styles.title}>Recovery Key</Text>
+          <Text style={styles.title}>Recovery Codes</Text>
           <Text style={styles.desc}>
-            We've generated a unique recovery key for your account. Store it in a safe place.
+            We've generated 9 one-time recovery codes for your account. Store them in a safe place.
           </Text>
           <Text style={styles.desc2}>
-            You will need this key if you ever forget your password. This key will only be shown once.
+            Each code can be used ONCE if you ever forget your password. These codes will only be shown once.
           </Text>
 
-          <View style={styles.keyBox}>
-            <Text style={styles.keyText} selectable>{key || 'NO KEY GENERATED'}</Text>
+          <View style={styles.keysGrid}>
+            {keys.map((k, i) => (
+              <View key={i} style={styles.keyBadge}>
+                <Text style={styles.keyBadgeIndex}>{i + 1}.</Text>
+                <Text style={styles.keyBadgeText} selectable>{k}</Text>
+              </View>
+            ))}
           </View>
 
           <View style={styles.buttonRow}>
             <TouchableOpacity style={styles.actionBtn} onPress={handleCopy}>
               <Ionicons name="copy-outline" size={18} color="#FFF" />
-              <Text style={styles.actionBtnText}>Copy Key</Text>
+              <Text style={styles.actionBtnText}>Copy Keys</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionBtn} onPress={handleDownloadTxt}>
@@ -228,9 +313,9 @@ startxref
               <Text style={styles.warningTitle}>IMPORTANT</Text>
             </View>
             <Text style={styles.warningText}>
-              If you lose this recovery key, there is NO way to recover your account.
-              For your privacy and security, we do not store or display this key again.
-              Please save it before continuing.
+              If you lose these recovery codes, there is NO way to recover your account.
+              For your privacy and security, we do not store or display these codes again.
+              Please save them before continuing.
             </Text>
           </View>
 
@@ -243,7 +328,7 @@ startxref
               {hasConfirmed && <Ionicons name="checkmark" size={16} color="#FFF" />}
             </View>
             <Text style={styles.checkboxText}>
-              I understand that if I lose this recovery key, my account cannot be recovered.
+              I understand that if I lose these recovery codes, my account cannot be recovered.
             </Text>
           </TouchableOpacity>
 
@@ -268,16 +353,23 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: '#FFF', marginBottom: 16 },
   desc: { fontSize: 15, color: Colors.dark.textSecondary, marginBottom: 8, lineHeight: 22 },
   desc2: { fontSize: 15, color: Colors.dark.textSecondary, marginBottom: 24, lineHeight: 22, fontWeight: '600' },
-  keyBox: {
-    backgroundColor: Colors.dark.input,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
+  keysGrid: {
+    gap: 10,
     marginBottom: 20,
   },
-  keyText: { color: Colors.primary, fontSize: 19, fontWeight: '700', letterSpacing: 1, textAlign: 'center' },
+  keyBadge: {
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  keyBadgeIndex: { color: Colors.dark.muted, fontSize: 14, fontWeight: '700', width: 24 },
+  keyBadgeText: { color: '#00E676', fontSize: 16, fontWeight: '800', letterSpacing: 1.5, flex: 1, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
   buttonRow: { flexDirection: 'row', gap: 8, marginBottom: 28 },
   actionBtn: {
     flex: 1,

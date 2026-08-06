@@ -40,6 +40,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       select: false,
     },
+    recoveryKeys: [
+      {
+        code: { type: String },
+        used: { type: Boolean, default: false },
+      }
+    ],
     displayName: {
       type: String,
       trim: true,

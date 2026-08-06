@@ -121,6 +121,7 @@ export default function SignupScreen({ navigation }) {
       }
 
       navigation.navigate('RecoveryKey', {
+        recoveryKeys: result.recoveryKeys,
         recoveryKey: result.recoveryKey,
         pendingUser: result.user,
         pendingToken: result.token,

@@ -129,7 +129,7 @@ const useAuthStore = create((set, get) => ({
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       set({ isLoading: false });
-      return { success: true, user: data.user, token: data.token, recoveryKey: data.recoveryKey };
+      return { success: true, user: data.user, token: data.token, recoveryKey: data.recoveryKey, recoveryKeys: data.recoveryKeys };
     } catch (err) {
       const message = err.response?.data?.message || 'Signup failed';
       set({ error: message, isLoading: false });
