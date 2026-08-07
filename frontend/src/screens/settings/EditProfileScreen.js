@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Platform, ActivityIndicator, Alert, Image, StatusBar,
+  ScrollView, Platform, ActivityIndicator, Image, StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,8 +10,10 @@ import * as ImagePicker from 'expo-image-picker';
 import useAuthStore from '../../store/useAuthStore';
 import { Colors } from '../../theme/colors';
 import { uploadApi } from '../../services/api';
+import { useAlert } from '../../components/CustomAlert';
 
 export default function EditProfileScreen({ navigation }) {
+  const { showAlert } = useAlert();
   const insets = useSafeAreaInsets();
   const { user, updateUser } = useAuthStore();
   const [form, setForm] = useState({
@@ -26,7 +28,7 @@ export default function EditProfileScreen({ navigation }) {
   const pickAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow photo library access.');
+      showAlert('Permission needed', 'Please allow photo library access.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -55,10 +57,10 @@ export default function EditProfileScreen({ navigation }) {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       updateUser(data.user);
-      Alert.alert('✅ Success', 'Profile updated!');
+      showAlert('Success', 'Profile updated!');
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Error', e.message || 'Update failed');
+      showAlert('Error', e.message || 'Update failed');
     } finally {
       setIsLoading(false);
     }

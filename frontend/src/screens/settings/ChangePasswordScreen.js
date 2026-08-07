@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert, StatusBar, Modal,
+  ScrollView, ActivityIndicator, StatusBar, Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,8 +12,10 @@ import { Platform } from 'react-native';
 import { Colors } from '../../theme/colors';
 import api from '../../services/api';
 import useAuthStore from '../../store/useAuthStore';
+import { useAlert } from '../../components/CustomAlert';
 
 export default function ChangePasswordScreen({ navigation }) {
+  const { showAlert } = useAlert();
   const insets = useSafeAreaInsets();
   const user = useAuthStore(state => state.user);
   
@@ -45,15 +47,15 @@ export default function ChangePasswordScreen({ navigation }) {
   const handleChangePassword = async () => {
     if (mode === 'remembered') {
       if (!form.currentPassword || !form.newPassword || !form.confirmPassword) {
-        Alert.alert('Error', 'All fields are required');
+        showAlert('Error', 'All fields are required');
         return;
       }
       if (form.newPassword !== form.confirmPassword) {
-        Alert.alert('Error', 'New passwords do not match');
+        showAlert('Error', 'New passwords do not match');
         return;
       }
       if (form.newPassword.length < 6) {
-        Alert.alert('Error', 'New password must be at least 6 characters');
+        showAlert('Error', 'New password must be at least 6 characters');
         return;
       }
 
@@ -63,32 +65,32 @@ export default function ChangePasswordScreen({ navigation }) {
           currentPassword: form.currentPassword,
           newPassword: form.newPassword,
         });
-        Alert.alert('Success', 'Password changed successfully!', [
+        showAlert('Success', 'Password changed successfully!', [
           { text: 'OK', onPress: () => navigation.goBack() }
         ]);
       } catch (e) {
-        Alert.alert('Error', e.response?.data?.message || e.message || 'Password change failed');
+        showAlert('Error', e.response?.data?.message || e.message || 'Password change failed');
       } finally {
         setIsLoading(false);
       }
     } else {
       // Forgot old password -> reset using recovery code
       if (!form.recoveryKey || !form.newPassword || !form.confirmPassword) {
-        Alert.alert('Error', 'Please enter your recovery key and new password fields');
+        showAlert('Error', 'Please enter your recovery key and new password fields');
         return;
       }
       if (form.newPassword !== form.confirmPassword) {
-        Alert.alert('Error', 'New passwords do not match');
+        showAlert('Error', 'New passwords do not match');
         return;
       }
       if (form.newPassword.length < 6) {
-        Alert.alert('Error', 'New password must be at least 6 characters');
+        showAlert('Error', 'New password must be at least 6 characters');
         return;
       }
 
       const identifier = user?.email || user?.username;
       if (!identifier) {
-        Alert.alert('Error', 'User identifier not found. Please log in again.');
+        showAlert('Error', 'User identifier not found. Please log in again.');
         return;
       }
 
@@ -113,11 +115,11 @@ export default function ChangePasswordScreen({ navigation }) {
           useAuthStore.getState().completeAuth(data.user, data.token);
         }
 
-        Alert.alert('Success', 'Password reset successfully using recovery key!', [
+        showAlert('Success', 'Password reset successfully using recovery key!', [
           { text: 'OK', onPress: () => navigation.goBack() }
         ]);
       } catch (e) {
-        Alert.alert('Error', e.response?.data?.message || e.message || 'Password reset failed');
+        showAlert('Error', e.response?.data?.message || e.message || 'Password reset failed');
       } finally {
         setIsLoading(false);
       }

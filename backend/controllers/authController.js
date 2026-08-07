@@ -274,7 +274,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
   // 2. Verify and consume the recovery code atomically
   const result = await verifyAndConsumeCode(recoveryKey, user);
   if (!result.valid) {
-    res.status(401);
+    res.status(400);
     throw new Error('Invalid or already used recovery code');
   }
 
@@ -369,7 +369,7 @@ const changePassword = asyncHandler(async (req, res) => {
   // 2. Verify current password
   const isMatch = await user.matchPassword(currentPassword);
   if (!isMatch) {
-    res.status(401);
+    res.status(400);
     throw new Error('Current password is incorrect');
   }
 
