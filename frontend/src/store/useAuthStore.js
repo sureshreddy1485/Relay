@@ -74,6 +74,24 @@ const useAuthStore = create((set, get) => ({
     await AsyncStorage.setItem('relay_saved_accounts', JSON.stringify(saved));
   },
 
+  removeSavedAccount: async (userId) => {
+    let currentSaved = get().savedAccounts;
+    if (!Array.isArray(currentSaved)) return;
+    let saved = currentSaved.filter(a => String(a?.user?._id) !== String(userId));
+    set({ savedAccounts: saved });
+    await AsyncStorage.setItem('relay_saved_accounts', JSON.stringify(saved));
+    
+    // Also remove from relay_saved_logins which is used by LoginScreen specifically
+    try {
+      let savedLoginsStr = await AsyncStorage.getItem('relay_saved_logins');
+      if (savedLoginsStr) {
+        let savedLogins = JSON.parse(savedLoginsStr);
+        savedLogins = savedLogins.filter(a => String(a?.userId) !== String(userId));
+        await AsyncStorage.setItem('relay_saved_logins', JSON.stringify(savedLogins));
+      }
+    } catch(e) {}
+  },
+
   switchAccount: async (targetUserId) => {
     const saved = get().savedAccounts;
     const target = saved.find(a => String(a?.user?._id) === String(targetUserId));
@@ -161,6 +179,21 @@ const useAuthStore = create((set, get) => ({
     } catch (err) {
       const message = err.response?.data?.message || 'Login failed';
       set({ error: message, isLoading: false });
+      
+      // If user was deleted or not found, remove from saved accounts automatically
+      if (err.response?.status === 404) {
+         try {
+           const savedLoginsStr = await AsyncStorage.getItem('relay_saved_logins');
+           if (savedLoginsStr) {
+             let savedLogins = JSON.parse(savedLoginsStr);
+             const matched = savedLogins.find(l => l.identifier === identifier);
+             if (matched) {
+               await get().removeSavedAccount(matched.userId);
+             }
+           }
+         } catch(e) {}
+      }
+
       return { success: false, message };
     }
   },

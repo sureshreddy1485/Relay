@@ -417,6 +417,8 @@ const deleteAccount = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const Message = require('../models/Message');
   const Story = require('../models/Story');
+  const PlayerGameStats = require('../models/PlayerGameStats');
+  const GameSession = require('../models/GameSession');
 
   // 1. Delete profile picture & cover photo from Cloudinary
   const userObj = await User.findById(userId);
@@ -504,6 +506,13 @@ const deleteAccount = asyncHandler(async (req, res) => {
 
   // 6. Delete the User profile document itself
   await User.findByIdAndDelete(userId);
+
+  // 7. Delete PlayerGameStats and remove from active GameSessions
+  await PlayerGameStats.findOneAndDelete({ userId });
+  await GameSession.updateMany(
+    { 'players.user': userId },
+    { $pull: { players: { user: userId } } }
+  );
 
   res.status(200).json({ success: true, message: 'Account and all related data permanently deleted' });
 });

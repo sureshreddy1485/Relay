@@ -301,7 +301,11 @@ export default function SettingsScreen({ navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
+              const currentUserId = user?._id;
               await api.delete('/users/profile/delete');
+              if (currentUserId) {
+                useAuthStore.getState().removeSavedAccount(currentUserId);
+              }
               disconnectSocket();
               await logout();
             } catch (e) {
