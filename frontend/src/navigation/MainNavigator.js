@@ -12,6 +12,7 @@ import MessageInfoScreen from '../screens/chat/MessageInfoScreen';
 import SharedMediaScreen from '../screens/chat/SharedMediaScreen';
 import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import ChangePasswordScreen from '../screens/settings/ChangePasswordScreen';
+import SecurityScreen from '../screens/settings/SecurityScreen';
 import HelpScreen from '../screens/settings/HelpScreen';
 import DeviceManagementScreen from '../screens/settings/DeviceManagementScreen';
 import ProfileScreen from '../screens/settings/ProfileScreen';
@@ -47,6 +48,7 @@ export default function MainNavigator() {
       <Stack.Screen name="MessageInfo" component={MessageInfoScreen} options={{ title: 'Message Info' }} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Security" component={SecurityScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Help" component={HelpScreen} options={{ headerShown: false }} />
       <Stack.Screen name="DeviceManagement" component={DeviceManagementScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />

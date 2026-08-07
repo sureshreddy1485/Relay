@@ -3,8 +3,8 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import api from './api';
-import messaging from '@react-native-firebase/messaging';
 import notifee from '@notifee/react-native';
+
 export async function registerForPushNotificationsAsync() {
   let token;
 
@@ -35,6 +35,14 @@ export async function registerForPushNotificationsAsync() {
       console.log('Failed to get push token for push notification!');
       return;
     }
+
+    // Request Firebase messaging permission — modular v22 API
+    try {
+      const { getMessaging, requestPermission } = require('@react-native-firebase/messaging');
+      await requestPermission(getMessaging());
+    } catch (e) {
+      console.log('Firebase permission request failed:', e.message);
+    }
     
     let expoPushToken = null;
     let fcmToken = null;
@@ -51,11 +59,10 @@ export async function registerForPushNotificationsAsync() {
       console.log('Error getting expo push token:', e.message || e);
     }
 
-    // 2. Try to get FCM Token
+    // 2. Try to get FCM Token — modular v22 API
     try {
-      if (messaging) {
-        fcmToken = await messaging().getToken();
-      }
+      const { getMessaging, getToken } = require('@react-native-firebase/messaging');
+      fcmToken = await getToken(getMessaging());
     } catch (fcmErr) {
       console.log('Failed to get FCM token:', fcmErr.message);
     }

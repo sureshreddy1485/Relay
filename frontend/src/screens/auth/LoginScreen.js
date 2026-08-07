@@ -64,23 +64,31 @@ export default function LoginScreen({ navigation }) {
     
     const result = await login(identifier.trim(), password);
     if (result.success) {
+      // NOTE: login() internally calls completeAuth which sets isAuthenticated=true.
+      // RootNavigator will unmount LoginScreen immediately after.
+      // Do NOT update state or call navigation after this point.
       const user = useAuthStore.getState().user;
-      let newAccounts = [...savedAccounts];
-      newAccounts = newAccounts.filter(a => a.identifier !== identifier.trim() && a.userId !== user._id);
-      
-      if (saveLogin) {
-        newAccounts.unshift({
-          userId: user._id,
-          identifier: identifier.trim(),
-          password,
-          name: user.displayName || user.username,
-          avatar: user.profilePicture
-        });
-        if (newAccounts.length > 3) newAccounts = newAccounts.slice(0, 3);
+      if (user?._id) {
+        try { connectSocket(user._id); } catch (_) {}
       }
-      await AsyncStorage.setItem('relay_saved_logins', JSON.stringify(newAccounts));
-      
-      if (user?._id) connectSocket(user._id);
+      // Save login credentials before unmount
+      try {
+        let newAccounts = [...savedAccounts];
+        newAccounts = newAccounts.filter(a => a.identifier !== identifier.trim() && a.userId !== user?._id);
+        if (saveLogin && user) {
+          newAccounts.unshift({
+            userId: user._id,
+            identifier: identifier.trim(),
+            password,
+            name: user.displayName || user.username,
+            avatar: user.profilePicture
+          });
+          if (newAccounts.length > 3) newAccounts = newAccounts.slice(0, 3);
+        }
+        await AsyncStorage.setItem('relay_saved_logins', JSON.stringify(newAccounts));
+      } catch (_) {}
+      // Component is now unmounting — return immediately, do not call navigation.
+      return;
     } else {
       shake();
     }

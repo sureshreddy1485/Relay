@@ -31,21 +31,44 @@ const userSchema = new mongoose.Schema(
       ],
       select: false,
     },
-    lastPasswordChange: { type: Date, default: Date.now },
-    securityKey: {
-      type: String,
-      select: false,
+
+    // ── New security system ────────────────────────────────────────────────────
+    // Exactly one active recovery-code set at a time.
+    // Only HMAC-SHA256 digests are stored — never plaintext.
+    recoveryCodesSet: {
+      codes: [
+        {
+          codeHash: { type: String },        // HMAC-SHA256(secret, normalizedCode)
+          usedAt:   { type: Date, default: null }, // null = available, Date = consumed
+        }
+      ],
+      generatedAt: { type: Date },           // when this set was created
     },
-    recoveryKey: {
-      type: String,
-      select: false,
-    },
+
+    // Rolling audit log of credential-change actions
+    securityActions: [
+      {
+        actionType: {
+          type: String,
+          enum: ['password_change', 'recovery_reset', 'code_regeneration'],
+        },
+        performedAt: { type: Date, default: Date.now },
+      }
+    ],
+
+    // ── Legacy fields (read-only — kept for backwards-compatible migration) ────
+    // Do NOT write to these from new code paths.
+    lastPasswordChange: { type: Date, select: false },
+    securityKey:        { type: String, select: false },
+    recoveryKey:        { type: String, select: false },
     recoveryKeys: [
       {
         code: { type: String },
         used: { type: Boolean, default: false },
       }
     ],
+    // ── End legacy ────────────────────────────────────────────────────────────
+
     displayName: {
       type: String,
       trim: true,
@@ -57,36 +80,28 @@ const userSchema = new mongoose.Schema(
       maxlength: [200, 'Bio cannot exceed 200 characters'],
       default: '',
     },
-    profilePicture: {
-      type: String,
-      default: '',
-    },
-    coverPhoto: {
-      type: String,
-      default: '',
-    },
-    isOnline: { type: Boolean, default: false },
-    lastSeen: { type: Date, default: Date.now },
+    profilePicture: { type: String, default: '' },
+    coverPhoto:     { type: String, default: '' },
+    isOnline:       { type: Boolean, default: false },
+    lastSeen:       { type: Date, default: Date.now },
     isCameraActive: { type: Boolean, default: false },
-    pushToken: { type: String, default: '' },
-    fcmToken: { type: String, default: '' },
-    friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    pushToken:      { type: String, default: '' },
+    fcmToken:       { type: String, default: '' },
+    friends:        [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     friendRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    sentRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    pinnedChats: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
-    archivedChats: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
-    mutedChats: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
-    savedMessages: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Message' }],
-    // Multi-device support
+    sentRequests:   [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    blockedUsers:   [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    pinnedChats:    [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
+    archivedChats:  [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
+    mutedChats:     [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
+    savedMessages:  [{ type: mongoose.Schema.Types.ObjectId, ref: 'Message' }],
     devices: [
       {
-        deviceId: String,
+        deviceId:   String,
         deviceName: String,
         lastActive: Date,
       },
     ],
-    // Privacy settings
     privacy: {
       lastSeenVisibility: {
         type: String,
@@ -108,15 +123,15 @@ const userSchema = new mongoose.Schema(
         enum: ['automatic', 'hide'],
         default: 'automatic',
       },
-      allowDMFromGroups: { type: Boolean, default: true },
+      allowDMFromGroups:        { type: Boolean, default: true },
       autoAcceptFriendRequests: { type: Boolean, default: false },
-      allowedDMGroups: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
-      disallowedDMGroups: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
+      allowedDMGroups:          [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
+      disallowedDMGroups:       [{ type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }],
     },
-    theme: { type: String, enum: ['dark', 'light', 'system'], default: 'system' },
+    theme:      { type: String, enum: ['dark', 'light', 'system'], default: 'system' },
     isVerified: { type: Boolean, default: false },
-    isAnonymous: { type: Boolean, default: false },
-    role: { type: String, enum: ['user', 'system_bot', 'admin'], default: 'user' },
+    isAnonymous:{ type: Boolean, default: false },
+    role:       { type: String, enum: ['user', 'system_bot', 'admin'], default: 'user' },
   },
   { timestamps: true }
 );

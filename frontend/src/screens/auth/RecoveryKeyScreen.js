@@ -13,22 +13,11 @@ import useAuthStore from '../../store/useAuthStore';
 export default function RecoveryKeyScreen({ navigation, route }) {
   const { recoveryKeys: initialKeys, recoveryKey: initialKey, isMigration, password, pendingUser, pendingToken } = route.params || {};
 
-  // Always generate/fill 9 codes if backend returned fewer or single key
+  // Server always provides exactly 9 codes — use them directly
   const parseKeys = (keysArr, singleKey) => {
-    let list = [];
-    if (Array.isArray(keysArr) && keysArr.length > 0) {
-      list = [...keysArr];
-    } else if (typeof singleKey === 'string' && singleKey.length > 0) {
-      list = [singleKey];
-    }
-
-    // Fill up to 9 codes if needed so user ALWAYS gets 9 codes
-    while (list.length < 9) {
-      const r1 = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const r2 = Math.random().toString(36).substring(2, 6).toUpperCase();
-      list.push(`RELAY-${r1}-${r2}`);
-    }
-    return list.slice(0, 9);
+    if (Array.isArray(keysArr) && keysArr.length > 0) return keysArr.slice(0, 9);
+    if (typeof singleKey === 'string' && singleKey.length > 0) return [singleKey];
+    return [];
   };
 
   const [keys, setKeys] = useState(parseKeys(initialKeys, initialKey));
@@ -250,10 +239,18 @@ Relay Messaging App • End-to-End Account Protection
       `;
 
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
+      const targetPdfUri = `${FileSystem.documentDirectory}relay_recovery_codes.pdf`;
+
+      try {
+        await FileSystem.deleteAsync(targetPdfUri, { idempotent: true });
+      } catch (_) {}
+
+      await FileSystem.copyAsync({ from: uri, to: targetPdfUri });
+
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { dialogTitle: 'Save Recovery Codes (.pdf)', mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
+        await Sharing.shareAsync(targetPdfUri, { dialogTitle: 'Save Recovery Codes (.pdf)', mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
       } else {
-        showAlert('Success', `Saved PDF to:\n${uri}`);
+        showAlert('Success', `Saved PDF to:\n${targetPdfUri}`);
       }
     } catch (err) {
       console.error('Save PDF error:', err);
@@ -262,32 +259,21 @@ Relay Messaging App • End-to-End Account Protection
   };
 
   const handleContinue = async () => {
-    try {
-      setLoading(true);
-      if (pendingUser && pendingToken) {
-        const { completeAuth } = useAuthStore.getState();
-        await completeAuth(pendingUser, pendingToken);
-        try {
-          const { connectSocket } = require('../../services/socketService');
-          connectSocket(pendingUser._id);
-        } catch (_) {}
-      }
-
-      // Exit screen cleanly
-      if (navigation?.canGoBack && navigation.canGoBack()) {
-        navigation.goBack();
-      } else if (navigation?.navigate) {
-        navigation.navigate('Tabs');
-      }
-    } catch (err) {
-      console.error('handleContinue error:', err);
-      if (navigation?.canGoBack && navigation.canGoBack()) {
-        navigation.goBack();
-      } else if (navigation?.navigate) {
-        navigation.navigate('Tabs');
-      }
-    } finally {
-      setLoading(false);
+    // completeAuth sets isAuthenticated=true in Zustand → RootNavigator swaps
+    // AuthNavigator for MainNavigator, unmounting this screen automatically.
+    // Do NOT touch navigation or component state after completeAuth returns.
+    if (pendingUser && pendingToken) {
+      try {
+        const { connectSocket } = require('../../services/socketService');
+        connectSocket(pendingUser._id);
+      } catch (_) {}
+      await useAuthStore.getState().completeAuth(pendingUser, pendingToken);
+      // Component is now unmounted — return immediately.
+      return;
+    }
+    // If no pending credentials (e.g., opened from Settings), just go back.
+    if (navigation?.canGoBack && navigation.canGoBack()) {
+      navigation.goBack();
     }
   };
 

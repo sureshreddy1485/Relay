@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
@@ -17,6 +17,13 @@ export default function ChangePasswordScreen({ navigation }) {
   // Mode selection: null (show prompt modal), 'remembered' (normal pass change), 'forgot' (recovery code reset)
   const [mode, setMode] = useState('remembered');
   const [promptModalVisible, setPromptModalVisible] = useState(true);
+  const [securityStatus, setSecurityStatus] = useState(null);
+
+  useEffect(() => {
+    api.get('/auth/security-status')
+      .then(({ data }) => setSecurityStatus(data))
+      .catch(() => {});
+  }, []);
 
   // Form states
   const [form, setForm] = useState({
@@ -162,40 +169,45 @@ export default function ChangePasswordScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* Header */}
+      {/* Only show the form after user has made their choice */}
+      {!promptModalVisible && (
+        <>
+          {/* Header */}
       <View style={[styles.header, { paddingTop: (insets.top || StatusBar.currentHeight || 0) + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ padding: 4 }}>
           <Ionicons name="arrow-back" size={24} color={Colors.dark.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Change Password</Text>
+        <Text style={styles.headerTitle}>
+          {mode === 'remembered' ? 'Change Password' : 'Reset with Recovery Key'}
+        </Text>
         <View style={{ width: 36 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets showsVerticalScrollIndicator={false}>
-        
-        {/* Mode Selector Segmented Tabs */}
-        <View style={styles.segmentContainer}>
-          <TouchableOpacity
-            style={[styles.segmentBtn, mode === 'remembered' && styles.segmentBtnActive]}
-            onPress={() => setMode('remembered')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="lock-closed-outline" size={16} color={mode === 'remembered' ? '#FFF' : Colors.dark.muted} />
-            <Text style={[styles.segmentText, mode === 'remembered' && styles.segmentTextActive]}>I Remember</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.segmentBtn, mode === 'forgot' && styles.segmentBtnActive]}
-            onPress={() => setMode('forgot')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="shield-outline" size={16} color={mode === 'forgot' ? '#FFF' : Colors.dark.muted} />
-            <Text style={[styles.segmentText, mode === 'forgot' && styles.segmentTextActive]}>I Forgot Old Pass</Text>
-          </TouchableOpacity>
-        </View>
 
         {mode === 'remembered' ? (
           <>
+            {/* Security actions remaining banner */}
+            {securityStatus && (
+              <View style={[
+                styles.infoBox,
+                securityStatus.securityActionsRemaining === 0
+                  ? { backgroundColor: '#EF444415', borderColor: '#EF444430' }
+                  : { backgroundColor: '#10B98115', borderColor: '#10B98130' }
+              ]}>
+                <Ionicons
+                  name={securityStatus.securityActionsRemaining === 0 ? 'ban-outline' : 'shield-checkmark-outline'}
+                  size={20}
+                  color={securityStatus.securityActionsRemaining === 0 ? '#EF4444' : '#10B981'}
+                />
+                <Text style={[styles.infoText, { color: securityStatus.securityActionsRemaining === 0 ? '#EF4444' : Colors.dark.text }]}>
+                  {securityStatus.securityActionsRemaining === 0
+                    ? "You've reached your security-change limit. Please try again after the 30-day window resets."
+                    : `Security changes remaining: ${securityStatus.securityActionsRemaining} of ${securityStatus.securityActionsLimit}`}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.infoBox}>
               <Ionicons name="information-circle-outline" size={20} color={Colors.primary} />
               <Text style={styles.infoText}>Enter your current password to update your password.</Text>
@@ -301,7 +313,9 @@ export default function ChangePasswordScreen({ navigation }) {
           </LinearGradient>
         </TouchableOpacity>
 
-      </ScrollView>
+          </ScrollView>
+        </>
+      )}
     </View>
   );
 }
@@ -316,36 +330,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.dark.text },
   scroll: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 },
-  segmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.dark.card,
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  segmentBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    gap: 6,
-  },
-  segmentBtnActive: {
-    backgroundColor: Colors.primary,
-  },
-  segmentText: {
-    color: Colors.dark.muted,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  segmentTextActive: {
-    color: '#FFF',
-    fontWeight: '700',
-  },
   infoBox: {
     flexDirection: 'row', gap: 10, backgroundColor: Colors.primary + '15',
     borderRadius: 14, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: Colors.primary + '30',

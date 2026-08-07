@@ -1,13 +1,12 @@
 import 'react-native-gesture-handler';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { StatusBar, LogBox, View, Animated, StyleSheet, Image, Text, Alert, AppState, Modal, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import notifee, { EventType } from '@notifee/react-native';
 import messaging from '@react-native-firebase/messaging';
-// RootNavigator dynamically imported later to allow Colors override
-// import RootNavigator from './src/navigation/RootNavigator';
+import RootNavigator from './src/navigation/RootNavigator';
 import useAuthStore from './src/store/useAuthStore';
 import { connectSocket } from './src/services/socketService';
 
@@ -64,8 +63,10 @@ export default function App() {
     }
   }, [themeLoaded]);
 
+  const pushRegistered = useRef(false);
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && !pushRegistered.current) {
+      pushRegistered.current = true;
       const { registerForPushNotificationsAsync } = require('./src/services/pushNotifications');
       registerForPushNotificationsAsync();
     }
@@ -241,13 +242,11 @@ export default function App() {
     };
   }, []);
 
-  const RootNavigator = themeLoaded ? require('./src/navigation/RootNavigator').default : null;
-
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#04070B' }}>
       <StatusBar barStyle="light-content" backgroundColor="#04070B" />
       <AlertProvider>
-        {themeLoaded && RootNavigator && <RootNavigator />}
+        {themeLoaded && <RootNavigator />}
       </AlertProvider>
 
       {/* Splash Animation Overlay */}
