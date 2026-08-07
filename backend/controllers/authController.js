@@ -256,7 +256,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
   // Select all fields needed for verification + consumption
   const user = await User.findOne(query).select(
-    '+recoveryKey +recoveryKeys +recoveryCodesSet +securityActions'
+    '+password +recoveryKey +recoveryKeys +recoveryCodesSet +securityActions'
   );
   if (!user) {
     res.status(404);
@@ -279,6 +279,11 @@ const forgotPassword = asyncHandler(async (req, res) => {
   }
 
   // 3. Update password
+  const isSamePassword = await user.matchPassword(newPassword);
+  if (isSamePassword) {
+    res.status(400);
+    throw new Error('New password must be different from your current password');
+  }
   user.password = newPassword;
 
   // 4. Record the security action
@@ -344,6 +349,11 @@ const changePassword = asyncHandler(async (req, res) => {
   if (!currentPassword || !newPassword) {
     res.status(400);
     throw new Error('Please provide all required fields');
+  }
+
+  if (currentPassword === newPassword) {
+    res.status(400);
+    throw new Error('New password must be different from your current password');
   }
 
   const user = await User.findById(req.user._id).select('+password +securityActions');

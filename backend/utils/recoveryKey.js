@@ -100,6 +100,7 @@ const verifyAndConsumeCode = async (inputCode, user) => {
       if (entry.usedAt) continue;           // already consumed
       if (entry.codeHash === digest) {       // constant-time-equivalent via HMAC
         user.recoveryCodesSet.codes[i].usedAt = new Date();
+        user.markModified('recoveryCodesSet.codes');
         return { valid: true, keyIndex: i };
       }
     }
@@ -114,6 +115,7 @@ const verifyAndConsumeCode = async (inputCode, user) => {
       const isMatch = await bcrypt.compare(normalized, item.code);
       if (isMatch) {
         user.recoveryKeys[i].used = true;
+        user.markModified('recoveryKeys');
         return { valid: true, keyIndex: i, isLegacy: true };
       }
     }
