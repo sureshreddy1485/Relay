@@ -7,8 +7,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as Device from 'expo-device';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../../theme/colors';
 import api from '../../services/api';
+import useAuthStore from '../../store/useAuthStore';
 
 const STEPS = ['identify', 'verify', 'reset', 'success'];
 
@@ -23,6 +26,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   const [showPass, setShowPass] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [sessionData, setSessionData] = useState(null);
 
   const handleReset = async () => {
     setError('');
@@ -33,11 +37,24 @@ export default function ForgotPasswordScreen({ navigation }) {
 
     setIsLoading(true);
     try {
-      await api.post('/auth/forgot-password', {
+      const deviceName = Device.isDevice ? `${Device.osName} ${Device.modelName}` : `${Platform.OS} Simulator`;
+      let deviceId = await AsyncStorage.getItem('relay_device_id');
+      if (!deviceId) {
+        deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2);
+        await AsyncStorage.setItem('relay_device_id', deviceId);
+      }
+
+      const { data } = await api.post('/auth/forgot-password', {
         identifier: identifier.trim(),
         recoveryKey: recoveryKey.trim(),
         newPassword,
+        deviceId,
+        deviceName
       });
+      
+      if (data.token && data.user) {
+        setSessionData({ token: data.token, user: data.user });
+      }
       setStep(3);
     } catch (err) {
       setError(err.response?.data?.message || 'Reset failed. Check your recovery key.');
@@ -55,10 +72,16 @@ export default function ForgotPasswordScreen({ navigation }) {
             <Ionicons name="checkmark" size={48} color="#FFF" />
           </LinearGradient>
           <Text style={styles.successTitle}>Password Reset!</Text>
-          <Text style={styles.successText}>Your password has been successfully changed. You can now sign in.</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <Text style={styles.successText}>Your password has been successfully changed.</Text>
+          <TouchableOpacity onPress={() => {
+            if (sessionData) {
+              useAuthStore.getState().completeAuth(sessionData.user, sessionData.token);
+            } else {
+              navigation.navigate('Login');
+            }
+          }}>
             <LinearGradient colors={[Colors.primary, Colors.primaryDark]} style={styles.successBtn}>
-              <Text style={styles.successBtnText}>Sign In Now</Text>
+              <Text style={styles.successBtnText}>{sessionData ? 'Continue to Relay' : 'Go to Login'}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>

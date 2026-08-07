@@ -284,12 +284,54 @@ const forgotPassword = asyncHandler(async (req, res) => {
   // 4. Record the security action
   user.securityActions.push({ actionType: 'recovery_reset', performedAt: new Date() });
 
-  // 5. Clear all devices (password was unknown — force re-login everywhere)
-  user.devices = [];
+  // 5. Manage sessions: clear other devices but issue a new one for this request
+  const sessionId = req.body.deviceId || crypto.randomBytes(16).toString('hex');
+  const deviceName = req.body.deviceName || 'Unknown Device';
+  
+  user.devices = [{ deviceId: sessionId, deviceName, lastActive: Date.now() }];
 
   await user.save();
 
-  res.status(200).json({ success: true, message: 'Password reset successfully' });
+  // Send security notification since password was reset
+  let relayId = getRelayBotId();
+  if (relayId) {
+    try {
+      let chat = await Chat.findOne({
+        isGroupChat: false,
+        $and: [
+          { users: { $elemMatch: { $eq: user._id } } },
+          { users: { $elemMatch: { $eq: relayId } } },
+        ],
+      });
+      if (!chat) {
+        chat = await Chat.create({
+          chatName: 'Relay Security',
+          isGroupChat: false,
+          users: [user._id, relayId],
+          disappearAfter: 86400,
+        });
+      }
+      const io = req.app.get('io');
+      const msgContent = `🔒 **Security Alert: Password Reset**\n\nYour account password was just reset using a recovery code.\n\n📱 **Device:** ${deviceName}\n\n⚠️ If you did not perform this action, your account may be compromised.`;
+      await BotManager.sendCustomMessage(chat, io, relayId, msgContent, 'text');
+    } catch (err) {}
+  }
+
+  res.status(200).json({ 
+    success: true, 
+    message: 'Password reset successfully',
+    token: generateToken(user._id, sessionId),
+    user: {
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      displayName: user.displayName,
+      profilePicture: user.profilePicture,
+      bio: user.bio,
+      isOnline: true,
+      theme: user.theme,
+    },
+  });
 });
 
 // ─── Change Password (authenticated) ─────────────────────────────────────────

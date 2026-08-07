@@ -6,6 +6,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as Device from 'expo-device';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { Colors } from '../../theme/colors';
 import api from '../../services/api';
 import useAuthStore from '../../store/useAuthStore';
@@ -91,11 +94,25 @@ export default function ChangePasswordScreen({ navigation }) {
 
       setIsLoading(true);
       try {
-        await api.post('/auth/forgot-password', {
+        const deviceName = Device.isDevice ? `${Device.osName} ${Device.modelName}` : `${Platform.OS} Simulator`;
+        let deviceId = await AsyncStorage.getItem('relay_device_id');
+        if (!deviceId) {
+          deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2);
+          await AsyncStorage.setItem('relay_device_id', deviceId);
+        }
+
+        const { data } = await api.post('/auth/forgot-password', {
           identifier,
           recoveryKey: form.recoveryKey.trim(),
           newPassword: form.newPassword,
+          deviceId,
+          deviceName
         });
+        
+        if (data.token && data.user) {
+          useAuthStore.getState().completeAuth(data.user, data.token);
+        }
+
         Alert.alert('Success', 'Password reset successfully using recovery key!', [
           { text: 'OK', onPress: () => navigation.goBack() }
         ]);
