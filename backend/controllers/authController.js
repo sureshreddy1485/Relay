@@ -66,7 +66,7 @@ const signup = asyncHandler(async (req, res) => {
   // Generate exactly 9 recovery codes — only hashes are stored
   const { plain: plainCodes, hashed: hashedCodes } = generateRecoverySet();
 
-  const sessionId = crypto.randomBytes(16).toString('hex');
+  const sessionId = req.body.deviceId || crypto.randomBytes(16).toString('hex');
   const deviceName = req.body.deviceName || 'Unknown Device';
   let profilePicture = req.body.profilePicture || '';
   if (req.file) {
@@ -187,6 +187,7 @@ const login = asyncHandler(async (req, res) => {
     user.devices.push({ deviceId: sessionId, deviceName, lastActive: Date.now() });
   }
 
+  user.markModified('devices');
   await user.save({ validateBeforeSave: false });
 
   // Security notification from Relay Bot

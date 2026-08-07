@@ -106,10 +106,17 @@ const useAuthStore = create((set, get) => ({
   },
 
   completeAuth: async (user, token) => {
+    // 1. Set auth header immediately so concurrent API calls have it.
+    setAuthHeader(token);
+
+    // 2. Persist to AsyncStorage FIRST to guarantee hydrate() works.
     await AsyncStorage.setItem('relay_token', token);
     await AsyncStorage.setItem('relay_user', JSON.stringify(user));
-    setAuthHeader(token);
+
+    // 3. Now set in-memory state. RootNavigator subscribes to this.
     set({ user, token, isAuthenticated: true, pendingRecoveryKey: null, migrationPassword: null });
+
+    // 4. Save to multi-account store (non-critical).
     await get()._saveAccountToStore(user, token);
   },
 
