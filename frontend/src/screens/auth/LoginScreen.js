@@ -134,13 +134,29 @@ export default function LoginScreen({ navigation }) {
                 {savedAccounts.map((acc, idx) => (
                   <TouchableOpacity 
                     key={idx} 
-                    style={{ alignItems: 'center', backgroundColor: Colors.dark.card, padding: 12, borderRadius: 16, width: 90, borderWidth: 1, borderColor: identifier === acc.identifier ? Colors.primary : Colors.dark.border }}
+                    style={{ alignItems: 'center', backgroundColor: Colors.dark.card, padding: 12, borderRadius: 16, width: 90, borderWidth: 1, borderColor: identifier === acc.identifier ? Colors.primary : Colors.dark.border, position: 'relative' }}
                     onPress={() => {
                       setIdentifier(acc.identifier);
                       setPassword(acc.password);
                       setSaveLogin(true);
                     }}
                   >
+                    <TouchableOpacity
+                      style={{ position: 'absolute', top: 4, right: 4, zIndex: 10, padding: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10 }}
+                      onPress={async (e) => {
+                        e.stopPropagation();
+                        const newAccounts = savedAccounts.filter((_, i) => i !== idx);
+                        setSavedAccounts(newAccounts);
+                        await AsyncStorage.setItem('relay_saved_logins', JSON.stringify(newAccounts));
+                        if (identifier === acc.identifier) {
+                          setIdentifier('');
+                          setPassword('');
+                          setSaveLogin(false);
+                        }
+                      }}
+                    >
+                      <Ionicons name="close" size={14} color="#FFF" />
+                    </TouchableOpacity>
                     {acc.avatar ? (
                       <Image source={{ uri: acc.avatar }} style={{ width: 44, height: 44, borderRadius: 22, marginBottom: 8 }} />
                     ) : (

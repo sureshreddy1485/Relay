@@ -265,7 +265,7 @@ Relay Messaging App • End-to-End Account Protection
     if (!isAuthenticated && continuing) {
       setContinuing(false);
     }
-  }, [isAuthenticated, continuing]);
+  }, [isAuthenticated]); // Do NOT add 'continuing' to deps, otherwise it immediately resets on click
 
   const handleContinue = async () => {
     if (continuing) return;
