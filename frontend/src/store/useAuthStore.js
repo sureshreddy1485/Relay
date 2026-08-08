@@ -211,7 +211,7 @@ const useAuthStore = create((set, get) => ({
 
   logout: async () => {
     try {
-      await api.post('/auth/logout');
+      await api.post('/auth/logout', {}, { ignore401: true });
     } catch (_) {}
     await AsyncStorage.removeItem('relay_token');
     await AsyncStorage.removeItem('relay_user');

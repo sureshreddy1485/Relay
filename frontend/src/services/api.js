@@ -26,6 +26,7 @@ export const markAuthCooldown = () => {
 };
 
 // Shared error handler
+let _isLoggingOut = false;
 const handleError = (error) => {
   const message =
     error.response?.data?.message ||
@@ -34,13 +35,15 @@ const handleError = (error) => {
   error.message = message;
 
   if (error.response?.status === 401 && !error.config?.ignore401) {
-    if (error.config && error.config.url !== '/auth/login' && error.config.url !== '/auth/signup') {
+    const url = error.config?.url || '';
+    if (error.config && url !== '/auth/login' && url !== '/auth/signup' && url !== '/auth/logout') {
       // Skip auto-logout during the post-auth cooldown window
       if (Date.now() < _authCooldownUntil) {
         console.log('401 interceptor: skipping logout (auth cooldown active)');
-      } else {
+      } else if (!_isLoggingOut) {
+        _isLoggingOut = true;
         const useAuthStore = require('../store/useAuthStore').default;
-        useAuthStore.getState().logout();
+        useAuthStore.getState().logout().finally(() => { _isLoggingOut = false; });
       }
     }
   }
