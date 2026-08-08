@@ -261,11 +261,7 @@ Relay Messaging App • End-to-End Account Protection
   const [continuing, setContinuing] = useState(false);
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
 
-  useEffect(() => {
-    if (!isAuthenticated && continuing) {
-      setContinuing(false);
-    }
-  }, [isAuthenticated]); // Do NOT add 'continuing' to deps, otherwise it immediately resets on click
+  // Removed the isAuthenticated useEffect to prevent any possibility of it resetting the button state
 
   const handleContinue = async () => {
     if (continuing) return;
