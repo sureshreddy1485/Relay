@@ -127,16 +127,25 @@ const useAuthStore = create((set, get) => ({
     // 1. Set auth header immediately so concurrent API calls have it.
     setAuthHeader(token);
 
-    // 2. Persist to AsyncStorage FIRST to guarantee hydrate() works.
+    // 2. Verify the session with the server *before* trusting it locally.
+    // This removes the race condition where MainNavigator mounts and fires
+    // API calls before the server has fully replicated/registered the session.
+    try {
+      await api.get('/auth/me');
+    } catch (err) {
+      // If the verification fails, undo the header and throw so the caller can handle it.
+      setAuthHeader(null);
+      throw new Error('Failed to verify session with server. Please try again.');
+    }
+
+    // 3. Persist to AsyncStorage FIRST to guarantee hydrate() works.
     await AsyncStorage.setItem('relay_token', token);
     await AsyncStorage.setItem('relay_user', JSON.stringify(user));
 
-    // 3. Activate cooldown so the 401 interceptor doesn't auto-logout
-    //    when screens mount after the navigator swap and fire API calls
-    //    before the server fully registers the new session.
+    // 4. Activate cooldown so the 401 interceptor doesn't auto-logout
     markAuthCooldown();
 
-    // 4. Now set in-memory state. RootNavigator subscribes to this.
+    // 5. Now set in-memory state. RootNavigator subscribes to this.
     set({ user, token, isAuthenticated: true, pendingRecoveryKey: null, migrationPassword: null });
 
     // 5. Save to multi-account store (non-critical, fire-and-forget).

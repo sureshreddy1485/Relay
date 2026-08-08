@@ -259,6 +259,13 @@ Relay Messaging App • End-to-End Account Protection
   };
 
   const [continuing, setContinuing] = useState(false);
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated);
+
+  useEffect(() => {
+    if (!isAuthenticated && continuing) {
+      setContinuing(false);
+    }
+  }, [isAuthenticated, continuing]);
 
   const handleContinue = async () => {
     if (continuing) return;
