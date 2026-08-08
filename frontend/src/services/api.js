@@ -17,6 +17,14 @@ export const uploadApi = axios.create({
   },
 });
 
+// Brief cooldown after fresh auth to prevent 401 interceptor from racing
+// against screens that mount and fire API calls before the server fully
+// registers the new session.
+let _authCooldownUntil = 0;
+export const markAuthCooldown = () => {
+  _authCooldownUntil = Date.now() + 5000; // 5-second grace window
+};
+
 // Shared error handler
 const handleError = (error) => {
   const message =
@@ -27,8 +35,13 @@ const handleError = (error) => {
 
   if (error.response?.status === 401 && !error.config?.ignore401) {
     if (error.config && error.config.url !== '/auth/login' && error.config.url !== '/auth/signup') {
-      const useAuthStore = require('../store/useAuthStore').default;
-      useAuthStore.getState().logout();
+      // Skip auto-logout during the post-auth cooldown window
+      if (Date.now() < _authCooldownUntil) {
+        console.log('401 interceptor: skipping logout (auth cooldown active)');
+      } else {
+        const useAuthStore = require('../store/useAuthStore').default;
+        useAuthStore.getState().logout();
+      }
     }
   }
 
@@ -50,3 +63,4 @@ export const setAuthHeader = (token) => {
 };
 
 export default api;
+

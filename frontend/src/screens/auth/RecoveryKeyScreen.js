@@ -243,7 +243,7 @@ Relay Messaging App • End-to-End Account Protection
 
       try {
         await FileSystem.deleteAsync(targetPdfUri, { idempotent: true });
-      } catch (_) {}
+      } catch (_) { }
 
       await FileSystem.copyAsync({ from: uri, to: targetPdfUri });
 
@@ -258,17 +258,24 @@ Relay Messaging App • End-to-End Account Protection
     }
   };
 
+  const [continuing, setContinuing] = useState(false);
+
   const handleContinue = async () => {
+    if (continuing) return;
     // completeAuth sets isAuthenticated=true in Zustand → RootNavigator swaps
     // AuthNavigator for MainNavigator, unmounting this screen automatically.
-    // Do NOT touch navigation or component state after completeAuth returns.
+    // App.js handles connectSocket reactively when isAuthenticated becomes true.
     if (pendingUser && pendingToken) {
+      setContinuing(true);
       try {
-        const { connectSocket } = require('../../services/socketService');
-        connectSocket(pendingUser._id);
-      } catch (_) {}
-      await useAuthStore.getState().completeAuth(pendingUser, pendingToken);
-      // Component is now unmounted — return immediately.
+        await useAuthStore.getState().completeAuth(pendingUser, pendingToken);
+        // Component is now unmounted — return immediately.
+        return;
+      } catch (err) {
+        setContinuing(false);
+        console.error('completeAuth failed:', err);
+        showAlert('Error', err?.message || 'Failed to complete sign-up. Please try again.');
+      }
       return;
     }
     // If no pending credentials (e.g., opened from Settings), just go back.
@@ -332,8 +339,8 @@ Relay Messaging App • End-to-End Account Protection
             </Text>
           </View>
 
-          <TouchableOpacity 
-            style={styles.checkboxRow} 
+          <TouchableOpacity
+            style={styles.checkboxRow}
             activeOpacity={0.8}
             onPress={() => setHasConfirmed(!hasConfirmed)}
           >
@@ -345,12 +352,14 @@ Relay Messaging App • End-to-End Account Protection
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.continueBtn, !hasConfirmed && styles.continueBtnDisabled]}
-            disabled={!hasConfirmed}
+          <TouchableOpacity
+            style={[styles.continueBtn, (!hasConfirmed || continuing) && styles.continueBtnDisabled]}
+            disabled={!hasConfirmed || continuing}
             onPress={handleContinue}
           >
-            <Text style={styles.continueBtnText}>Continue</Text>
+            {continuing
+              ? <ActivityIndicator size="small" color="#FFF" />
+              : <Text style={styles.continueBtnText}>Continue</Text>}
           </TouchableOpacity>
         </ScrollView>
       )}

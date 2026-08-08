@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
-import api, { uploadApi, setAuthHeader } from '../services/api';
+import api, { uploadApi, setAuthHeader, markAuthCooldown } from '../services/api';
 
 const useAuthStore = create((set, get) => ({
   user: null,
@@ -131,11 +131,20 @@ const useAuthStore = create((set, get) => ({
     await AsyncStorage.setItem('relay_token', token);
     await AsyncStorage.setItem('relay_user', JSON.stringify(user));
 
-    // 3. Now set in-memory state. RootNavigator subscribes to this.
+    // 3. Activate cooldown so the 401 interceptor doesn't auto-logout
+    //    when screens mount after the navigator swap and fire API calls
+    //    before the server fully registers the new session.
+    markAuthCooldown();
+
+    // 4. Now set in-memory state. RootNavigator subscribes to this.
     set({ user, token, isAuthenticated: true, pendingRecoveryKey: null, migrationPassword: null });
 
-    // 4. Save to multi-account store (non-critical).
-    await get()._saveAccountToStore(user, token);
+    // 5. Save to multi-account store (non-critical, fire-and-forget).
+    try {
+      await get()._saveAccountToStore(user, token);
+    } catch (e) {
+      console.log('Non-critical: failed to save account to multi-account store:', e);
+    }
   },
 
   signup: async (formData) => {
