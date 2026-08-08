@@ -9,18 +9,7 @@ import useAuthStore from '../store/useAuthStore';
 export const navigationRef = createNavigationContainerRef();
 
 export default function RootNavigator() {
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    () => useAuthStore.getState().isAuthenticated
-  );
-
-  useEffect(() => {
-    const unsub = useAuthStore.subscribe((state) => {
-      setIsAuthenticated(state.isAuthenticated);
-    });
-    // Catch any changes that occurred between initialization and effect
-    setIsAuthenticated(useAuthStore.getState().isAuthenticated);
-    return unsub;
-  }, []);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return (
     <NavigationContainer theme={DarkTheme} ref={navigationRef}>
