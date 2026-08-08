@@ -25,9 +25,11 @@ export const markAuthCooldown = () => {
   _authCooldownUntil = Date.now() + 5000; // 5-second grace window
 };
 
-// Shared error handler
+// Shared error handler with retry-before-logout for 401s.
+// A single transient 401 (server lag, replication delay) should NOT nuke the session.
+// We retry once; only if the retry also fails do we treat it as a real auth failure.
 let _isLoggingOut = false;
-const handleError = (error) => {
+const handleError = async (error) => {
   const message =
     error.response?.data?.message ||
     error.message ||
@@ -40,7 +42,22 @@ const handleError = (error) => {
       // Skip auto-logout during the post-auth cooldown window
       if (Date.now() < _authCooldownUntil) {
         console.log('401 interceptor: skipping logout (auth cooldown active)');
+      } else if (!error.config._retried) {
+        // Retry the request once before giving up
+        error.config._retried = true;
+        try {
+          return await api(error.config);
+        } catch (retryErr) {
+          // Retry also failed — fall through to logout
+          if (retryErr.response?.status === 401 && !_isLoggingOut) {
+            _isLoggingOut = true;
+            const useAuthStore = require('../store/useAuthStore').default;
+            useAuthStore.getState().logout().finally(() => { _isLoggingOut = false; });
+          }
+          return Promise.reject(retryErr);
+        }
       } else if (!_isLoggingOut) {
+        // This is already a retried request that failed again
         _isLoggingOut = true;
         const useAuthStore = require('../store/useAuthStore').default;
         useAuthStore.getState().logout().finally(() => { _isLoggingOut = false; });
